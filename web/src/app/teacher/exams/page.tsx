@@ -3,6 +3,7 @@ import { useState } from "react";
 
 export default function TeacherExams() {
     const [activeTab, setActiveTab] = useState<"create" | "bank" | "results">("create");
+    const [correctAnswer, setCorrectAnswer] = useState<string>("");
 
     return (
         <div className="page-wrapper">
@@ -64,9 +65,26 @@ export default function TeacherExams() {
                         <label>Correct Answer</label>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                             {["A", "B", "C", "D"].map(o => (
-                                <button key={o} className="btn btn-outline" style={{ width: 48 }}>{o}</button>
+                                <button
+                                    key={o}
+                                    onClick={() => setCorrectAnswer(o)}
+                                    className={`btn ${correctAnswer === o ? "btn-primary" : "btn-outline"}`}
+                                    style={{ width: 48, position: "relative" }}
+                                >
+                                    {o}
+                                    {correctAnswer === o && (
+                                        <span style={{ position: "absolute", top: -6, right: -6, width: 14, height: 14, borderRadius: "50%", background: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                    )}
+                                </button>
                             ))}
                         </div>
+                        {correctAnswer && (
+                            <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>
+                                ✓ Option {correctAnswer} marked as correct answer
+                            </p>
+                        )}
                     </div>
 
                     <div style={{ display: "flex", gap: "0.75rem" }}>

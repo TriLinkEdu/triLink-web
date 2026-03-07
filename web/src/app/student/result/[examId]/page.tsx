@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { useExamStore } from "@/store/examStore";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
 
@@ -15,22 +16,49 @@ interface Question {
 
 export default function ExamResult({ params }: { params: Promise<{ examId: string }> }) {
     const router = useRouter();
+    const storeResult = useExamStore(s => s.result);
+
+    // Fallback shown when navigating directly to the URL without a live session
+    const fallbackQuestions: { id: number; order: number; type: QuestionType; text: string; options?: string[]; correctAnswer: string; studentAnswer: string }[] = [
+        { id: 1, order: 1, type: "mcq", text: "Which of the following is a conjunction?", options: ["Run", "But", "Quickly", "Chair"], correctAnswer: "But", studentAnswer: "But" },
+        { id: 2, order: 2, type: "truefalse", text: "'Their' is a possessive pronoun.", correctAnswer: "True", studentAnswer: "True" },
+        { id: 3, order: 3, type: "fillin", text: "The past tense of 'go' is ______.", correctAnswer: "went", studentAnswer: "went" },
+        { id: 4, order: 4, type: "mcq", text: "What type of sentence is 'Close the door!'?", options: ["Declarative", "Interrogative", "Imperative", "Exclamatory"], correctAnswer: "Imperative", studentAnswer: "Imperative" },
+        { id: 5, order: 5, type: "truefalse", text: "An adverb modifies a noun.", correctAnswer: "False", studentAnswer: "False" },
+        { id: 6, order: 6, type: "mcq", text: "Which word is a synonym for 'happy'?", options: ["Sad", "Angry", "Joyful", "Tired"], correctAnswer: "Joyful", studentAnswer: "Joyful" },
+        { id: 7, order: 7, type: "fillin", text: "The plural of 'child' is ______.", correctAnswer: "children", studentAnswer: "children" },
+        { id: 8, order: 8, type: "mcq", text: "What is the subject in 'The cat sat on the mat'?", options: ["cat", "sat", "mat", "on"], correctAnswer: "cat", studentAnswer: "mat" },
+        { id: 9, order: 9, type: "truefalse", text: "A compound sentence has two independent clauses.", correctAnswer: "True", studentAnswer: "True" },
+        { id: 10, order: 10, type: "mcq", text: "Which is a preposition?", options: ["Under", "Beautiful", "Quickly", "Speak"], correctAnswer: "Under", studentAnswer: "" },
+    ];
+
+    const data = storeResult ?? {
+        examId: 0,
+        examTitle: "Grammar & Vocabulary Quiz",
+        examCourse: "English",
+        examType: "Quiz",
+        totalQuestions: 10,
+        timeSpent: 872,
+        tabViolations: 0,
+        questions: fallbackQuestions,
+    };
+
+    const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+
+    const correct = data.questions.filter(q => q.studentAnswer && q.studentAnswer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
+    const unanswered = data.questions.filter(q => !q.studentAnswer).length;
+    const wrong = data.totalQuestions - correct - unanswered;
+    const scoreVal = Math.round((correct / data.totalQuestions) * 100);
 
     const result = {
-        exam: { course: "English", type: "Quiz", title: "Grammar & Vocabulary Quiz", date: "Feb 19, 2026", duration: "20 min", totalQuestions: 10 },
-        score: 88, correct: 8, wrong: 1, unanswered: 1, timeTaken: "14:32", tabViolations: 0,
-        questions: [
-            { id: 1, order: 1, type: "mcq" as QuestionType, text: "Which of the following is a conjunction?", options: ["Run", "But", "Quickly", "Chair"], correctAnswer: "But", studentAnswer: "But" },
-            { id: 2, order: 2, type: "truefalse" as QuestionType, text: "'Their' is a possessive pronoun.", correctAnswer: "True", studentAnswer: "True" },
-            { id: 3, order: 3, type: "fillin" as QuestionType, text: "The past tense of 'go' is ______.", correctAnswer: "went", studentAnswer: "went" },
-            { id: 4, order: 4, type: "mcq" as QuestionType, text: "What type of sentence is 'Close the door!'?", options: ["Declarative", "Interrogative", "Imperative", "Exclamatory"], correctAnswer: "Imperative", studentAnswer: "Imperative" },
-            { id: 5, order: 5, type: "truefalse" as QuestionType, text: "An adverb modifies a noun.", correctAnswer: "False", studentAnswer: "False" },
-            { id: 6, order: 6, type: "mcq" as QuestionType, text: "Which word is a synonym for 'happy'?", options: ["Sad", "Angry", "Joyful", "Tired"], correctAnswer: "Joyful", studentAnswer: "Joyful" },
-            { id: 7, order: 7, type: "fillin" as QuestionType, text: "The plural of 'child' is ______.", correctAnswer: "children", studentAnswer: "children" },
-            { id: 8, order: 8, type: "mcq" as QuestionType, text: "What is the subject in 'The cat sat on the mat'?", options: ["cat", "sat", "mat", "on"], correctAnswer: "cat", studentAnswer: "mat" },
-            { id: 9, order: 9, type: "truefalse" as QuestionType, text: "A compound sentence has two independent clauses.", correctAnswer: "True", studentAnswer: "True" },
-            { id: 10, order: 10, type: "mcq" as QuestionType, text: "Which is a preposition?", options: ["Under", "Beautiful", "Quickly", "Speak"], correctAnswer: "Under", studentAnswer: "" },
-        ],
+        exam: { course: data.examCourse, type: data.examType, title: data.examTitle, totalQuestions: data.totalQuestions },
+        score: scoreVal,
+        correct,
+        wrong,
+        unanswered,
+        timeTaken: formatTime(data.timeSpent),
+        tabViolations: data.tabViolations,
+        questions: data.questions,
     };
 
     const getGrade = (score: number) => {
@@ -124,12 +152,18 @@ export default function ExamResult({ params }: { params: Promise<{ examId: strin
                             <div className="result-answer-row">
                                 <div style={{ flex: 1 }}>
                                     <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--gray-400)", marginBottom: "0.25rem", textTransform: "uppercase" }}>Your Answer</div>
-                                    <div style={{
-                                        padding: "0.5rem 0.75rem", borderRadius: 8,
+                                    <div style={{ padding: "0.5rem 0.75rem", borderRadius: 8,
                                         background: isCorrect ? "var(--success-light)" : isUnanswered ? "var(--gray-50)" : "var(--danger-light)",
-                                        fontWeight: 600,
+                                        fontWeight: isUnanswered ? 400 : 600,
                                         color: isCorrect ? "#065f46" : isUnanswered ? "var(--gray-400)" : "#991b1b",
-                                    }}>{q.studentAnswer || "(no answer)"}</div>
+                                        fontStyle: isUnanswered ? "italic" : "normal",
+                                    }}>
+                                        {q.studentAnswer
+                                            ? q.studentAnswer
+                                            : q.type === "fillin"
+                                                ? "Left blank"
+                                                : "Not answered"}
+                                    </div>
                                 </div>
                                 {!isCorrect && (
                                     <div style={{ flex: 1 }}>

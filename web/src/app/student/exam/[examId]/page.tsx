@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useExamStore } from "@/store/examStore";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
 
@@ -55,6 +56,8 @@ export default function ExamSession({ params }: { params: Promise<{ examId: stri
     const [submitted, setSubmitted] = useState(false);
     const [showReport, setShowReport] = useState(false);
     const tabViolationsRef = useRef(0);
+    const submittedRef = useRef(false);
+    const { setResult } = useExamStore();
 
     const question = exam.questions[currentQ];
     const answeredCount = Object.keys(answers).length;
@@ -90,6 +93,62 @@ export default function ExamSession({ params }: { params: Promise<{ examId: stri
         };
     }, [submitted]);
 
+    // Fullscreen enforcement — entering is attempted on mount; exiting counts as a violation
+    useEffect(() => {
+        const enterFullscreen = () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        };
+        enterFullscreen();
+        const handleFullscreenChange = () => {
+            if (!document.fullscreenElement && !submittedRef.current) {
+                tabViolationsRef.current += 1;
+                setTabViolations(tabViolationsRef.current);
+                setShowTabWarning(true);
+                setTimeout(enterFullscreen, 500);
+            }
+        };
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
+        return () => {
+            document.removeEventListener("fullscreenchange", handleFullscreenChange);
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+        };
+    }, []);
+
+    // Save results to store and navigate to result page when exam is submitted
+    useEffect(() => {
+        if (!submitted) return;
+        submittedRef.current = true;
+        const correctAnswers: Record<number, string> = {
+            1: "6x + 2", 2: "Division by zero rule", 3: "True", 4: "cos(x)",
+            5: "1", 6: "True", 7: "f'(g(x)) \u00b7 g'(x)", 8: "v du",
+            9: "Ratio test", 10: "True",
+        };
+        setResult({
+            examId: exam.id,
+            examTitle: exam.title,
+            examCourse: exam.course,
+            examType: exam.type,
+            totalQuestions: exam.totalQuestions,
+            timeSpent,
+            tabViolations: tabViolationsRef.current,
+            questions: exam.questions.map(q => ({
+                id: q.id,
+                order: q.order,
+                type: q.type,
+                text: q.text,
+                options: q.options,
+                correctAnswer: correctAnswers[q.id] || "",
+                studentAnswer: answers[q.id] || "",
+            })),
+        });
+        router.push(`/student/result/${exam.id}`);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [submitted]);
+
     const setAnswer = (qId: number, value: string) => setAnswers(prev => ({ ...prev, [qId]: value }));
     const toggleFlag = (qId: number) => { setFlagged(prev => { const next = new Set(prev); next.has(qId) ? next.delete(qId) : next.add(qId); return next; }); };
 
@@ -106,52 +165,6 @@ export default function ExamSession({ params }: { params: Promise<{ examId: stri
     const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
     const timePercent = (timeLeft / (exam.duration * 60)) * 100;
     const isLowTime = timeLeft < 300;
-
-    /* ─── SUBMITTED ─── */
-    if (submitted) {
-        const correctAnswers: Record<number, string> = { 1: "6x + 2", 2: "Division by zero rule", 3: "True", 4: "cos(x)", 5: "1", 6: "True", 7: "f'(g(x)) · g'(x)", 8: "v du", 9: "Ratio test", 10: "True" };
-        const score = exam.questions.reduce((acc, q) => acc + ((answers[q.id]?.trim().toLowerCase() || "") === (correctAnswers[q.id]?.toLowerCase() || "") ? 1 : 0), 0);
-        const pct = Math.round((score / exam.totalQuestions) * 100);
-
-        return (
-            <div style={{ minHeight: "100vh", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-                <div className="submitted-card">
-                    <div style={{ width: 80, height: 80, borderRadius: "50%", background: pct >= 50 ? "var(--success-light)" : "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem", color: pct >= 50 ? "var(--success)" : "var(--danger)" }}>
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{pct >= 50 ? <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></> : <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>}</svg>
-                    </div>
-                    <h1 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "0.5rem" }}>Exam Submitted!</h1>
-                    <p style={{ color: "var(--gray-500)", marginBottom: "2rem" }}>{exam.title}</p>
-                    <div className="submitted-scores">
-                        <div>
-                            <div style={{ fontSize: "2.5rem", fontWeight: 900, color: pct >= 90 ? "var(--success)" : pct >= 70 ? "var(--primary-500)" : pct >= 50 ? "var(--warning)" : "var(--danger)" }}>{pct}%</div>
-                            <div style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>Score</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "var(--gray-900)" }}>{score}/{exam.totalQuestions}</div>
-                            <div style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>Correct</div>
-                        </div>
-                    </div>
-                    <div className="submitted-meta">
-                        <div style={{ padding: "0.5rem 1rem", background: "var(--gray-50)", borderRadius: 10 }}>
-                            <span style={{ color: "var(--gray-500)" }}>Time Spent: </span>
-                            <span style={{ fontWeight: 700 }}>{formatTime(timeSpent)}</span>
-                        </div>
-                        {tabViolations > 0 && (
-                            <div style={{ padding: "0.5rem 1rem", background: "var(--danger-light)", borderRadius: 10, color: "#991b1b", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg> Tab violations: {tabViolations}
-                            </div>
-                        )}
-                    </div>
-                    <button onClick={() => router.push("/student/dashboard")} style={{
-                        padding: "0.75rem 2rem", borderRadius: 12,
-                        background: "linear-gradient(135deg, var(--primary-500), var(--primary-600))",
-                        color: "#fff", fontWeight: 700, fontSize: "0.9rem",
-                        border: "none", cursor: "pointer", boxShadow: "0 2px 8px rgba(37,99,235,0.25)"
-                    }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg> Back to Exam Portal</button>
-                </div>
-            </div>
-        );
-    }
 
     /* ─── EXAM UI ─── */
     return (

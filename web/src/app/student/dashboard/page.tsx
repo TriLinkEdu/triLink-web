@@ -71,19 +71,19 @@ export default function StudentDashboard() {
                 <p style={{ fontSize: "0.875rem", color: "var(--gray-500)", marginTop: "0.25rem" }}>Select a course exam to begin</p>
             </div>
 
-            <div className="exam-stats-grid">
+            <div className="stats-grid" style={{ marginBottom: "1.5rem" }}>
                 {[
                     { label: "Available Now", value: availableCount },
                     { label: "Completed", value: completedCount },
                     { label: "Avg. Score", value: `${Math.round(avgScore)}%` },
                 ].map((s, i) => (
-                    <div key={i} style={{ background: "#fff", borderRadius: 14, padding: "1.25rem", border: "1px solid var(--gray-100)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                            <div style={{ width: 42, height: 42, borderRadius: 12, background: statBgs[i], display: "flex", alignItems: "center", justifyContent: "center", color: statColors[i] }}>{statIcons[i]}</div>
-                            <div>
-                                <div style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>{s.label}</div>
-                                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)" }}>{s.value}</div>
-                            </div>
+                    <div key={i} className="stat-card">
+                        <div className="stat-icon" style={{ width: 42, height: 42, borderRadius: 12, background: statBgs[i], color: statColors[i] }}>
+                            {statIcons[i]}
+                        </div>
+                        <div className="stat-info">
+                            <div className="stat-label">{s.label}</div>
+                            <div className="stat-value">{s.value}</div>
                         </div>
                     </div>
                 ))}
@@ -99,17 +99,32 @@ export default function StudentDashboard() {
                         fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
                         transition: "all 150ms ease", display: "flex", alignItems: "center", gap: "0.4rem",
                     }}>
-                        {f === "all" ? "All Exams" : f === "available" ? <><span style={{ width: 8, height: 8, borderRadius: "50%", background: filter === f ? "#fff" : "var(--success)", display: "inline-block" }} /> Available</> : <><IconCheckCircle /> Completed</>}
+                        {f === "all" && "All Exams"}
+                        {f === "available" && <>
+                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: filter === f ? "#fff" : "var(--success)", display: "inline-block" }} />
+                            Available
+                        </>}
+                        {f === "completed" && <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                            Completed
+                        </>}
                     </button>
                 ))}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {filtered.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--gray-400)" }}>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 1rem", display: "block" }}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><line x1="9" x2="15" y1="13" y2="13" /><line x1="9" x2="15" y1="17" y2="17" /></svg>
+                        <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No exams found</div>
+                        <div style={{ fontSize: "0.85rem" }}>There are no exams in this category yet.</div>
+                    </div>
+                )}
                 {filtered.map(exam => (
                     <div key={exam.id} style={{
                         background: "#fff", borderRadius: 16, padding: "1.25rem",
-                        border: `1.5px solid ${exam.status === "available" ? "var(--success)" : "var(--gray-100)"}`,
-                        boxShadow: exam.status === "available" ? "0 0 0 3px rgba(16,185,129,0.08)" : "none",
+                        border: `1.5px solid ${exam.status === "available" ? "var(--success)" : exam.status === "missed" ? "var(--danger)" : "var(--gray-100)"}`,
+                        boxShadow: exam.status === "available" ? "0 0 0 3px rgba(16,185,129,0.08)" : exam.status === "missed" ? "0 0 0 3px rgba(239,68,68,0.07)" : "none",
                     }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>

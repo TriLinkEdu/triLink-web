@@ -134,22 +134,30 @@ export default function TeacherAttendance() {
             </div>
 
             {/* Stats Bar */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
-                <div style={{ background: "#fff", borderRadius: 12, padding: "1rem", border: "1px solid var(--gray-100)", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)" }}>{stats.total}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", fontWeight: 500 }}>Total</div>
+            <div className="stats-grid" style={{ marginBottom: "1.5rem" }}>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: "var(--gray-100)", color: "var(--gray-700)" }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    </div>
+                    <div className="stat-info"><div className="stat-label">Total</div><div className="stat-value">{stats.total}</div></div>
                 </div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: "1rem", border: "1px solid var(--gray-100)", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--success)" }}>{stats.present}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", fontWeight: 500 }}>Present</div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: "var(--success-light)", color: "var(--success)" }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                    </div>
+                    <div className="stat-info"><div className="stat-label">Present</div><div className="stat-value" style={{ color: "var(--success)" }}>{stats.present}</div></div>
                 </div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: "1rem", border: "1px solid var(--gray-100)", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--danger)" }}>{stats.absent}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", fontWeight: 500 }}>Absent</div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: "var(--danger-light)", color: "var(--danger)" }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </div>
+                    <div className="stat-info"><div className="stat-label">Absent</div><div className="stat-value" style={{ color: "var(--danger)" }}>{stats.absent}</div></div>
                 </div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: "1rem", border: "1px solid var(--gray-100)", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--purple)" }}>{stats.excused}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", fontWeight: 500 }}>Excused</div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: "var(--warning-light)", color: "var(--warning)" }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><line x1="9" x2="15" y1="13" y2="13" /></svg>
+                    </div>
+                    <div className="stat-info"><div className="stat-label">Excused</div><div className="stat-value" style={{ color: "var(--warning)" }}>{stats.excused}</div></div>
                 </div>
             </div>
 
