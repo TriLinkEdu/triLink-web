@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAnnouncementStore } from "@/store/announcementStore";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
 
@@ -34,6 +35,8 @@ const IconTarget = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="n
 export default function StudentDashboard() {
     const router = useRouter();
     const [filter, setFilter] = useState<"all" | "available" | "completed">("all");
+    const { announcements } = useAnnouncementStore();
+    const sentAnnouncements = announcements.filter(a => a.status === "sent");
 
     const exams: Exam[] = [
         { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", date: "2026-02-20", time: "09:00", duration: 120, totalQuestions: 40, status: "available", room: "ICT Lab 1" },
@@ -88,6 +91,25 @@ export default function StudentDashboard() {
                     </div>
                 ))}
             </div>
+
+            {sentAnnouncements.length > 0 && (
+                <div style={{ background: "#fff", borderRadius: 16, padding: "1.25rem", border: "1.5px solid var(--gray-100)", marginBottom: "1.25rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+                        <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--gray-900)" }}>Announcements</span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--gray-400)" }}>{sentAnnouncements.length} new</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        {sentAnnouncements.map(a => (
+                            <div key={a.id} style={{ background: "var(--primary-50)", borderRadius: 12, padding: "0.75rem 1rem", borderLeft: "4px solid var(--primary-500)" }}>
+                                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--gray-900)" }}>{a.title}</div>
+                                <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem" }}>{a.message}</div>
+                                <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: "0.35rem" }}>From your teacher · {a.date}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="exam-filter-tabs">
                 {(["all", "available", "completed"] as const).map(f => (
