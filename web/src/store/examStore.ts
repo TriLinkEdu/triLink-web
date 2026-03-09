@@ -21,14 +21,34 @@ export interface SubmittedExamResult {
     questions: QuestionResult[];
 }
 
+export interface TeacherGrade {
+    studentName: string;
+    quizTitle: string;
+    subject: string;
+    score: number;
+    grade: string;
+    comment: string;
+    sentAt: string;
+    assessments?: { id: number; name: string; type: string; maxMark: number; result: number }[];
+}
+
 interface ExamStore {
     result: SubmittedExamResult | null;
     setResult: (result: SubmittedExamResult) => void;
     clearResult: () => void;
+    teacherGrades: TeacherGrade[];
+    sendGrade: (g: TeacherGrade) => void;
 }
 
 export const useExamStore = create<ExamStore>((set) => ({
     result: null,
     setResult: (result) => set({ result }),
     clearResult: () => set({ result: null }),
+    teacherGrades: [],
+    sendGrade: (g) => set(s => ({
+        teacherGrades: [
+            ...s.teacherGrades.filter(x => !(x.studentName === g.studentName && x.quizTitle === g.quizTitle)),
+            g,
+        ],
+    })),
 }));

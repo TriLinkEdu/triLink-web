@@ -2,6 +2,9 @@
 import { useState, useCallback } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { useExamStore } from "@/store/examStore";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
 function preprocess(tex: string): string {
@@ -438,6 +441,41 @@ const INITIAL_BANK: BankQ[] = [
     { id: 6, q: "What is the molecular formula of glucose?", subj: "Chemistry", type: "Multiple Choice", used: 6 },
 ];
 
+type Assessment = { id: number; name: string; type: string; maxMark: number; result: number };
+type ResultRow = { name: string; quiz: string; subject: string; score: number; grade: string; sent: boolean; comment: string; sentAt: string; assessments: Assessment[] };
+
+const DEFAULT_ASSESSMENTS = (): Assessment[] => [
+    { id: 1, name: "Quiz-1",               type: "continuous", maxMark: 5,  result: 0 },
+    { id: 2, name: "Quiz-2",               type: "continuous", maxMark: 5,  result: 0 },
+    { id: 3, name: "Mid-term Examination", type: "midterm",    maxMark: 20, result: 0 },
+    { id: 4, name: "Assignment-1",         type: "continuous", maxMark: 10, result: 0 },
+    { id: 5, name: "Assignment-2",         type: "continuous", maxMark: 10, result: 0 },
+    { id: 6, name: "Final Exam",           type: "final",      maxMark: 50, result: 0 },
+];
+
+function calcScore(list: Assessment[]): number {
+    const totalMax = list.reduce((s, a) => s + a.maxMark, 0);
+    const totalResult = list.reduce((s, a) => s + a.result, 0);
+    if (totalMax === 0) return 0;
+    return Math.round((totalResult / totalMax) * 1000) / 10;
+}
+
+function autoGrade(score: number): string {
+    if (score >= 97) return "A+";
+    if (score >= 93) return "A";
+    if (score >= 90) return "A-";
+    if (score >= 87) return "B+";
+    if (score >= 83) return "B";
+    if (score >= 80) return "B-";
+    if (score >= 77) return "C+";
+    if (score >= 73) return "C";
+    if (score >= 70) return "C-";
+    if (score >= 67) return "D+";
+    if (score >= 63) return "D";
+    if (score >= 60) return "D-";
+    return "F";
+}
+
 /* ─── LatexField component ─── */
 interface LatexFieldProps {
     label: string; value: string; onChange: (v: string) => void;
@@ -566,11 +604,11 @@ export default function TeacherExams() {
     const [editingBank, setEditingBank] = useState<BankQ | null>(null);
 
     // Results
-    const [results, setResults] = useState([
-        { name: "Abebe Kebede", quiz: "Ch.7 Calculus Quiz", score: 92, grade: "A", sent: false },
-        { name: "Kalkidan Assefa", quiz: "Ch.7 Calculus Quiz", score: 88, grade: "A-", sent: false },
-        { name: "Meron Girma", quiz: "Ch.7 Calculus Quiz", score: 75, grade: "B", sent: true },
-        { name: "Samuel Dereje", quiz: "Ch.7 Calculus Quiz", score: 95, grade: "A+", sent: true },
+    const [results, setResults] = useState<ResultRow[]>([
+        { name: "Abebe Kebede",    quiz: "Ch.7 Calculus Quiz", subject: "Mathematics", score: 92, grade: "A",  sent: false, comment: "",             sentAt: "",           assessments: [{ id:1, name:"Quiz-1",               type:"continuous", maxMark:5,  result:5   }, { id:2, name:"Quiz-2",               type:"continuous", maxMark:5,  result:4   }, { id:3, name:"Mid-term Examination", type:"midterm",    maxMark:20, result:18  }, { id:4, name:"Assignment-1",         type:"continuous", maxMark:10, result:9   }, { id:5, name:"Assignment-2",         type:"continuous", maxMark:10, result:9   }, { id:6, name:"Final Exam",           type:"final",      maxMark:50, result:47  }] },
+        { name: "Kalkidan Assefa", quiz: "Ch.7 Calculus Quiz", subject: "Mathematics", score: 88, grade: "A-", sent: false, comment: "",             sentAt: "",           assessments: [{ id:1, name:"Quiz-1",               type:"continuous", maxMark:5,  result:4   }, { id:2, name:"Quiz-2",               type:"continuous", maxMark:5,  result:4   }, { id:3, name:"Mid-term Examination", type:"midterm",    maxMark:20, result:17  }, { id:4, name:"Assignment-1",         type:"continuous", maxMark:10, result:9   }, { id:5, name:"Assignment-2",         type:"continuous", maxMark:10, result:9   }, { id:6, name:"Final Exam",           type:"final",      maxMark:50, result:45  }] },
+        { name: "Meron Girma",     quiz: "Ch.7 Calculus Quiz", subject: "Mathematics", score: 75, grade: "B",  sent: true,  comment: "Good effort!", sentAt: "2026-03-08", assessments: [{ id:1, name:"Quiz-1",               type:"continuous", maxMark:5,  result:3   }, { id:2, name:"Quiz-2",               type:"continuous", maxMark:5,  result:4   }, { id:3, name:"Mid-term Examination", type:"midterm",    maxMark:20, result:15  }, { id:4, name:"Assignment-1",         type:"continuous", maxMark:10, result:7.5 }, { id:5, name:"Assignment-2",         type:"continuous", maxMark:10, result:7.5 }, { id:6, name:"Final Exam",           type:"final",      maxMark:50, result:38  }] },
+        { name: "Samuel Dereje",   quiz: "Ch.7 Calculus Quiz", subject: "Mathematics", score: 95, grade: "A+", sent: true,  comment: "",             sentAt: "2026-03-08", assessments: [{ id:1, name:"Quiz-1",               type:"continuous", maxMark:5,  result:5   }, { id:2, name:"Quiz-2",               type:"continuous", maxMark:5,  result:5   }, { id:3, name:"Mid-term Examination", type:"midterm",    maxMark:20, result:19  }, { id:4, name:"Assignment-1",         type:"continuous", maxMark:10, result:9.5 }, { id:5, name:"Assignment-2",         type:"continuous", maxMark:10, result:9.5 }, { id:6, name:"Final Exam",           type:"final",      maxMark:50, result:47  }] },
     ]);
 
     // Toast
@@ -608,6 +646,208 @@ export default function TeacherExams() {
     const filteredBank = bankSearch.trim()
         ? bank.filter(b => b.q.toLowerCase().includes(bankSearch.toLowerCase()) || b.subj.toLowerCase().includes(bankSearch.toLowerCase()))
         : bank;
+
+    // ── Evaluate modal state ─────────────────────────────────────────────────
+    const [evaluating, setEvaluating] = useState<ResultRow | null>(null);
+    const [evalAssessments, setEvalAssessments] = useState<Assessment[]>([]);
+    const [evalComment, setEvalComment] = useState("");
+    const evalTotalMax    = evalAssessments.reduce((s, a) => s + a.maxMark, 0);
+    const evalTotalResult = evalAssessments.reduce((s, a) => s + a.result, 0);
+    const evalScore       = calcScore(evalAssessments);
+    const evalGrade       = autoGrade(evalScore);
+
+    // ── Store grade sender ──────────────────────────────────────────────────
+    const storeSendGrade = useExamStore(s => s.sendGrade);
+
+    const openEvaluate = (row: ResultRow) => {
+        setEvaluating(row);
+        setEvalAssessments(row.assessments.length > 0 ? row.assessments.map(a => ({ ...a })) : DEFAULT_ASSESSMENTS());
+        setEvalComment(row.comment);
+    };
+
+    const saveEval = (sendNow: boolean) => {
+        if (!evaluating) return;
+        const score = calcScore(evalAssessments);
+        const grade = autoGrade(score);
+        const now = new Date().toISOString().slice(0, 10);
+        const updated: ResultRow = {
+            ...evaluating,
+            score,
+            grade,
+            comment: evalComment,
+            assessments: evalAssessments,
+            sent: sendNow ? true : evaluating.sent,
+            sentAt: sendNow && !evaluating.sentAt ? now : evaluating.sentAt,
+        };
+        setResults(p => p.map(r => r.name === evaluating.name && r.quiz === evaluating.quiz ? updated : r));
+        if (sendNow) {
+            storeSendGrade({ studentName: updated.name, quizTitle: updated.quiz, subject: updated.subject, score: updated.score, grade: updated.grade, comment: updated.comment, sentAt: updated.sentAt, assessments: updated.assessments });
+            showToast(`Grade sent to ${updated.name} ✓`);
+        } else {
+            showToast("Evaluation saved ✓");
+        }
+        setEvaluating(null);
+    };
+
+    const downloadPDF = () => {
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const pageW = doc.internal.pageSize.getWidth();
+        const now = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+        const BLUE   = [30,  58, 138] as [number,number,number];
+        const DKGRAY = [30,  30,  30] as [number,number,number];
+        const MDGRAY = [100,100,100] as [number,number,number];
+
+        // ─── Institution header band ──────────────────────────────────
+        doc.setFillColor(...BLUE);
+        doc.rect(0, 0, pageW, 28, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("TRILINK SCHOOL", pageW / 2, 11, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("Academic Assessment Transcript  \u2014  Teacher Copy", pageW / 2, 18, { align: "center" });
+        doc.text(`Generated: ${now}`, pageW / 2, 24, { align: "center" });
+
+        // ─── Meta info block ──────────────────────────────────────────
+        doc.setTextColor(...DKGRAY);
+        let yy = 35;
+        const metaRows: [string, string][] = [
+            ["Class Group", classGroup],
+            ["Course / Quiz", results[0]?.quiz ?? ""],
+            ["Subject",      results[0]?.subject ?? ""],
+            ["Total Students", String(results.length)],
+        ];
+        const colW = (pageW - 28) / 2;
+        metaRows.forEach(([k, v], idx) => {
+            const x = idx % 2 === 0 ? 14 : 14 + colW + 4;
+            if (idx % 2 === 0 && idx > 0) yy += 7;
+            doc.setFont("helvetica", "bold");   doc.setFontSize(8);  doc.setTextColor(...MDGRAY);  doc.text(k.toUpperCase(), x, yy);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...DKGRAY);  doc.text(v, x, yy + 4.5);
+        });
+        yy += 12;
+
+        // ─── Divider ──────────────────────────────────────────────────
+        doc.setDrawColor(...BLUE);
+        doc.setLineWidth(0.5);
+        doc.line(14, yy, pageW - 14, yy);
+        yy += 5;
+
+        // ─── Per-student assessment breakdown ─────────────────────────
+        results.forEach((r, si) => {
+            // Student name header row
+            if (yy > 250) { doc.addPage(); yy = 15; }
+            doc.setFillColor(239, 246, 255);
+            doc.roundedRect(14, yy, pageW - 28, 8, 2, 2, "F");
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...BLUE);
+            doc.text(`${si + 1}.  ${r.name}`, 18, yy + 5.5);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...MDGRAY);
+            doc.text(`Status: ${r.sent ? "Sent" : "Pending"}`, pageW - 14, yy + 5.5, { align: "right" });
+            yy += 10;
+
+            // Assessment breakdown table
+            const assessRows = r.assessments.length > 0
+                ? r.assessments.map((a, i) => [(i + 1).toString(), a.name, a.type, String(a.maxMark), String(a.result), ""])
+                : [["--", "No breakdown available", "", "", "", ""]];
+
+            const totalMax    = r.assessments.reduce((s, a) => s + a.maxMark, 0);
+            const totalResult = r.assessments.reduce((s, a) => s + a.result, 0);
+
+            autoTable(doc, {
+                startY: yy,
+                margin: { left: 14, right: 14 },
+                head: [["SN", "Assessment Name", "Type", "Max Mark", "Result", "Grade"]],
+                body: assessRows,
+                foot: [[{ content: "Totals", colSpan: 3, styles: { halign: "right", fontStyle: "bold" } }, String(totalMax), `${totalResult}/${totalMax}`, r.grade]],
+                theme: "grid",
+                styles: { fontSize: 8.5, cellPadding: 2.5, textColor: DKGRAY },
+                headStyles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: "bold", fontSize: 8 },
+                footStyles: { fillColor: [240,253,244], textColor: [6,95,70], fontStyle: "bold" },
+                alternateRowStyles: { fillColor: [248,250,252] },
+                columnStyles: {
+                    0: { cellWidth: 9 },
+                    2: { cellWidth: 22 },
+                    3: { cellWidth: 22, halign: "center" },
+                    4: { cellWidth: 25, halign: "center" },
+                    5: { cellWidth: 18, halign: "center" },
+                },
+                didParseCell: (data) => {
+                    if (data.section === "foot" && data.column.index === 5) {
+                        const g = data.cell.raw as string;
+                        data.cell.styles.textColor = g.startsWith("A") ? [6,95,70] : g.startsWith("B") ? [30,58,138] : g.startsWith("F") ? [153,27,27] : [146,64,14];
+                    }
+                },
+            });
+            yy = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 3;
+
+            // Score summary line
+            doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+            doc.setTextColor(...BLUE);
+            doc.text(`Final Score: ${r.score}%   ·   Grade: ${r.grade}`, 18, yy + 4);
+            if (r.comment) {
+                doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.setTextColor(...MDGRAY);
+                doc.text(`Feedback: ${r.comment}`, 18, yy + 9, { maxWidth: pageW - 36 });
+                yy += 6;
+            }
+            yy += 10;
+        });
+
+        // ─── Summary roster table ──────────────────────────────────────
+        if (yy > 220) { doc.addPage(); yy = 15; }
+        doc.setDrawColor(...BLUE); doc.setLineWidth(0.5);
+        doc.line(14, yy, pageW - 14, yy); yy += 5;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...BLUE);
+        doc.text("Class Summary Roster", 14, yy); yy += 6;
+
+        autoTable(doc, {
+            startY: yy,
+            margin: { left: 14, right: 14 },
+            head: [["#", "Student Name", "Quiz / Course", "Total Score", "Grade", "Status", "Date Sent"]],
+            body: results.map((r, i) => [
+                String(i + 1),
+                r.name,
+                r.quiz,
+                `${r.score}%`,
+                r.grade,
+                r.sent ? "Sent" : "Pending",
+                r.sentAt || "—",
+            ]),
+            theme: "striped",
+            styles: { fontSize: 9, cellPadding: 3, textColor: DKGRAY },
+            headStyles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248,250,252] },
+            columnStyles: {
+                0: { cellWidth: 9 },
+                3: { halign: "center" },
+                4: { halign: "center", fontStyle: "bold" },
+                5: { halign: "center" },
+                6: { halign: "center" },
+            },
+            didParseCell: (data) => {
+                if (data.section === "body" && data.column.index === 4) {
+                    const g = String(data.cell.raw);
+                    data.cell.styles.textColor = g.startsWith("A") ? [6,95,70] : g.startsWith("B") ? [30,58,138] : g.startsWith("F") ? [153,27,27] : [146,64,14];
+                }
+                if (data.section === "body" && data.column.index === 5) {
+                    data.cell.styles.textColor = data.cell.raw === "Sent" ? [6,95,70] : [146,64,14];
+                }
+            },
+        });
+
+        // ─── Footer on every page ─────────────────────────────────────
+        const totalPages = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
+        for (let p = 1; p <= totalPages; p++) {
+            doc.setPage(p);
+            const pageH = doc.internal.pageSize.getHeight();
+            doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
+            doc.line(14, pageH - 12, pageW - 14, pageH - 12);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(160,160,160);
+            doc.text("Trilink School — Confidential Teacher Transcript", 14, pageH - 7);
+            doc.text(`Page ${p} of ${totalPages}`, pageW - 14, pageH - 7, { align: "right" });
+        }
+
+        doc.save(`transcript_${classGroup.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    };
 
     return (
         <div className="page-wrapper">
@@ -653,6 +893,147 @@ export default function TeacherExams() {
                     </div>
                 </div>
             )}
+
+            {/* ── Evaluate Modal ── */}
+            {evaluating && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", overflowY: "auto" }}>
+                    <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 820, boxShadow: "0 28px 90px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", maxHeight: "95vh" }}>
+
+                        {/* ── Modal Header ── */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.1rem 1.5rem", borderBottom: "1.5px solid var(--gray-100)", flexShrink: 0 }}>
+                            <div>
+                                <h3 style={{ fontWeight: 800, fontSize: "1.05rem", margin: 0 }}>Evaluate Student</h3>
+                                <div style={{ fontSize: "0.76rem", color: "var(--gray-400)", marginTop: "0.15rem" }}>Score is calculated automatically from assessments below</div>
+                            </div>
+                            <button onClick={() => setEvaluating(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+
+                        {/* ── Course Info Strip ── */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0", background: "var(--gray-50)", borderBottom: "1px solid var(--gray-100)", flexShrink: 0 }}>
+                            {[
+                                { label: "Course Title", value: evaluating.quiz },
+                                { label: "Subject",      value: evaluating.subject },
+                                { label: "Student",      value: evaluating.name },
+                            ].map((item, i) => (
+                                <div key={item.label} style={{ padding: "0.75rem 1.25rem", borderRight: i < 2 ? "1px solid var(--gray-200)" : "none" }}>
+                                    <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: "0.2rem" }}>{item.label}</div>
+                                    <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--gray-800)" }}>{item.value}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* ── Scrollable body ── */}
+                        <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem 1.5rem" }}>
+
+                            {/* Assessment Table */}
+                            <div style={{ overflowX: "auto", borderRadius: 12, border: "1.5px solid var(--gray-200)", marginBottom: "1rem" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                                    <thead>
+                                        <tr style={{ background: "var(--gray-50)" }}>
+                                            <th style={{ padding: "0.65rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)", width: 36 }}>SN</th>
+                                            <th style={{ padding: "0.65rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)" }}>Assessment Name</th>
+                                            <th style={{ padding: "0.65rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)", width: 150 }}>Assessment Type</th>
+                                            <th style={{ padding: "0.65rem 0.75rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)", width: 110 }}>Maximum Mark</th>
+                                            <th style={{ padding: "0.65rem 0.75rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)", width: 110 }}>Result</th>
+                                            <th style={{ padding: "0.65rem 0.5rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.75rem", color: "var(--gray-600)", borderBottom: "2px solid var(--gray-200)", width: 34 }}></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {evalAssessments.map((a, i) => (
+                                            <tr key={a.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid var(--gray-100)" }}>
+                                                <td style={{ padding: "0.45rem 0.75rem", color: "var(--gray-400)", fontWeight: 600, fontSize: "0.8rem" }}>{i + 1}</td>
+                                                <td style={{ padding: "0.45rem 0.5rem" }}>
+                                                    <input value={a.name}
+                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                                                        style={{ width: "100%", padding: "0.3rem 0.55rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                                </td>
+                                                <td style={{ padding: "0.45rem 0.5rem" }}>
+                                                    <select value={a.type}
+                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", background: "#fff", fontFamily: "inherit" }}>
+                                                        <option value="continuous">continuous</option>
+                                                        <option value="midterm">midterm</option>
+                                                        <option value="quiz">quiz</option>
+                                                        <option value="assignment">assignment</option>
+                                                        <option value="project">project</option>
+                                                        <option value="final">final</option>
+                                                        <option value="other">other</option>
+                                                    </select>
+                                                </td>
+                                                <td style={{ padding: "0.45rem 0.5rem" }}>
+                                                    <input type="number" min={0} value={a.maxMark}
+                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, maxMark: parseFloat(e.target.value) || 0 } : x))}
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const }} />
+                                                </td>
+                                                <td style={{ padding: "0.45rem 0.5rem" }}>
+                                                    <input type="number" min={0} max={a.maxMark} value={a.result}
+                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, result: parseFloat(e.target.value) || 0 } : x))}
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: `1.5px solid ${a.result > a.maxMark ? "var(--danger)" : "var(--gray-200)"}`, borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const, background: a.result > a.maxMark ? "var(--danger-light)" : "#fff" }} />
+                                                </td>
+                                                <td style={{ padding: "0.45rem 0.4rem", textAlign: "center" as const }}>
+                                                    <button onClick={() => setEvalAssessments(p => p.filter((_, j) => j !== i))}
+                                                        style={{ width: 24, height: 24, borderRadius: 5, border: "none", background: "var(--danger-light)", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style={{ background: "var(--gray-50)", borderTop: "2px solid var(--gray-200)" }}>
+                                            <td colSpan={3} style={{ padding: "0.65rem 0.75rem", fontWeight: 700, fontSize: "0.85rem", textAlign: "right" as const, color: "var(--gray-700)" }}>Totals</td>
+                                            <td style={{ padding: "0.65rem 0.75rem", textAlign: "center" as const, fontWeight: 800, fontSize: "0.9rem" }}>{evalTotalMax}</td>
+                                            <td style={{ padding: "0.65rem 0.75rem", textAlign: "center" as const, fontWeight: 800, fontSize: "0.9rem", color: evalScore >= 90 ? "var(--success)" : evalScore >= 70 ? "var(--primary-600)" : "var(--warning)" }}>
+                                                <strong>{evalTotalResult}</strong><span style={{ fontSize: "0.75rem", color: "var(--gray-400)", fontWeight: 400 }}>/{evalTotalMax}</span>
+                                            </td>
+                                            <td />
+                                        </tr>
+                                        <tr style={{ background: evalScore >= 90 ? "#f0fdf4" : evalScore >= 70 ? "var(--primary-50)" : "#fffbeb" }}>
+                                            <td colSpan={6} style={{ padding: "0.6rem 0.75rem" }}>
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.5rem", flexWrap: "wrap" as const }}>
+                                                    <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray-600)" }}>
+                                                        Final Score: <strong style={{ fontSize: "1rem", color: evalScore >= 90 ? "var(--success)" : evalScore >= 70 ? "var(--primary-600)" : "var(--warning)" }}>{evalScore}%</strong>
+                                                    </span>
+                                                    <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gray-600)" }}>
+                                                        Grade: <strong style={{ fontSize: "1.15rem", color: evalScore >= 90 ? "var(--success)" : evalScore >= 70 ? "var(--primary-600)" : "var(--warning)" }}>{evalGrade}</strong>
+                                                    </span>
+                                                    {evalTotalMax !== 100 && evalTotalMax > 0 && (
+                                                        <span style={{ fontSize: "0.72rem", color: "#b45309", background: "#fef3c7", padding: "0.15rem 0.5rem", borderRadius: 5 }}>⚠ Total max marks = {evalTotalMax} (not 100)</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Add Row */}
+                            <button onClick={() => setEvalAssessments(p => [...p, { id: Date.now(), name: "New Assessment", type: "continuous", maxMark: 10, result: 0 }])}
+                                style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.875rem", borderRadius: 8, border: "1.5px dashed var(--primary-300)", background: "var(--primary-50)", color: "var(--primary-600)", fontWeight: 600, fontSize: "0.8rem", cursor: "pointer", marginBottom: "1.25rem" }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                Add Assessment Row
+                            </button>
+
+                            {/* Feedback */}
+                            <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.4rem" }}>Feedback for Student (optional)</label>
+                            <textarea value={evalComment} onChange={e => setEvalComment(e.target.value)} rows={3}
+                                placeholder="E.g. 'Great work on the mid-term. Focus on exam technique for the final.'"
+                                style={{ width: "100%", padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 10, fontSize: "0.875rem", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" as const }} />
+                        </div>
+
+                        {/* ── Footer ── */}
+                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", padding: "1rem 1.5rem", borderTop: "1.5px solid var(--gray-100)", flexShrink: 0 }}>
+                            <button className="btn btn-secondary" onClick={() => setEvaluating(null)}>Cancel</button>
+                            <button className="btn btn-outline" onClick={() => saveEval(false)}>Save Only</button>
+                            <button className="btn btn-primary" onClick={() => saveEval(true)}>Save &amp; Send to Student</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── CSV Column Picker Modal removed ── */}
 
             <div className="page-header">
                 <div>
@@ -833,8 +1214,17 @@ export default function TeacherExams() {
                     <div className="card-header">
                         <h3 className="card-title">Student Results</h3>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
-                            <button className="btn btn-primary btn-sm" onClick={() => { setResults(p => p.map(r => ({ ...r, sent: true }))); showToast("All grades sent ✓"); }}>Send All Grades</button>
-                            <button className="btn btn-outline btn-sm">Export CSV</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => {
+                                const now = new Date().toISOString().slice(0, 10);
+                                const updated = results.map(r => r.sent ? r : { ...r, sent: true, sentAt: now });
+                                setResults(updated);
+                                updated.forEach(r => storeSendGrade({ studentName: r.name, quizTitle: r.quiz, subject: r.subject, score: r.score, grade: r.grade, comment: r.comment, sentAt: r.sentAt }));
+                                showToast("All grades sent ✓");
+                            }}>Send All Grades</button>
+                            <button className="btn btn-outline btn-sm" onClick={downloadPDF} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                Download PDF
+                            </button>
                         </div>
                     </div>
                     <div className="table-wrapper">
@@ -850,8 +1240,14 @@ export default function TeacherExams() {
                                         <td>{s.sent ? <span className="badge badge-success">Sent</span> : <span className="badge badge-warning">Pending</span>}</td>
                                         <td>
                                             <div style={{ display: "flex", gap: "0.375rem" }}>
-                                                <button className="btn btn-outline btn-sm">Evaluate</button>
-                                                {!s.sent && <button className="btn btn-primary btn-sm" onClick={() => { setResults(p => p.map((r, ri) => ri === i ? { ...r, sent: true } : r)); showToast(`Grade sent to ${s.name} ✓`); }}>Send Grade</button>}
+                                                <button className="btn btn-outline btn-sm" onClick={() => openEvaluate(s)}>Evaluate</button>
+                                                {!s.sent && <button className="btn btn-primary btn-sm" onClick={() => {
+                                                    const now = new Date().toISOString().slice(0, 10);
+                                                    const updated = { ...s, sent: true, sentAt: now };
+                                                    setResults(p => p.map((r, ri) => ri === i ? updated : r));
+                                                    storeSendGrade({ studentName: updated.name, quizTitle: updated.quiz, subject: updated.subject, score: updated.score, grade: updated.grade, comment: updated.comment, sentAt: updated.sentAt });
+                                                    showToast(`Grade sent to ${s.name} ✓`);
+                                                }}>Send Grade</button>}
                                             </div>
                                         </td>
                                     </tr>

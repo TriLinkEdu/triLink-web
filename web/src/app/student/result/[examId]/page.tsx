@@ -17,6 +17,7 @@ interface Question {
 export default function ExamResult({ params }: { params: Promise<{ examId: string }> }) {
     const router = useRouter();
     const storeResult = useExamStore(s => s.result);
+    const teacherGrades = useExamStore(s => s.teacherGrades);
 
     // Fallback shown when navigating directly to the URL without a live session
     const fallbackQuestions: { id: number; order: number; type: QuestionType; text: string; options?: string[]; correctAnswer: string; studentAnswer: string }[] = [
@@ -42,6 +43,8 @@ export default function ExamResult({ params }: { params: Promise<{ examId: strin
         tabViolations: 0,
         questions: fallbackQuestions,
     };
+
+    const teacherFeedback = teacherGrades.find(g => g.quizTitle === data.examTitle);
 
     const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
@@ -176,6 +179,86 @@ export default function ExamResult({ params }: { params: Promise<{ examId: strin
                     );
                 })}
             </div>
+
+            {/* Teacher Grade Feedback */}
+            {teacherFeedback && (
+                <div style={{ background: "#f0fdf4", border: "1.5px solid var(--success)", borderRadius: 16, padding: "1.25rem 1.5rem", marginBottom: "2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.875rem" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "#065f46" }}>Your teacher has reviewed your submission</div>
+                            <div style={{ fontSize: "0.75rem", color: "#16a34a" }}>Graded on {teacherFeedback.sentAt} · {teacherFeedback.subject}</div>
+                        </div>
+                    </div>
+
+                    {/* Assessment breakdown table */}
+                    {teacherFeedback.assessments && teacherFeedback.assessments.length > 0 && (
+                        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #bbf7d0", marginBottom: "0.75rem", overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.83rem" }}>
+                                <thead>
+                                    <tr style={{ background: "#f0fdf4" }}>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0", width: 32 }}>SN</th>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0" }}>Assessment Name</th>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "left" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0" }}>Assessment Type</th>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0" }}>Maximum Mark</th>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0" }}>Result</th>
+                                        <th style={{ padding: "0.5rem 0.75rem", textAlign: "center" as const, fontWeight: 700, fontSize: "0.72rem", color: "#065f46", borderBottom: "1.5px solid #bbf7d0" }}>Grade</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {teacherFeedback.assessments.map((a, i) => (
+                                        <tr key={i} style={{ borderBottom: "1px solid #dcfce7", background: i % 2 === 0 ? "#fff" : "#f0fdf4" }}>
+                                            <td style={{ padding: "0.45rem 0.75rem", color: "#6b7280", fontWeight: 600, fontSize: "0.8rem" }}>{i + 1}</td>
+                                            <td style={{ padding: "0.45rem 0.75rem", fontWeight: 500 }}>{a.name}</td>
+                                            <td style={{ padding: "0.45rem 0.75rem" }}>
+                                                <span style={{ background: "#dcfce7", color: "#166534", padding: "0.1rem 0.45rem", borderRadius: 5, fontSize: "0.72rem", fontWeight: 600 }}>{a.type}</span>
+                                            </td>
+                                            <td style={{ padding: "0.45rem 0.75rem", textAlign: "center" as const }}>{a.maxMark}</td>
+                                            <td style={{ padding: "0.45rem 0.75rem", textAlign: "center" as const, fontWeight: 700, color: a.result >= a.maxMark * 0.9 ? "#065f46" : a.result >= a.maxMark * 0.7 ? "#1d4ed8" : "#92400e" }}>{a.result}</td>
+                                            <td style={{ padding: "0.45rem 0.75rem", textAlign: "center" as const }}></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ background: "#dcfce7", borderTop: "2px solid #86efac" }}>
+                                        <td colSpan={3} style={{ padding: "0.55rem 0.75rem", fontWeight: 700, textAlign: "right" as const, color: "#065f46" }}>Totals</td>
+                                        <td style={{ padding: "0.55rem 0.75rem", textAlign: "center" as const, fontWeight: 800 }}>
+                                            {teacherFeedback.assessments.reduce((s, a) => s + a.maxMark, 0)}
+                                        </td>
+                                        <td style={{ padding: "0.55rem 0.75rem", textAlign: "center" as const, fontWeight: 800, color: "#065f46" }}>
+                                            {teacherFeedback.assessments.reduce((s, a) => s + a.result, 0)}/{teacherFeedback.assessments.reduce((s, a) => s + a.maxMark, 0)}
+                                        </td>
+                                        <td style={{ padding: "0.55rem 0.75rem", textAlign: "center" as const, fontWeight: 800, fontSize: "0.95rem", color: "#065f46" }}>{teacherFeedback.grade}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Score + Grade summary boxes (shown when no assessment breakdown, or always) */}
+                    {(!teacherFeedback.assessments || teacherFeedback.assessments.length === 0) && (
+                        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: teacherFeedback.comment ? "0.75rem" : 0 }}>
+                            <div style={{ background: "#fff", borderRadius: 12, padding: "0.6rem 1.25rem", flex: 1, minWidth: 100 }}>
+                                <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Teacher Score</div>
+                                <div style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--success)" }}>{teacherFeedback.score}%</div>
+                            </div>
+                            <div style={{ background: "#fff", borderRadius: 12, padding: "0.6rem 1.25rem", flex: 1, minWidth: 100 }}>
+                                <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Grade</div>
+                                <div style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--success)" }}>{teacherFeedback.grade}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {teacherFeedback.comment && (
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "0.75rem 1rem", border: "1px solid #bbf7d0" }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: "0.35rem" }}>Teacher Feedback</div>
+                            <p style={{ fontSize: "0.875rem", color: "#065f46", lineHeight: 1.6, margin: 0 }}>{teacherFeedback.comment}</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
