@@ -84,7 +84,7 @@ export default function AdminDashboard() {
                         <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.625rem 0", borderBottom: "1px solid var(--gray-50)" }}>
                             <span style={{ fontWeight: 500, fontSize: "0.875rem" }}>{f.subject}</span>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <span style={{ color: "var(--warning)", fontSize: "0.875rem" }}>{"⭐".repeat(Math.round(f.rating))}</span>
+                                <span style={{ color: "var(--warning)", fontSize: "0.875rem" }}>{"⭐".repeat(Math.max(0, Math.round(f.rating)))}</span>
                                 <span style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>{f.rating} ({f.count})</span>
                             </div>
                         </div>
