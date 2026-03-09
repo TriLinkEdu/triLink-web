@@ -3,43 +3,422 @@ import { useState, useCallback } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
-/* ─── helpers ─── */
-function renderLatex(raw: string): string {
-    if (!raw) return "";
-    let out = raw.replace(/\$\$([\s\S]+?)\$\$/g, (_m, tex) => {
-        try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }); }
-        catch { return `<code>$$${tex}$$</code>`; }
-    });
-    out = out.replace(/\$([^\n$]+?)\$/g, (_m, tex) => {
-        try { return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }); }
-        catch { return `<code>$${tex}$</code>`; }
-    });
-    out = out.replace(/\n/g, "<br />");
+/* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
+function preprocess(tex: string): string {
+    let out = tex;
+    // sqrt(expr) → \sqrt{expr}
+    out = out.replace(/\bsqrt\s*\(([^)]+)\)/g, '\\sqrt{$1}');
+    // (a)/(b) → \frac{a}{b}  (parenthesized fractions)
+    out = out.replace(/\(([^)]+)\)\s*\/\s*\(([^)]+)\)/g, '\\frac{$1}{$2}');
+    // Greek letter words  (only plain words, not already \-prefixed)
+    const greek: [RegExp, string][] = [
+        [/(?<!\\)\balpha\b/g,'\\alpha'],  [/(?<!\\)\bbeta\b/g,'\\beta'],
+        [/(?<!\\)\bgamma\b/g,'\\gamma'],  [/(?<!\\)\bdelta\b/g,'\\delta'],
+        [/(?<!\\)\btheta\b/g,'\\theta'],  [/(?<!\\)\blambda\b/g,'\\lambda'],
+        [/(?<!\\)\bmu\b/g,'\\mu'],        [/(?<!\\)\bpi\b/g,'\\pi'],
+        [/(?<!\\)\bsigma\b/g,'\\sigma'],  [/(?<!\\)\bphi\b/g,'\\phi'],
+        [/(?<!\\)\bomega\b/g,'\\omega'],  [/(?<!\\)\bDelta\b/g,'\\Delta'],
+        [/\binfinity\b/gi,'\\infty'],      [/(?<!\\)\binf\b/g,'\\infty'],
+    ];
+    for (const [re, rep] of greek) out = out.replace(re, rep);
+    // Common shorthand operators
+    out = out
+        .replace(/(?<!\\)>=/g, '\\geq ')
+        .replace(/(?<!\\)<=/g, '\\leq ')
+        .replace(/(?<!\\)!=/g, '\\neq ')
+        .replace(/(?<!\\)<->/g, '\\leftrightarrow ')
+        .replace(/(?<!\\)->/g, '\\rightarrow ')
+        .replace(/(?<![\\A-Za-z])\+-/g, '\\pm ');
     return out;
 }
 
-const LATEX_SNIPPETS = [
-    { label: "a/b", snippet: "\\frac{a}{b}", tip: "Fraction" },
-    { label: "√", snippet: "\\sqrt{x}", tip: "Square root" },
-    { label: "x²", snippet: "x^{2}", tip: "Superscript" },
-    { label: "xₙ", snippet: "x_{n}", tip: "Subscript" },
-    { label: "∫", snippet: "\\int_{a}^{b} f(x)\\,dx", tip: "Integral" },
-    { label: "∑", snippet: "\\sum_{i=1}^{n} x_i", tip: "Summation" },
-    { label: "∞", snippet: "\\infty", tip: "Infinity" },
-    { label: "π", snippet: "\\pi", tip: "Pi" },
-    { label: "α", snippet: "\\alpha", tip: "Alpha" },
-    { label: "β", snippet: "\\beta", tip: "Beta" },
-    { label: "θ", snippet: "\\theta", tip: "Theta" },
-    { label: "≠", snippet: "\\neq", tip: "Not equal" },
-    { label: "≤", snippet: "\\leq", tip: "≤" },
-    { label: "≥", snippet: "\\geq", tip: "≥" },
-    { label: "→", snippet: "\\rightarrow", tip: "Arrow" },
-    { label: "±", snippet: "\\pm", tip: "Plus-minus" },
-    { label: "×", snippet: "\\times", tip: "Times" },
-    { label: "÷", snippet: "\\div", tip: "Divide" },
-    { label: "Matrix", snippet: "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}", tip: "2×2 matrix" },
-];
+/* ─── Render LaTeX ─── */
+function renderLatex(raw: string): string {
+    if (!raw) return "";
+    let out = raw.replace(/\$\$([\s\S]+?)\$\$/g, (_m, tex) => {
+        try { return katex.renderToString(preprocess(tex.trim()), { displayMode: true, throwOnError: false }); }
+        catch { return `<code>$$${tex}$$</code>`; }
+    });
+    out = out.replace(/\$([^\n$]+?)\$/g, (_m, tex) => {
+        try { return katex.renderToString(preprocess(tex.trim()), { displayMode: false, throwOnError: false }); }
+        catch { return `<code>$${tex}$</code>`; }
+    });
+    return out.replace(/\n/g, "<br />");
+}
 
+/* ─── Snippet data (pre-render KaTeX at module load for performance) ─── */
+type Snippet = { display: string; insert: string; tip: string };
+
+function preRender(items: Snippet[]) {
+    return items.map(item => {
+        let html = item.display;
+        try { html = katex.renderToString(item.display, { displayMode: false, throwOnError: false }); } catch {}
+        return { ...item, html };
+    });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ALL SUBJECT CONFIGS  — snippets, mini, tips, sidebar ref, placeholder
+───────────────────────────────────────────────────────────── */
+type RefItem = { name: string; input: string; tex: string; note: string };
+type TipExample = { title: string; code: string; rendered: string; note: string };
+type SubjectConfig = {
+    icon: string;
+    cats: { name: string; items: { display: string; insert: string; tip: string; html: string }[] }[];
+    mini: { display: string; insert: string; tip: string; html: string }[];
+    tips: TipExample[];
+    ref: RefItem[];
+    hintLine: string;
+    placeholder: string;
+};
+
+function makeConfig(rawCats: { name: string; items: Snippet[] }[], rawMini: Snippet[], tips: TipExample[], ref: RefItem[], hintLine: string, placeholder: string, icon: string): SubjectConfig {
+    return {
+        icon,
+        cats: rawCats.map(cat => ({ name: cat.name, items: preRender(cat.items) })),
+        mini: preRender(rawMini),
+        tips, ref, hintLine, placeholder,
+    };
+}
+
+const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
+
+    /* ── MATHEMATICS ── */
+    Mathematics: makeConfig(
+        [
+            { name: "Algebra", items: [
+                { display: "\\frac{a}{b}", insert: "\\frac{a}{b}", tip: "Fraction — replace a and b" },
+                { display: "\\sqrt{x}", insert: "\\sqrt{x}", tip: "Square root — replace x" },
+                { display: "\\sqrt[3]{x}", insert: "\\sqrt[n]{x}", tip: "nth root — replace n and x" },
+                { display: "x^{2}", insert: "x^{n}", tip: "Power — replace x and n" },
+                { display: "x_{0}", insert: "x_{n}", tip: "Subscript — replace x and n" },
+                { display: "\\log_{b}x", insert: "\\log_{b}(x)", tip: "Logarithm base b" },
+                { display: "\\ln x", insert: "\\ln(x)", tip: "Natural logarithm" },
+                { display: "|x|", insert: "|x|", tip: "Absolute value" },
+            ]},
+            { name: "Operators", items: [
+                { display: "\\pm", insert: "\\pm", tip: "± Plus/Minus" },
+                { display: "\\times", insert: "\\times", tip: "× Multiply" },
+                { display: "\\div", insert: "\\div", tip: "÷ Divide" },
+                { display: "\\neq", insert: "\\neq", tip: "≠ Not equal" },
+                { display: "\\leq", insert: "\\leq", tip: "≤ Less or equal" },
+                { display: "\\geq", insert: "\\geq", tip: "≥ Greater or equal" },
+                { display: "\\approx", insert: "\\approx", tip: "≈ Approximately" },
+                { display: "\\infty", insert: "\\infty", tip: "∞ Infinity" },
+                { display: "\\therefore", insert: "\\therefore", tip: "∴ Therefore" },
+                { display: "\\in", insert: "\\in", tip: "∈ Element of" },
+            ]},
+            { name: "Greek", items: [
+                { display: "\\alpha", insert: "\\alpha", tip: "α Alpha" },
+                { display: "\\beta", insert: "\\beta", tip: "β Beta" },
+                { display: "\\gamma", insert: "\\gamma", tip: "γ Gamma" },
+                { display: "\\delta", insert: "\\delta", tip: "δ Delta" },
+                { display: "\\theta", insert: "\\theta", tip: "θ Theta" },
+                { display: "\\lambda", insert: "\\lambda", tip: "λ Lambda" },
+                { display: "\\mu", insert: "\\mu", tip: "μ Mu" },
+                { display: "\\pi", insert: "\\pi", tip: "π Pi" },
+                { display: "\\sigma", insert: "\\sigma", tip: "σ Sigma" },
+                { display: "\\phi", insert: "\\phi", tip: "φ Phi" },
+                { display: "\\omega", insert: "\\omega", tip: "ω Omega" },
+                { display: "\\Delta", insert: "\\Delta", tip: "Δ Delta (capital)" },
+            ]},
+            { name: "Calculus", items: [
+                { display: "\\int", insert: "\\int_{a}^{b} f(x)\\,dx", tip: "Definite integral" },
+                { display: "\\frac{d}{dx}", insert: "\\frac{d}{dx}()", tip: "Derivative d/dx" },
+                { display: "\\frac{dy}{dx}", insert: "\\frac{dy}{dx}", tip: "dy/dx notation" },
+                { display: "\\lim_{x\\to0}", insert: "\\lim_{x \\to 0}", tip: "Limit" },
+                { display: "\\sum", insert: "\\sum_{i=1}^{n}", tip: "Summation Σ" },
+                { display: "\\partial", insert: "\\partial", tip: "∂ Partial derivative" },
+            ]},
+        ],
+        [
+            { display: "\\frac{a}{b}", insert: "\\frac{a}{b}", tip: "Fraction" },
+            { display: "x^{2}", insert: "x^{n}", tip: "Power" },
+            { display: "x_{0}", insert: "x_{n}", tip: "Subscript" },
+            { display: "\\sqrt{x}", insert: "\\sqrt{x}", tip: "Square root" },
+            { display: "\\pm", insert: "\\pm", tip: "±" },
+            { display: "\\times", insert: "\\times", tip: "×" },
+            { display: "\\pi", insert: "\\pi", tip: "π" },
+            { display: "\\infty", insert: "\\infty", tip: "∞" },
+            { display: "\\theta", insert: "\\theta", tip: "θ" },
+        ],
+        [
+            { title: "① Surround math with $ signs", code: "Solve for $x = 5$", rendered: "x = 5", note: "Anything between $ $ becomes a formula" },
+            { title: "② Fractions: (a)/(b)", code: "$(x+1)/(x-1)$", rendered: "\\frac{x+1}{x-1}", note: "Parenthesized fraction auto-converts" },
+            { title: "③ Roots: sqrt( )", code: "$sqrt(x^2 + 4)$", rendered: "\\sqrt{x^2+4}", note: "Works for any expression" },
+            { title: "④ Type greek letters", code: "$theta = pi/4$", rendered: "\\theta = \\frac{\\pi}{4}", note: "alpha, beta, gamma, delta, pi, theta…" },
+        ],
+        [
+            { name: "(a)/(b)", input: "(a)/(b)", tex: "\\frac{a}{b}", note: "fraction" },
+            { name: "sqrt(x)", input: "sqrt(x)", tex: "\\sqrt{x}", note: "square root" },
+            { name: "x^{n}", input: "x^{n}", tex: "x^{n}", note: "exponent" },
+            { name: "x_{n}", input: "x_{n}", tex: "x_{n}", note: "subscript" },
+            { name: "pi", input: "pi", tex: "\\pi", note: "" },
+            { name: "theta", input: "theta", tex: "\\theta", note: "" },
+            { name: ">=  <=  !=", input: ">=", tex: "\\geq", note: "comparisons" },
+            { name: "+-", input: "+-", tex: "\\pm", note: "" },
+            { name: "infinity / inf", input: "inf", tex: "\\infty", note: "" },
+        ],
+        "Put math between $ dollar signs $ · Type (a)/(b) for fractions, sqrt(x), pi, theta, >= naturally",
+        "Type question here…\n\nExample: Solve for $x$: $(x^2 - 4)/(x + 2) = 3$\n\nTip: write $(top)/(bottom)$ for fractions, sqrt(expr) for roots, and greek letters like theta, pi directly.",
+        "∑"
+    ),
+
+    /* ── PHYSICS ── */
+    Physics: makeConfig(
+        [
+            { name: "Mechanics", items: [
+                { display: "\\vec{F}", insert: "\\vec{F}", tip: "Force vector" },
+                { display: "\\vec{v}", insert: "\\vec{v}", tip: "Velocity vector" },
+                { display: "\\vec{a}", insert: "\\vec{a}", tip: "Acceleration vector" },
+                { display: "\\frac{a}{b}", insert: "\\frac{a}{b}", tip: "Fraction — replace a and b" },
+                { display: "x^{2}", insert: "x^{n}", tip: "Power — replace x and n" },
+                { display: "\\Delta x", insert: "\\Delta x", tip: "Δx Change in x" },
+                { display: "\\mu", insert: "\\mu", tip: "μ Friction coefficient" },
+                { display: "\\omega", insert: "\\omega", tip: "ω Angular velocity" },
+            ]},
+            { name: "Energy", items: [
+                { display: "E = mc^2", insert: "E = mc^{2}", tip: "Mass-energy equivalence" },
+                { display: "\\frac{1}{2}mv^2", insert: "\\frac{1}{2}mv^{2}", tip: "Kinetic energy" },
+                { display: "mgh", insert: "mgh", tip: "Gravitational PE" },
+                { display: "P = (W)/(t)", insert: "P = \\frac{W}{t}", tip: "Power = Work/time" },
+                { display: "W = Fd\\cos\\theta", insert: "W = Fd\\cos\\theta", tip: "Work formula" },
+            ]},
+            { name: "Waves & EM", items: [
+                { display: "\\lambda", insert: "\\lambda", tip: "λ Wavelength" },
+                { display: "\\nu", insert: "\\nu", tip: "ν Frequency" },
+                { display: "c = \\lambda\\nu", insert: "c = \\lambda\\nu", tip: "Speed of light" },
+                { display: "\\varepsilon_0", insert: "\\varepsilon_0", tip: "ε₀ Permittivity" },
+                { display: "\\mu_0", insert: "\\mu_0", tip: "μ₀ Permeability" },
+                { display: "\\vec{E}", insert: "\\vec{E}", tip: "Electric field vector" },
+                { display: "\\vec{B}", insert: "\\vec{B}", tip: "Magnetic field vector" },
+            ]},
+            { name: "Units", items: [
+                { display: "\\text{m/s}", insert: "\\text{m/s}", tip: "Metres per second" },
+                { display: "\\text{m/s}^2", insert: "\\text{m/s}^{2}", tip: "Acceleration unit" },
+                { display: "\\text{kg}", insert: "\\text{kg}", tip: "Kilograms" },
+                { display: "\\text{N}", insert: "\\text{N}", tip: "Newtons" },
+                { display: "\\text{J}", insert: "\\text{J}", tip: "Joules" },
+                { display: "\\text{W}", insert: "\\text{W}", tip: "Watts" },
+                { display: "\\text{Pa}", insert: "\\text{Pa}", tip: "Pascals" },
+            ]},
+        ],
+        [
+            { display: "\\frac{a}{b}", insert: "\\frac{a}{b}", tip: "Fraction" },
+            { display: "\\vec{F}", insert: "\\vec{F}", tip: "Vector" },
+            { display: "x^{2}", insert: "x^{n}", tip: "Power" },
+            { display: "\\Delta x", insert: "\\Delta x", tip: "Change in x" },
+            { display: "\\mu", insert: "\\mu", tip: "μ" },
+            { display: "\\omega", insert: "\\omega", tip: "ω" },
+            { display: "\\lambda", insert: "\\lambda", tip: "λ" },
+            { display: "\\text{m/s}", insert: "\\text{m/s}", tip: "m/s" },
+            { display: "\\pm", insert: "\\pm", tip: "±" },
+        ],
+        [
+            { title: "① Wrap quantities in $ signs", code: "Mass $m = 2$ kg, force $F = 10$ N", rendered: "F = 10", note: "Isolate the math — leave units outside or use \\text{}" },
+            { title: "② Fractions for formulas", code: "$v = (d)/(t)$", rendered: "\\frac{d}{t}", note: "Type (numerator)/(denominator)" },
+            { title: "③ Vectors: vec( )", code: "$\\vec{F} = m\\vec{a}$", rendered: "\\vec{F} = m\\vec{a}", note: "Use \\vec{} for vector notation" },
+            { title: "④ Units: use \\text{}", code: "$a = 9.8\\,\\text{m/s}^2$", rendered: "9.8\\,\\text{m/s}^{2}", note: "\\text{} keeps units upright" },
+        ],
+        [
+            { name: "(d)/(t)", input: "(d)/(t)", tex: "\\frac{d}{t}", note: "fraction / formula" },
+            { name: "\\vec{F}", input: "\\vec{F}", tex: "\\vec{F}", note: "force vector" },
+            { name: "\\Delta x", input: "\\Delta x", tex: "\\Delta x", note: "change" },
+            { name: "x^{2}", input: "x^{2}", tex: "x^{2}", note: "squared" },
+            { name: "\\text{m/s}^2", input: "\\text{m/s}^2", tex: "\\text{m/s}^{2}", note: "unit" },
+            { name: "->", input: "->", tex: "\\rightarrow", note: "direction" },
+            { name: ">=  <=", input: ">=", tex: "\\geq", note: "inequality" },
+            { name: "+-", input: "+-", tex: "\\pm", note: "" },
+        ],
+        "Wrap quantities in $ signs $ · Type (a)/(b) for fractions, \\vec{F} for vectors, \\text{m/s} for units",
+        "Type question here…\n\nExample: An object of mass $m = 2\\,\\text{kg}$ accelerates at $a = 5\\,\\text{m/s}^2$.\nFind the net force $F$.\n\nTip: use $F = ma$, type -> for arrows, >= for ≥",
+        "⚡"
+    ),
+
+    /* ── CHEMISTRY ── */
+    Chemistry: makeConfig(
+        [
+            { name: "Reactions", items: [
+                { display: "\\rightarrow", insert: "\\rightarrow", tip: "→ Reaction arrow" },
+                { display: "\\rightleftharpoons", insert: "\\rightleftharpoons", tip: "⇌ Equilibrium" },
+                { display: "\\overset{\\Delta}{\\rightarrow}", insert: "\\overset{\\Delta}{\\rightarrow}", tip: "→ Heat above arrow" },
+                { display: "\\uparrow", insert: "\\uparrow", tip: "↑ Gas produced" },
+                { display: "\\downarrow", insert: "\\downarrow", tip: "↓ Precipitate" },
+            ]},
+            { name: "Compounds", items: [
+                { display: "\\text{H}_2\\text{O}", insert: "\\text{H}_2\\text{O}", tip: "H₂O Water" },
+                { display: "\\text{CO}_2", insert: "\\text{CO}_2", tip: "CO₂" },
+                { display: "\\text{O}_2", insert: "\\text{O}_2", tip: "O₂ Oxygen" },
+                { display: "\\text{H}_2", insert: "\\text{H}_2", tip: "H₂ Hydrogen" },
+                { display: "\\text{NaCl}", insert: "\\text{NaCl}", tip: "NaCl Salt" },
+                { display: "\\text{H}_2\\text{SO}_4", insert: "\\text{H}_2\\text{SO}_4", tip: "H₂SO₄ Sulfuric acid" },
+                { display: "\\text{HCl}", insert: "\\text{HCl}", tip: "HCl Hydrochloric acid" },
+                { display: "\\text{NH}_3", insert: "\\text{NH}_3", tip: "NH₃ Ammonia" },
+            ]},
+            { name: "Charges", items: [
+                { display: "^{+}", insert: "^{+}", tip: "⁺ Positive charge" },
+                { display: "^{-}", insert: "^{-}", tip: "⁻ Negative charge" },
+                { display: "^{2+}", insert: "^{2+}", tip: "²⁺ 2+ charge" },
+                { display: "^{2-}", insert: "^{2-}", tip: "²⁻ 2− charge" },
+                { display: "\\text{Ca}^{2+}", insert: "\\text{Ca}^{2+}", tip: "Ca²⁺ Calcium ion" },
+                { display: "\\text{Cl}^{-}", insert: "\\text{Cl}^{-}", tip: "Cl⁻ Chloride ion" },
+            ]},
+            { name: "Quantities", items: [
+                { display: "\\text{mol}", insert: "\\text{mol}", tip: "mol — amount" },
+                { display: "\\text{g/mol}", insert: "\\text{g/mol}", tip: "Molar mass unit" },
+                { display: "\\text{mol/L}", insert: "\\text{mol/L}", tip: "Concentration" },
+                { display: "K_{eq}", insert: "K_{eq}", tip: "Equilibrium constant" },
+                { display: "\\Delta H", insert: "\\Delta H", tip: "ΔH Enthalpy" },
+                { display: "\\Delta G", insert: "\\Delta G", tip: "ΔG Gibbs energy" },
+                { display: "\\Delta S", insert: "\\Delta S", tip: "ΔS Entropy" },
+            ]},
+        ],
+        [
+            { display: "\\rightarrow", insert: "\\rightarrow", tip: "→ reaction" },
+            { display: "\\rightleftharpoons", insert: "\\rightleftharpoons", tip: "⇌ equilibrium" },
+            { display: "^{+}", insert: "^{+}", tip: "⁺ charge" },
+            { display: "^{-}", insert: "^{-}", tip: "⁻ charge" },
+            { display: "\\text{H}_2\\text{O}", insert: "\\text{H}_2\\text{O}", tip: "H₂O" },
+            { display: "\\Delta H", insert: "\\Delta H", tip: "ΔH" },
+            { display: "\\uparrow", insert: "\\uparrow", tip: "↑ gas" },
+            { display: "\\downarrow", insert: "\\downarrow", tip: "↓ precipitate" },
+            { display: "\\text{mol}", insert: "\\text{mol}", tip: "mol" },
+        ],
+        [
+            { title: "① Write compounds in $ signs", code: "$\\text{H}_2\\text{O}$", rendered: "\\text{H}_2\\text{O}", note: "Use \\text{} for element symbols, _ for subscripts" },
+            { title: "② Reaction arrow: ->", code: "$\\text{H}_2 + \\text{O}_2 -> \\text{H}_2\\text{O}$", rendered: "\\text{H}_2 + \\text{O}_2 \\rightarrow \\text{H}_2\\text{O}", note: "Type -> for →, use equilibrium button for ⇌" },
+            { title: "③ Ions and charges: ^{+}", code: "$\\text{Ca}^{2+}$, $\\text{Cl}^{-}$", rendered: "\\text{Ca}^{2+}", note: "Use ^{2+} or ^{-} after the element symbol" },
+            { title: "④ Thermodynamic symbols", code: "$\\Delta H = -286\\,\\text{kJ/mol}$", rendered: "\\Delta H = -286\\,\\text{kJ/mol}", note: "Delta H, Delta G, Delta S from the Quantities tab" },
+        ],
+        [
+            { name: "->", input: "->", tex: "\\rightarrow", note: "reaction arrow" },
+            { name: "subscript: _{2}", input: "\\text{H}_{2}", tex: "\\text{H}_{2}", note: "atoms" },
+            { name: "charge: ^{+}", input: "^{+}", tex: "^{+}", note: "ion charge" },
+            { name: "\\Delta H", input: "\\Delta H", tex: "\\Delta H", note: "enthalpy" },
+            { name: "\\Delta G", input: "\\Delta G", tex: "\\Delta G", note: "Gibbs" },
+            { name: "K_{eq}", input: "K_{eq}", tex: "K_{eq}", note: "equilibrium constant" },
+            { name: "\\uparrow  \\downarrow", input: "\\uparrow", tex: "\\uparrow", note: "gas / precipitate" },
+        ],
+        "Write compounds in $ signs $ · Type -> for →, use element buttons in Compounds tab · ^{+} for charges",
+        "Type question here…\n\nExample: Balance the equation:\n$\\text{C}_3\\text{H}_8 + \\text{O}_2 -> \\text{CO}_2 + \\text{H}_2\\text{O}$\n\nTip: type -> for reaction arrow, use _ for subscripts: $\\text{H}_2\\text{O}$",
+        "⚗"
+    ),
+
+    /* ── BIOLOGY ── */
+    Biology: makeConfig(
+        [
+            { name: "Notation", items: [
+                { display: "\\text{ATP}", insert: "\\text{ATP}", tip: "ATP" },
+                { display: "\\text{DNA}", insert: "\\text{DNA}", tip: "DNA" },
+                { display: "\\text{RNA}", insert: "\\text{RNA}", tip: "RNA" },
+                { display: "\\text{CO}_2", insert: "\\text{CO}_2", tip: "CO₂" },
+                { display: "\\text{O}_2", insert: "\\text{O}_2", tip: "O₂" },
+                { display: "\\text{H}_2\\text{O}", insert: "\\text{H}_2\\text{O}", tip: "H₂O" },
+                { display: "\\text{C}_6\\text{H}_{12}\\text{O}_6", insert: "\\text{C}_6\\text{H}_{12}\\text{O}_6", tip: "Glucose" },
+            ]},
+            { name: "Genetics", items: [
+                { display: "\\text{AA}", insert: "\\text{AA}", tip: "Homozygous dominant" },
+                { display: "\\text{Aa}", insert: "\\text{Aa}", tip: "Heterozygous" },
+                { display: "\\text{aa}", insert: "\\text{aa}", tip: "Homozygous recessive" },
+                { display: "\\text{P}_1", insert: "\\text{P}_1", tip: "Parental generation" },
+                { display: "\\text{F}_1", insert: "\\text{F}_1", tip: "First filial generation" },
+                { display: "\\text{F}_2", insert: "\\text{F}_2", tip: "Second filial generation" },
+                { display: "3:1", insert: "3:1", tip: "3:1 ratio" },
+            ]},
+            { name: "Process", items: [
+                { display: "\\rightarrow", insert: "\\rightarrow", tip: "→ leads to" },
+                { display: "\\uparrow", insert: "\\uparrow", tip: "↑ increases" },
+                { display: "\\downarrow", insert: "\\downarrow", tip: "↓ decreases" },
+                { display: "\\approx", insert: "\\approx", tip: "≈ approximately" },
+                { display: "\\Delta", insert: "\\Delta", tip: "Δ change in" },
+                { display: "\\%", insert: "\\%", tip: "% percent" },
+            ]},
+        ],
+        [
+            { display: "\\text{ATP}", insert: "\\text{ATP}", tip: "ATP" },
+            { display: "\\text{DNA}", insert: "\\text{DNA}", tip: "DNA" },
+            { display: "\\text{RNA}", insert: "\\text{RNA}", tip: "RNA" },
+            { display: "\\text{CO}_2", insert: "\\text{CO}_2", tip: "CO₂" },
+            { display: "\\text{O}_2", insert: "\\text{O}_2", tip: "O₂" },
+            { display: "\\rightarrow", insert: "\\rightarrow", tip: "→" },
+            { display: "\\uparrow", insert: "\\uparrow", tip: "↑" },
+            { display: "\\downarrow", insert: "\\downarrow", tip: "↓" },
+        ],
+        [
+            { title: "① Molecules in $ signs", code: "$\\text{ATP}$ is produced in mitochondria", rendered: "\\text{ATP}", note: "Use \\text{} for abbreviations like ATP, DNA, RNA" },
+            { title: "② Chemical formulas", code: "$\\text{C}_6\\text{H}_{12}\\text{O}_6$", rendered: "\\text{C}_6\\text{H}_{12}\\text{O}_6", note: "Click the button in Notation tab" },
+            { title: "③ Genetics notation", code: "$\\text{Aa} \\times \\text{Aa}$", rendered: "\\text{Aa} \\times \\text{Aa}", note: "Use the Genetics tab for genotype buttons" },
+            { title: "④ Process arrows", code: "Light energy $\\rightarrow$ Glucose", rendered: "\\rightarrow", note: "Type -> for arrows, ↑ for increases, ↓ for decreases" },
+        ],
+        [
+            { name: "->  sequence", input: "->", tex: "\\rightarrow", note: "process/leads to" },
+            { name: "\\text{ATP}", input: "\\text{ATP}", tex: "\\text{ATP}", note: "molecule name" },
+            { name: "\\text{DNA}", input: "\\text{DNA}", tex: "\\text{DNA}", note: "" },
+            { name: "Aa genotype", input: "\\text{Aa}", tex: "\\text{Aa}", note: "genetics" },
+            { name: "F_1 generation", input: "\\text{F}_1", tex: "\\text{F}_1", note: "" },
+            { name: "↑ increases", input: "\\uparrow", tex: "\\uparrow", note: "" },
+            { name: "↓ decreases", input: "\\downarrow", tex: "\\downarrow", note: "" },
+        ],
+        "Biology: use $ signs $ for molecules, genotypes, ratios · Type -> for arrows",
+        "Type question here…\n\nExample: Describe the role of $\\text{ATP}$ in cellular respiration.\nWrite the overall equation:\n$\\text{C}_6\\text{H}_{12}\\text{O}_6 + \\text{O}_2 -> \\text{CO}_2 + \\text{H}_2\\text{O} + \\text{ATP}$\n\nTip: no special formatting needed for text-only answers.",
+        "🧬"
+    ),
+
+    /* ── ENGLISH ── */
+    English: makeConfig(
+        [
+            { name: "Quotes", items: [
+                { display: "\\text{\"...\"}", insert: "\\text{\"\"}", tip: "Double quotation marks" },
+                { display: "\\text{'...'}", insert: "\\text{''}", tip: "Single quotation / apostrophe" },
+                { display: "\\ldots", insert: "\\ldots", tip: "… Ellipsis" },
+                { display: "\\text{---}", insert: "\\text{---}", tip: "Em dash" },
+                { display: "\\text{--}", insert: "\\text{--}", tip: "En dash" },
+            ]},
+            { name: "Phonetics", items: [
+                { display: "\\text{/θ/}", insert: "\\text{/θ/}", tip: "/θ/ voiceless dental fricative (thin)" },
+                { display: "\\text{/ð/}", insert: "\\text{/ð/}", tip: "/ð/ voiced dental fricative (this)" },
+                { display: "\\text{/ʃ/}", insert: "\\text{/ʃ/}", tip: "/ʃ/ sh sound" },
+                { display: "\\text{/ŋ/}", insert: "\\text{/ŋ/}", tip: "/ŋ/ ng sound (sing)" },
+                { display: "\\text{/æ/}", insert: "\\text{/æ/}", tip: "/æ/ short a (cat)" },
+                { display: "\\text{/ɪ/}", insert: "\\text{/ɪ/}", tip: "/ɪ/ short i (bit)" },
+            ]},
+            { name: "Misc", items: [
+                { display: "\\underline{x}", insert: "\\underline{word}", tip: "Underline text" },
+                { display: "\\textit{x}", insert: "\\textit{word}", tip: "Italic" },
+                { display: "\\textbf{x}", insert: "\\textbf{word}", tip: "Bold" },
+                { display: "\\neq", insert: "\\neq", tip: "≠ not equal / contrasting" },
+                { display: "\\rightarrow", insert: "\\rightarrow", tip: "→ leads to / results in" },
+            ]},
+        ],
+        [
+            { display: "\\ldots", insert: "\\ldots", tip: "…" },
+            { display: "\\underline{x}", insert: "\\underline{word}", tip: "Underline" },
+            { display: "\\textit{x}", insert: "\\textit{word}", tip: "Italic" },
+            { display: "\\textbf{x}", insert: "\\textbf{word}", tip: "Bold" },
+            { display: "\\rightarrow", insert: "\\rightarrow", tip: "→" },
+            { display: "\\text{/θ/}", insert: "\\text{/θ/}", tip: "/θ/" },
+        ],
+        [
+            { title: "① Quoting text in $ signs", code: "\"$\\text{To be or not to be}$\"", rendered: "\\text{To be or not to be}", note: "Use \\text{} to keep words formatted correctly" },
+            { title: "② Phonetic symbols", code: "The word \"thin\" uses $\\text{/θ/}$", rendered: "\\text{/θ/}", note: "Find phonetic buttons in the Phonetics tab" },
+            { title: "③ Most of an English question needs no $", code: "Identify the literary device in the passage.", rendered: "", note: "Only use $ when you need special symbols" },
+            { title: "④ Emphasis or structure", code: "$\\underline{\\text{Underline}}$ the correct word.", rendered: "\\underline{\\text{word}}", note: "Use underline, italic, or bold from the Misc tab" },
+        ],
+        [
+            { name: "\\ldots", input: "\\ldots", tex: "\\ldots", note: "ellipsis" },
+            { name: "\\underline{word}", input: "\\underline{word}", tex: "\\underline{\\text{word}}", note: "underline" },
+            { name: "\\textit{word}", input: "\\textit{word}", tex: "\\textit{word}", note: "italic" },
+            { name: "\\textbf{word}", input: "\\textbf{word}", tex: "\\textbf{word}", note: "bold" },
+            { name: "->", input: "->", tex: "\\rightarrow", note: "leads to" },
+            { name: "phonetic /θ/", input: "\\text{/θ/}", tex: "\\text{/θ/}", note: "IPA symbol" },
+        ],
+        "English: wrap special symbols in $ signs $ · Use \\text{} for words, \\underline{} to underline",
+        "Type question here…\n\nExample: Identify the literary device used in the following passage, then explain its effect on the reader.\n\nTip: most English questions need no special formatting — just type normally.",
+        "📝"
+    ),
+};
+
+/* ─── Interfaces ─── */
 interface Question {
     id: number;
     text: string;
@@ -47,69 +426,123 @@ interface Question {
     correct: "A" | "B" | "C" | "D" | "";
     points: number;
 }
+const blankQ = (): Question => ({ id: Date.now() + Math.random(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1 });
 
-const blankQ = (): Question => ({ id: Date.now(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1 });
+interface BankQ { id: number; q: string; subj: string; type: string; used: number; }
+const INITIAL_BANK: BankQ[] = [
+    { id: 1, q: "Find the derivative of $f(x) = x^3 + 2x^2 - 5x$", subj: "Mathematics", type: "Multiple Choice", used: 3 },
+    { id: 2, q: "Explain Newton's Second Law of Motion in your own words.", subj: "Physics", type: "Short Answer", used: 5 },
+    { id: 3, q: "Balance: $\\text{H}_2 + \\text{O}_2 \\rightarrow \\text{H}_2\\text{O}$", subj: "Chemistry", type: "Multiple Choice", used: 2 },
+    { id: 4, q: "Calculate the area under $y = x^2$ from $x = 0$ to $x = 3$", subj: "Mathematics", type: "Problem Solving", used: 1 },
+    { id: 5, q: "What is the electric field at distance $r$ from a point charge $q$?", subj: "Physics", type: "Multiple Choice", used: 4 },
+    { id: 6, q: "What is the molecular formula of glucose?", subj: "Chemistry", type: "Multiple Choice", used: 6 },
+];
 
-interface LatexFieldProps { label: string; value: string; onChange: (v: string) => void; rows?: number; placeholder?: string; }
+/* ─── LatexField component ─── */
+interface LatexFieldProps {
+    label: string; value: string; onChange: (v: string) => void;
+    rows?: number; placeholder?: string; mini?: boolean; subject?: string;
+}
 
-function LatexField({ label, value, onChange, rows = 3, placeholder }: LatexFieldProps) {
-    const [tab, setTab] = useState<"write" | "preview">("write");
-    const textareaRef = useCallback((node: HTMLTextAreaElement | null) => { if (node) (window as unknown as Record<string, HTMLTextAreaElement>)[`_lf_${label}`] = node; }, [label]);
+function LatexField({ label, value, onChange, rows = 3, placeholder, mini = false, subject = "Mathematics" }: LatexFieldProps) {
+    const cfg = SUBJECT_CONFIG[subject] ?? SUBJECT_CONFIG["Mathematics"];
+    const [activeCat, setActiveCat] = useState(0);
+    const [showTips, setShowTips] = useState(false);
+    const taRef = useCallback((node: HTMLTextAreaElement | null) => {
+        if (node) (window as unknown as Record<string, HTMLTextAreaElement>)[`_lf_${label}`] = node;
+    }, [label]);
 
-    const insert = (snippet: string) => {
+    const insertSnippet = (item: Snippet) => {
         const ta = (window as unknown as Record<string, HTMLTextAreaElement>)[`_lf_${label}`];
+        const ins = ` $${item.insert}$ `;
         if (ta) {
             const s = ta.selectionStart ?? value.length;
             const e = ta.selectionEnd ?? value.length;
-            onChange(value.slice(0, s) + `$${snippet}$` + value.slice(e));
-            setTimeout(() => { ta.focus(); ta.setSelectionRange(s + snippet.length + 2, s + snippet.length + 2); }, 0);
-        } else { onChange(value + `$${snippet}$`); }
+            onChange(value.slice(0, s) + ins + value.slice(e));
+            setTimeout(() => { ta.focus(); ta.setSelectionRange(s + ins.length, s + ins.length); }, 0);
+        } else { onChange(value + ins); }
     };
+
+    const snippetBtn = (item: Snippet & { html: string }, key: string) => (
+        <button key={key} title={item.tip} onClick={() => insertSnippet(item)}
+            dangerouslySetInnerHTML={{ __html: item.html }}
+            style={{ padding: "0.1rem 0.4rem", minWidth: 30, height: 26, borderRadius: 5, border: "1.5px solid var(--gray-200)", background: "#fff", cursor: "pointer" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--primary-50)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary-300)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gray-200)"; }}
+        />
+    );
 
     return (
         <div style={{ marginBottom: "0.875rem" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>
-                <div style={{ display: "flex", gap: "0.2rem" }}>
-                    {(["write", "preview"] as const).map(t => (
-                        <button key={t} onClick={() => setTab(t)} style={{ padding: "0.15rem 0.55rem", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600, border: "1.5px solid", borderColor: tab === t ? "var(--primary-500)" : "var(--gray-200)", background: tab === t ? "var(--primary-50)" : "#fff", color: tab === t ? "var(--primary-600)" : "var(--gray-400)", cursor: "pointer" }}>
-                            {t === "write" ? "Write" : "Preview"}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.2rem", marginBottom: "0.4rem" }}>
-                {LATEX_SNIPPETS.map(s => (
-                    <button key={s.label} title={s.tip} onClick={() => insert(s.snippet)}
-                        style={{ padding: "0.15rem 0.45rem", borderRadius: 5, border: "1.5px solid var(--gray-200)", background: "#fff", fontSize: "0.72rem", fontWeight: 600, color: "var(--gray-700)", cursor: "pointer" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--primary-50)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary-300)"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gray-200)"; }}>
-                        {s.label}
+                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>{label}</label>
+                {!mini && (
+                    <button onClick={() => setShowTips(t => !t)} style={{ fontSize: "0.68rem", fontWeight: 600, color: showTips ? "#b45309" : "var(--primary-600)", background: showTips ? "#fef3c7" : "var(--primary-50)", border: `1px solid ${showTips ? "#fde68a" : "var(--primary-200)"}`, borderRadius: 5, padding: "0.1rem 0.45rem", cursor: "pointer" }}>
+                        {showTips ? "✕ Hide tips" : `? How to write ${subject ?? "math"}`}
                     </button>
-                ))}
+                )}
             </div>
-            {tab === "write" ? (
-                <textarea ref={textareaRef} value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder={placeholder}
-                    style={{ width: "100%", padding: "0.65rem 0.9rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.875rem", fontFamily: "monospace", resize: "vertical", lineHeight: 1.6 }}
-                    onFocus={e => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.boxShadow = "0 0 0 3px var(--primary-50)"; }}
-                    onBlur={e => { e.target.style.borderColor = "var(--gray-200)"; e.target.style.boxShadow = "none"; }} />
-            ) : (
-                <div style={{ minHeight: rows * 26, padding: "0.65rem 0.9rem", background: "var(--gray-50)", border: "1.5px solid var(--primary-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", lineHeight: 1.8 }}
-                    dangerouslySetInnerHTML={{ __html: value ? renderLatex(value) : "<em style='color:var(--gray-400)'>Nothing to preview…</em>" }} />
+
+            {/* Teacher-friendly tips panel — subject-specific */}
+            {!mini && showTips && (
+                <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 10, padding: "0.75rem 0.875rem", marginBottom: "0.5rem" }}>
+                    <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.82rem", marginBottom: "0.6rem" }}>{cfg.icon} Writing {subject} — quick guide</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+                        {cfg.tips.map(tip => {
+                            let rendered = "";
+                            if (tip.rendered) { try { rendered = katex.renderToString(tip.rendered, { throwOnError: false }); } catch {} }
+                            return (
+                                <div key={tip.title} style={{ background: "#fff", borderRadius: 8, padding: "0.5rem 0.65rem" }}>
+                                    <div style={{ fontWeight: 700, color: "#78350f", fontSize: "0.75rem", marginBottom: "0.25rem" }}>{tip.title}</div>
+                                    <code style={{ fontSize: "0.72rem", color: "#b45309", display: "block", marginBottom: "0.15rem" }}>{tip.code}</code>
+                                    {rendered && <div style={{ fontSize: "0.7rem", color: "#78350f" }}>→&nbsp;<span dangerouslySetInnerHTML={{ __html: rendered }} /></div>}
+                                    <div style={{ fontSize: "0.67rem", color: "#a16207", marginTop: "0.15rem" }}>{tip.note}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
-            <p style={{ fontSize: "0.68rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>Use <code>$...$</code> for inline math, <code>$$...$$</code> for block</p>
+
+            {mini ? (
+                /* Compact subject-specific single-row toolbar for option fields */
+                <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "0.2rem", marginBottom: "0.35rem" }}>
+                    {cfg.mini.map(item => snippetBtn(item, item.insert))}
+                </div>
+            ) : (
+                /* Full subject-specific categorized toolbar for question text */
+                <div style={{ background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: 10, padding: "0.4rem 0.5rem", marginBottom: "0.4rem" }}>
+                    <div style={{ display: "flex", gap: "0.2rem", marginBottom: "0.4rem", flexWrap: "wrap" as const }}>
+                        {cfg.cats.map((cat, i) => (
+                            <button key={cat.name} onClick={() => setActiveCat(i)}
+                                style={{ padding: "0.1rem 0.5rem", borderRadius: 5, fontSize: "0.68rem", fontWeight: 600, border: "1.5px solid", cursor: "pointer",
+                                    borderColor: activeCat === i ? "var(--primary-500)" : "transparent",
+                                    background: activeCat === i ? "var(--primary-50)" : "transparent",
+                                    color: activeCat === i ? "var(--primary-600)" : "var(--gray-500)" }}>
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "0.2rem" }}>
+                        {cfg.cats[Math.min(activeCat, cfg.cats.length - 1)].items.map(item => snippetBtn(item, item.insert))}
+                    </div>
+                </div>
+            )}
+
+            <textarea ref={taRef} value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder={placeholder}
+                style={{ width: "100%", padding: "0.65rem 0.9rem", background: "#fff", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.875rem", fontFamily: "monospace", resize: "vertical" as const, lineHeight: 1.6, boxSizing: "border-box" as const }}
+                onFocus={e => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.boxShadow = "0 0 0 3px var(--primary-50)"; }}
+                onBlur={e => { e.target.style.borderColor = "var(--gray-200)"; e.target.style.boxShadow = "none"; }} />
+
+            {/* Always-visible live preview when there is content */}
+            {!mini && value.trim() && (
+                <div style={{ marginTop: "0.3rem", padding: "0.5rem 0.75rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: 8, fontSize: "0.9rem", lineHeight: 1.8 }}
+                    dangerouslySetInnerHTML={{ __html: renderLatex(value) }} />
+            )}
+            {!mini && <p style={{ fontSize: "0.63rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>{cfg.hintLine}</p>}
         </div>
     );
 }
-
-const BANK_QUESTIONS = [
-    { q: "Find the derivative of $f(x) = x^3 + 2x^2 - 5x$", subj: "Mathematics", type: "Multiple Choice", used: 3 },
-    { q: "Explain Newton&apos;s Second Law of Motion", subj: "Physics", type: "Short Answer", used: 5 },
-    { q: "Balance: $\\text{H}_2 + \\text{O}_2 \\rightarrow \\text{H}_2\\text{O}$", subj: "Chemistry", type: "Multiple Choice", used: 2 },
-    { q: "Area under $y = x^2$ from $0$ to $3$", subj: "Mathematics", type: "Problem Solving", used: 1 },
-    { q: "Electric field at distance $r$ from charge $q$?", subj: "Physics", type: "Multiple Choice", used: 4 },
-    { q: "Molecular formula of glucose", subj: "Chemistry", type: "Multiple Choice", used: 6 },
-];
 
 export default function TeacherExams() {
     const [activeTab, setActiveTab] = useState<"create" | "bank" | "results">("create");
@@ -126,6 +559,11 @@ export default function TeacherExams() {
     const q = questions[activeQ];
     const updateQ = (patch: Partial<Question>) =>
         setQuestions(prev => prev.map((qq, i) => i === activeQ ? { ...qq, ...patch } : qq));
+
+    // Bank state (mutable so Edit/Use work)
+    const [bank, setBank] = useState<BankQ[]>(INITIAL_BANK);
+    const [bankSearch, setBankSearch] = useState("");
+    const [editingBank, setEditingBank] = useState<BankQ | null>(null);
 
     // Results
     const [results, setResults] = useState([
@@ -150,15 +588,69 @@ export default function TeacherExams() {
         setQuizTitle(""); setQuestions([blankQ()]); setActiveQ(0);
     };
 
+    // Add a bank question into the current quiz
+    const useFromBank = (item: BankQ) => {
+        const newQ: Question = { ...blankQ(), text: item.q };
+        setQuestions(p => { const next = [...p, newQ]; setActiveQ(next.length - 1); return next; });
+        setBank(p => p.map(b => b.id === item.id ? { ...b, used: b.used + 1 } : b));
+        setActiveTab("create");
+        showToast("Question added — fill in the answer options ✓");
+    };
+
+    // Save edits to a bank question
+    const saveBankEdit = () => {
+        if (!editingBank) return;
+        setBank(p => p.map(b => b.id === editingBank.id ? editingBank : b));
+        setEditingBank(null);
+        showToast("Bank question updated ✓");
+    };
+
+    const filteredBank = bankSearch.trim()
+        ? bank.filter(b => b.q.toLowerCase().includes(bankSearch.toLowerCase()) || b.subj.toLowerCase().includes(bankSearch.toLowerCase()))
+        : bank;
+
     return (
         <div className="page-wrapper">
             {/* Toast */}
             {toast && (
-                <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#fff", borderRadius: 14, padding: "1rem 1.5rem", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", border: `1.5px solid ${toast.ok ? "var(--success)" : "var(--danger)"}`, display: "flex", alignItems: "center", gap: "0.75rem", animation: "fadeIn 0.3s ease" }}>
+                <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#fff", borderRadius: 14, padding: "1rem 1.5rem", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", border: `1.5px solid ${toast.ok ? "var(--success)" : "var(--danger)"}`, display: "flex", alignItems: "center", gap: "0.75rem" }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: toast.ok ? "var(--success-light)" : "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", color: toast.ok ? "var(--success)" : "var(--danger)" }}>
                         {toast.ok ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
                     </div>
                     <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{toast.msg}</span>
+                </div>
+            )}
+
+            {/* Bank Edit Modal */}
+            {editingBank && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+                    <div style={{ background: "#fff", borderRadius: 16, padding: "1.5rem", width: "100%", maxWidth: 600, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+                            <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Edit Bank Question</h3>
+                            <button onClick={() => setEditingBank(null)} style={{ width: 30, height: 30, borderRadius: 7, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gray-500)" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <LatexField label="Question Text" value={editingBank.q} onChange={v => setEditingBank({ ...editingBank, q: v })} rows={4} placeholder="Edit question text…" />
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
+                            <div>
+                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.35rem" }}>Subject</label>
+                                <select value={editingBank.subj} onChange={e => setEditingBank({ ...editingBank, subj: e.target.value })} style={{ width: "100%", padding: "0.6rem 0.8rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.875rem", background: "#fff" }}>
+                                    <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.35rem" }}>Type</label>
+                                <select value={editingBank.type} onChange={e => setEditingBank({ ...editingBank, type: e.target.value })} style={{ width: "100%", padding: "0.6rem 0.8rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.875rem", background: "#fff" }}>
+                                    <option>Multiple Choice</option><option>Short Answer</option><option>Problem Solving</option><option>True/False</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                            <button className="btn btn-secondary" onClick={() => setEditingBank(null)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={saveBankEdit}>Save Changes</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -168,13 +660,13 @@ export default function TeacherExams() {
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                         Exams & Assessments
                     </h1>
-                    <p className="page-subtitle">Create quizzes with live LaTeX preview, manage exam bank &amp; grades</p>
+                    <p className="page-subtitle">Create quizzes, manage exam bank &amp; student grades</p>
                 </div>
             </div>
 
             <div className="tabs" style={{ marginBottom: "1.5rem" }}>
                 <button className={`tab ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>Create Quiz</button>
-                <button className={`tab ${activeTab === "bank" ? "active" : ""}`} onClick={() => setActiveTab("bank")}>Exam Bank</button>
+                <button className={`tab ${activeTab === "bank" ? "active" : ""}`} onClick={() => setActiveTab("bank")}>Exam Bank ({bank.length})</button>
                 <button className={`tab ${activeTab === "results" ? "active" : ""}`} onClick={() => setActiveTab("results")}>Results &amp; Grades</button>
             </div>
 
@@ -186,10 +678,10 @@ export default function TeacherExams() {
                         <div className="card">
                             <h3 className="card-title" style={{ marginBottom: "1rem" }}>Quiz Details</h3>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                                <div className="input-group"><label>Quiz Title</label><div className="input-field"><input value={quizTitle} onChange={e => setQuizTitle(e.target.value)} placeholder="e.g., Chapter 7 — Calculus Quiz" /></div></div>
+                                <div className="input-group"><label>Quiz Title</label><div className="input-field"><input value={quizTitle} onChange={e => setQuizTitle(e.target.value)} placeholder={`e.g., ${subject} Chapter Quiz`} /></div></div>
                                 <div className="input-group"><label>Subject</label>
                                     <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
-                                        <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
+                                        <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>English</option>
                                     </select>
                                 </div>
                                 <div className="input-group"><label>Class</label>
@@ -208,27 +700,27 @@ export default function TeacherExams() {
                                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                                     <label style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>Points:</label>
                                     <input type="number" min={1} max={20} value={q.points} onChange={e => updateQ({ points: parseInt(e.target.value) || 1 })}
-                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.85rem", textAlign: "center" }} />
+                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.85rem", textAlign: "center" as const }} />
                                     {questions.length > 1 && (
                                         <button onClick={() => removeQuestion(activeQ)} style={{ padding: "0.3rem 0.65rem", borderRadius: 8, border: "1.5px solid var(--danger-light)", background: "var(--danger-light)", color: "var(--danger)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>Remove</button>
                                     )}
                                 </div>
                             </div>
 
-                            <LatexField label="Question Text" value={q.text} onChange={v => updateQ({ text: v })} rows={4}
-                                placeholder={"Type question here…\n\nExample: Find the derivative of $f(x) = x^3 + 2x$"} />
+                            {/* Subject-aware field — snippets, tips, placeholder all derived from subject */}
+                            <LatexField label="Question Text" value={q.text} onChange={v => updateQ({ text: v })} rows={4} placeholder={SUBJECT_CONFIG[subject]?.placeholder ?? "Type question here…"} subject={subject} />
 
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
                                 {(["A", "B", "C", "D"] as const).map(opt => (
-                                    <LatexField key={opt} label={`Option ${opt}`} value={q.options[opt]} onChange={v => updateQ({ options: { ...q.options, [opt]: v } })} rows={2} placeholder={`Option ${opt}`} />
+                                    <LatexField key={opt} label={`Option ${opt}`} value={q.options[opt]} onChange={v => updateQ({ options: { ...q.options, [opt]: v } })} rows={2} placeholder={`Option ${opt}`} mini subject={subject} />
                                 ))}
                             </div>
 
                             <div>
-                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>Correct Answer</label>
+                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>Correct Answer</label>
                                 <div style={{ display: "flex", gap: "0.5rem" }}>
                                     {(["A", "B", "C", "D"] as const).map(o => (
-                                        <button key={o} onClick={() => updateQ({ correct: o })} className={`btn ${q.correct === o ? "btn-primary" : "btn-outline"}`} style={{ width: 48, position: "relative" }}>
+                                        <button key={o} onClick={() => updateQ({ correct: o })} className={`btn ${q.correct === o ? "btn-primary" : "btn-secondary"}`} style={{ width: 48, position: "relative" as const }}>
                                             {o}
                                             {q.correct === o && (
                                                 <span style={{ position: "absolute", top: -6, right: -6, width: 14, height: 14, borderRadius: "50%", background: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -238,7 +730,7 @@ export default function TeacherExams() {
                                         </button>
                                     ))}
                                 </div>
-                                {q.correct && <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>✓ Option {q.correct} is the correct answer</p>}
+                                {q.correct && <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>✓ Option {q.correct} is correct</p>}
                             </div>
                         </div>
 
@@ -255,15 +747,15 @@ export default function TeacherExams() {
                         </div>
                     </div>
 
-                    {/* Right: navigator + cheatsheet */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", position: "sticky", top: "1rem" }}>
+                    {/* Right: navigator + rendered LaTeX ref */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", position: "sticky" as const, top: "1rem" }}>
                         <div className="card">
                             <h3 className="card-title" style={{ marginBottom: "0.875rem" }}>Questions</h3>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 380, overflowY: "auto" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 380, overflowY: "auto" as const }}>
                                 {questions.map((qq, i) => (
-                                    <button key={qq.id} onClick={() => setActiveQ(i)} style={{ padding: "0.6rem 0.75rem", borderRadius: 10, textAlign: "left", border: `2px solid ${activeQ === i ? "var(--primary-400)" : "var(--gray-200)"}`, background: activeQ === i ? "var(--primary-50)" : "#fff", cursor: "pointer" }}>
+                                    <button key={qq.id} onClick={() => setActiveQ(i)} style={{ padding: "0.6rem 0.75rem", borderRadius: 10, textAlign: "left" as const, border: `2px solid ${activeQ === i ? "var(--primary-400)" : "var(--gray-200)"}`, background: activeQ === i ? "var(--primary-50)" : "#fff", cursor: "pointer" }}>
                                         <div style={{ fontSize: "0.76rem", fontWeight: 700, color: activeQ === i ? "var(--primary-600)" : "var(--gray-600)" }}>Q{i + 1}</div>
-                                        <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{qq.text ? qq.text.replace(/\$[^$]*\$/g, "[math]").slice(0, 45) : <em>No text yet</em>}</div>
+                                        <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{qq.text ? qq.text.replace(/\$[^$]*\$/g, "[math]").slice(0, 45) : <em>No text yet</em>}</div>
                                         <div style={{ marginTop: 3, display: "flex", gap: "0.25rem" }}>
                                             {qq.correct && <span style={{ fontSize: "0.62rem", padding: "0.1rem 0.35rem", borderRadius: 4, background: "var(--success-light)", color: "#065f46", fontWeight: 600 }}>Ans: {qq.correct}</span>}
                                             <span style={{ fontSize: "0.62rem", padding: "0.1rem 0.35rem", borderRadius: 4, background: "var(--gray-100)", color: "var(--gray-500)" }}>{qq.points}pt</span>
@@ -276,14 +768,24 @@ export default function TeacherExams() {
                             </div>
                         </div>
 
+                        {/* Subject-specific reference card */}
                         <div className="card">
-                            <h3 className="card-title" style={{ marginBottom: "0.75rem", fontSize: "0.82rem" }}>LaTeX Quick Ref</h3>
-                            {[["Fraction", "$\\\\frac{a}{b}$"], ["Root", "$\\\\sqrt{x}$"], ["Integral", "$\\\\int_a^b$"], ["Block", "$$E=mc^2$$"], ["Sub", "$x_{n}$"], ["Sup", "$x^{2}$"], ["Pi", "$\\\\pi$"], ["Sum", "$\\\\sum_i$"]].map(([nm, ex]) => (
-                                <div key={nm} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.73rem", padding: "0.2rem 0", borderBottom: "1px solid var(--gray-100)" }}>
-                                    <span style={{ color: "var(--gray-500)" }}>{nm}</span>
-                                    <code style={{ color: "var(--primary-700)", background: "var(--primary-50)", padding: "0.1rem 0.35rem", borderRadius: 4 }}>{ex}</code>
-                                </div>
-                            ))}
+                            <h3 className="card-title" style={{ marginBottom: "0.1rem", fontSize: "0.82rem" }}>{SUBJECT_CONFIG[subject]?.icon} {subject} Reference</h3>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: "0.5rem" }}>What you type → how it looks</div>
+                            {(SUBJECT_CONFIG[subject]?.ref ?? []).map(({ name, tex, note }) => {
+                                let rendered = tex;
+                                try { rendered = katex.renderToString(tex, { displayMode: false, throwOnError: false }); } catch {}
+                                return (
+                                    <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.73rem", padding: "0.3rem 0", borderBottom: "1px solid var(--gray-100)", gap: "0.4rem" }}>
+                                        <code style={{ color: "var(--primary-700)", background: "var(--primary-50)", padding: "0.1rem 0.35rem", borderRadius: 4, fontSize: "0.68rem", flexShrink: 0, maxWidth: 90 }}>{name}</code>
+                                        {note && <span style={{ color: "var(--gray-400)", fontSize: "0.65rem", flex: 1 }}>{note}</span>}
+                                        <span dangerouslySetInnerHTML={{ __html: rendered }} />
+                                    </div>
+                                );
+                            })}
+                            <div style={{ marginTop: "0.6rem", padding: "0.5rem", background: "var(--primary-50)", borderRadius: 8, fontSize: "0.68rem", color: "var(--primary-700)" }}>
+                                Wrap formulas/symbols in <strong>$ dollar signs $</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -293,22 +795,32 @@ export default function TeacherExams() {
             {activeTab === "bank" && (
                 <div className="card">
                     <div className="card-header">
-                        <h3 className="card-title">Exam Bank</h3>
-                        <div className="header-search" style={{ width: 240 }}><input placeholder="Search questions..." /></div>
+                        <h3 className="card-title">Exam Bank ({filteredBank.length})</h3>
+                        <div className="header-search" style={{ width: 240 }}>
+                            <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="Search questions or subject…" />
+                        </div>
                     </div>
                     <div className="table-wrapper">
                         <table>
-                            <thead><tr><th>Question</th><th>Subject</th><th>Type</th><th>Used</th><th>Action</th></tr></thead>
+                            <thead><tr><th>Question</th><th>Subject</th><th>Type</th><th>Used</th><th>Actions</th></tr></thead>
                             <tbody>
-                                {BANK_QUESTIONS.map((item, i) => (
-                                    <tr key={i}>
+                                {filteredBank.map(item => (
+                                    <tr key={item.id}>
                                         <td style={{ maxWidth: 320 }}><div dangerouslySetInnerHTML={{ __html: renderLatex(item.q) }} style={{ fontSize: "0.875rem", fontWeight: 500 }} /></td>
                                         <td><span className="badge badge-primary">{item.subj}</span></td>
                                         <td style={{ fontSize: "0.85rem" }}>{item.type}</td>
                                         <td style={{ fontSize: "0.85rem" }}>{item.used}×</td>
-                                        <td><div style={{ display: "flex", gap: "0.375rem" }}><button className="btn btn-outline btn-sm">Edit</button><button className="btn btn-secondary btn-sm">Use</button></div></td>
+                                        <td>
+                                            <div style={{ display: "flex", gap: "0.375rem" }}>
+                                                <button className="btn btn-outline btn-sm" onClick={() => setEditingBank({ ...item })}>Edit</button>
+                                                <button className="btn btn-secondary btn-sm" onClick={() => useFromBank(item)}>Use</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
+                                {filteredBank.length === 0 && (
+                                    <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--gray-400)", padding: "2rem", fontStyle: "italic" }}>No questions match your search.</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
