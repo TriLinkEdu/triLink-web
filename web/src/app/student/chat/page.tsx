@@ -1,35 +1,12 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import {
-    useChatStore, fmtTs, fmtTime,
-    Conversation, ChatParticipant, SECTION_STUDENTS,
-} from "@/store/chatStore";
+import { useChatStore, fmtTs, fmtTime, ChatParticipant } from "@/store/chatStore";
 
-const ME: ChatParticipant = { id: "teacher-1", name: "Mr. Solomon", role: "teacher", initials: "MS" };
-
-type Filter = "all" | "private" | "group";
-
-const ROLE_COLOR: Record<string, string> = {
-    student: "var(--success)",
-    admin: "var(--warning)",
-    parent: "#7c3aed",
-    teacher: "var(--primary-500)",
-};
-const ROLE_BG: Record<string, string> = {
-    student: "#dcfce7",
-    admin: "var(--warning-light)",
-    parent: "#ede9fe",
-    teacher: "var(--primary-50)",
-};
+const ME: ChatParticipant = { id: "student-1", name: "Abebe Kebede", role: "student", initials: "AK" };
 
 const IconSend = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <line x1="22" x2="11" y1="2" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-    </svg>
-);
-const IconClose = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" />
     </svg>
 );
 const IconUsers = () => (
@@ -39,20 +16,21 @@ const IconUsers = () => (
     </svg>
 );
 
-export default function TeacherChat() {
-    const { conversations, sendMessage, createGroup } = useChatStore();
+const ROLE_COLOR: Record<string, string> = {
+    teacher: "var(--primary-500)",
+    student: "var(--success)",
+    admin: "var(--warning)",
+    parent: "#7c3aed",
+};
+
+export default function StudentChat() {
+    const { conversations, sendMessage } = useChatStore();
     const myConvs = conversations.filter((c) => c.participants.some((p) => p.id === ME.id));
 
-    const [filter, setFilter] = useState<Filter>("all");
     const [activeId, setActiveId] = useState<string>(myConvs[0]?.id ?? "");
     const [draft, setDraft] = useState("");
-    const [showNewGroup, setShowNewGroup] = useState(false);
-    const [groupSection, setGroupSection] = useState("11-A");
-    const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const filtered = myConvs.filter((c) => filter === "all" || c.type === filter);
     const active = myConvs.find((c) => c.id === activeId);
 
     useEffect(() => {
@@ -70,65 +48,21 @@ export default function TeacherChat() {
         setDraft("");
     }
 
-    function handleCreateGroup() {
-        const students = SECTION_STUDENTS[groupSection].filter((s) =>
-            selectedStudents.includes(s.id)
-        );
-        if (students.length === 0) return;
-        createGroup(groupSection, [ME, ...students]);
-        setShowNewGroup(false);
-        setSelectedStudents([]);
-    }
-
-    function getOther(conv: Conversation): ChatParticipant | undefined {
-        return conv.participants.find((p) => p.id !== ME.id);
-    }
-
     return (
-        <div className="page-wrapper" style={{ padding: 0, height: "calc(100vh - 64px)" }}>
+        <div style={{ padding: 0, height: "calc(100vh - 64px)" }}>
             <div className="chat-layout">
                 {/* ── Sidebar ── */}
                 <div className="chat-sidebar">
                     <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--gray-100)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Messages</h2>
-                            <button
-                                className="btn btn-primary"
-                                style={{ fontSize: "0.72rem", padding: "0.3rem 0.65rem" }}
-                                onClick={() => setShowNewGroup(true)}
-                            >
-                                + New Group
-                            </button>
-                        </div>
-                        {/* Filter tabs */}
-                        <div style={{ display: "flex", gap: "0.25rem" }}>
-                            {(["all", "private", "group"] as Filter[]).map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    style={{
-                                        flex: 1, padding: "0.3rem 0", fontSize: "0.72rem", fontWeight: 500,
-                                        borderRadius: "var(--radius)", border: "1px solid", cursor: "pointer",
-                                        background: filter === f ? "var(--primary-500)" : "transparent",
-                                        color: filter === f ? "#fff" : "var(--gray-500)",
-                                        borderColor: filter === f ? "var(--primary-500)" : "var(--gray-200)",
-                                        textTransform: "capitalize",
-                                    }}
-                                >
-                                    {f === "all" ? `All (${myConvs.length})` : f === "private" ? "Private" : "Groups"}
-                                </button>
-                            ))}
-                        </div>
+                        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>My Messages</h2>
+                        <p style={{ fontSize: "0.78rem", color: "var(--gray-500)", marginTop: "0.25rem" }}>
+                            {myConvs.length} conversation{myConvs.length !== 1 ? "s" : ""}
+                        </p>
                     </div>
 
                     <div className="chat-list">
-                        {filtered.length === 0 && (
-                            <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: "var(--gray-400)", fontSize: "0.8rem" }}>
-                                No conversations
-                            </div>
-                        )}
-                        {filtered.map((conv) => {
-                            const other = conv.type === "private" ? getOther(conv) : null;
+                        {myConvs.map((conv) => {
+                            const other = conv.participants.find((p) => p.id !== ME.id);
                             const initials = conv.type === "group" ? (conv.section ?? "GR") : (other?.initials ?? "?");
                             const lastMsg = conv.messages[conv.messages.length - 1];
                             const isActive = conv.id === activeId;
@@ -153,7 +87,7 @@ export default function TeacherChat() {
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                                             <span style={{ fontWeight: 600, fontSize: "0.875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {conv.title}
+                                                {conv.type === "private" ? other?.name ?? conv.title : conv.title}
                                             </span>
                                             <span style={{ fontSize: "0.68rem", color: "var(--gray-400)", flexShrink: 0, marginLeft: 4 }}>
                                                 {fmtTs(conv.lastTs)}
@@ -166,7 +100,7 @@ export default function TeacherChat() {
                                                 </span>
                                             )}
                                             {conv.parentVisible && (
-                                                <span style={{ fontSize: "0.62rem", background: "var(--warning-light)", color: "#92400e", borderRadius: "4px", padding: "1px 5px", fontWeight: 700, flexShrink: 0 }}>
+                                                <span style={{ fontSize: "0.62rem", background: "#fffbeb", color: "#92400e", borderRadius: "4px", padding: "1px 5px", fontWeight: 700, flexShrink: 0 }}>
                                                     👁 PARENT
                                                 </span>
                                             )}
@@ -188,31 +122,22 @@ export default function TeacherChat() {
                         <div style={{ padding: "0.875rem 1.5rem", borderBottom: "1px solid var(--gray-100)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
                             {active.type === "group" ? (
                                 <>
-                                    <div
-                                        className="avatar avatar-initials"
-                                        style={{ width: 38, height: 38, fontSize: "0.72rem", background: "linear-gradient(135deg, #7c3aed, var(--primary-500))" }}
-                                    >
+                                    <div className="avatar avatar-initials" style={{ width: 38, height: 38, fontSize: "0.72rem", background: "linear-gradient(135deg, #7c3aed, var(--primary-500))" }}>
                                         {active.section ?? "GR"}
                                     </div>
                                     <div>
                                         <div style={{ fontWeight: 600 }}>{active.title}</div>
                                         <div style={{ fontSize: "0.74rem", color: "var(--gray-500)", display: "flex", alignItems: "center", gap: 4 }}>
                                             <IconUsers />
-                                            {active.participants.length} members &middot; {active.participants.filter((p) => p.role === "student").length} students
+                                            {active.participants.length} members
                                         </div>
                                     </div>
-                                    <span style={{ marginLeft: "auto", fontSize: "0.74rem", background: "#ede9fe", color: "#7c3aed", borderRadius: "20px", padding: "0.2rem 0.7rem", fontWeight: 600 }}>
-                                        Section {active.section}
-                                    </span>
                                 </>
                             ) : (() => {
                                 const other = active.participants.find((p) => p.id !== ME.id)!;
                                 return (
                                     <>
-                                        <div
-                                            className="avatar avatar-initials"
-                                            style={{ width: 38, height: 38, fontSize: "0.72rem", background: `linear-gradient(135deg, ${ROLE_COLOR[other.role]}, ${ROLE_COLOR[other.role]}bb)` }}
-                                        >
+                                        <div className="avatar avatar-initials" style={{ width: 38, height: 38, fontSize: "0.72rem", background: `linear-gradient(135deg, ${ROLE_COLOR[other.role]}, ${ROLE_COLOR[other.role]}bb)` }}>
                                             {other.initials}
                                         </div>
                                         <div>
@@ -222,7 +147,7 @@ export default function TeacherChat() {
                                                 Online
                                             </div>
                                         </div>
-                                        <span style={{ marginLeft: "auto", fontSize: "0.74rem", borderRadius: "20px", padding: "0.2rem 0.7rem", fontWeight: 600, textTransform: "capitalize", background: ROLE_BG[other.role], color: ROLE_COLOR[other.role] }}>
+                                        <span style={{ marginLeft: "auto", fontSize: "0.74rem", borderRadius: "20px", padding: "0.2rem 0.7rem", fontWeight: 600, textTransform: "capitalize", background: "var(--primary-50)", color: "var(--primary-600)" }}>
                                             {other.role}
                                         </span>
                                     </>
@@ -230,11 +155,11 @@ export default function TeacherChat() {
                             })()}
                         </div>
 
-                        {/* Parent transparency banner */}
+                        {/* Parent transparency notice */}
                         {active.parentVisible && (
                             <div style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a", padding: "0.45rem 1.5rem", display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", color: "#92400e" }}>
                                 <span>👁</span>
-                                <span><strong>Parent transparency:</strong> Mr. Kebede (Abebe&apos;s parent) can view this conversation.</span>
+                                <span>Your parent (Mr. Kebede) can view this conversation for transparency.</span>
                             </div>
                         )}
 
@@ -265,7 +190,7 @@ export default function TeacherChat() {
                                                     ? "var(--radius-lg) var(--radius-lg) 4px var(--radius-lg)"
                                                     : "var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px",
                                                 background: isMe
-                                                    ? "linear-gradient(135deg, var(--primary-500), var(--primary-600))"
+                                                    ? "linear-gradient(135deg, var(--success), #16a34a)"
                                                     : "var(--gray-100)",
                                                 color: isMe ? "#fff" : "var(--gray-800)",
                                                 fontSize: "0.875rem",
@@ -283,7 +208,7 @@ export default function TeacherChat() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input area */}
+                        {/* Input */}
                         <div className="chat-input-area">
                             <input
                                 className="chat-input"
@@ -296,7 +221,7 @@ export default function TeacherChat() {
                             />
                             <button
                                 className="btn btn-primary btn-icon"
-                                style={{ borderRadius: "var(--radius-full)", flexShrink: 0 }}
+                                style={{ borderRadius: "var(--radius-full)", flexShrink: 0, background: "linear-gradient(135deg, var(--success), #16a34a)", border: "none" }}
                                 onClick={handleSend}
                                 disabled={!draft.trim()}
                             >
@@ -308,85 +233,12 @@ export default function TeacherChat() {
                     <div className="chat-main" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <div className="empty-state">
                             <div className="empty-state-icon">💬</div>
-                            <h3 style={{ fontWeight: 600 }}>Select a conversation</h3>
-                            <p style={{ fontSize: "0.875rem", color: "var(--gray-500)" }}>Choose a message from the sidebar to start chatting</p>
+                            <h3 style={{ fontWeight: 600 }}>No conversations yet</h3>
+                            <p style={{ fontSize: "0.875rem", color: "var(--gray-500)" }}>Your teacher will appear here once a conversation is started.</p>
                         </div>
                     </div>
                 )}
             </div>
-
-            {/* ── New Group Modal ── */}
-            {showNewGroup && (
-                <div className="modal-overlay" onClick={() => setShowNewGroup(false)}>
-                    <div className="modal" style={{ maxWidth: 480, width: "90%" }} onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 style={{ fontWeight: 700 }}>Create Class Group</h3>
-                            <button className="btn-icon" onClick={() => setShowNewGroup(false)}><IconClose /></button>
-                        </div>
-                        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">Select Section</label>
-                                <select
-                                    className="form-select"
-                                    value={groupSection}
-                                    onChange={(e) => { setGroupSection(e.target.value); setSelectedStudents([]); }}
-                                >
-                                    {Object.keys(SECTION_STUDENTS).map((s) => (
-                                        <option key={s} value={s}>Grade {s}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label" style={{ display: "flex", justifyContent: "space-between" }}>
-                                    <span>Students <span style={{ color: "var(--gray-400)", fontWeight: 400 }}>({selectedStudents.length} selected)</span></span>
-                                    <button
-                                        style={{ fontSize: "0.75rem", color: "var(--primary-600)", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
-                                        onClick={() => setSelectedStudents(SECTION_STUDENTS[groupSection].map((s) => s.id))}
-                                    >
-                                        Select All
-                                    </button>
-                                </label>
-                                <div style={{ border: "1px solid var(--gray-200)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-                                    {SECTION_STUDENTS[groupSection].map((student, idx) => (
-                                        <label
-                                            key={student.id}
-                                            style={{
-                                                display: "flex", alignItems: "center", gap: "0.75rem",
-                                                padding: "0.6rem 1rem", cursor: "pointer",
-                                                borderBottom: idx < SECTION_STUDENTS[groupSection].length - 1 ? "1px solid var(--gray-100)" : "none",
-                                                background: selectedStudents.includes(student.id) ? "var(--primary-50)" : "",
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedStudents.includes(student.id)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) setSelectedStudents((p) => [...p, student.id]);
-                                                    else setSelectedStudents((p) => p.filter((id) => id !== student.id));
-                                                }}
-                                            />
-                                            <div className="avatar avatar-initials" style={{ width: 28, height: 28, fontSize: "0.65rem", flexShrink: 0 }}>
-                                                {student.initials}
-                                            </div>
-                                            <span style={{ fontSize: "0.875rem" }}>{student.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-ghost" onClick={() => setShowNewGroup(false)}>Cancel</button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleCreateGroup}
-                                disabled={selectedStudents.length === 0}
-                            >
-                                Create Group ({selectedStudents.length} students)
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
