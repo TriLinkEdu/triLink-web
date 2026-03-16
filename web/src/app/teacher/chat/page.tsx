@@ -252,7 +252,7 @@ export default function TeacherChat() {
                                 <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Messages</h2>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: "0.72rem", color: "var(--gray-500)" }}>
                                     <IconSpark />
-                                    {filtered.length} active conversation{filtered.length === 1 ? "" : "s"}
+                                    {filtered.length > 0 ? `${filtered.length} active conversation${filtered.length === 1 ? "" : "s"}` : "No active conversations"}
                                 </div>
                             </div>
                             <button
@@ -284,7 +284,11 @@ export default function TeacherChat() {
                                         transition: "all var(--transition-fast)",
                                     }}
                                 >
-                                    {f === "all" ? `All (${myConvs.length})` : f === "private" ? "Private" : "Groups"}
+                                    {f === "all"
+                                        ? (myConvs.length > 0 ? `All (${myConvs.length})` : "All")
+                                        : f === "private"
+                                        ? "Private"
+                                        : "Groups"}
                                 </button>
                             ))}
                         </div>
