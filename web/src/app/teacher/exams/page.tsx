@@ -970,13 +970,31 @@ export default function TeacherExams() {
                                                     </select>
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
-                                                    <input type="number" min={0} value={a.maxMark}
-                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, maxMark: parseFloat(e.target.value) || 0 } : x))}
+                                                    <input type="number" min={0} value={a.maxMark === 0 ? "" : a.maxMark}
+                                                        onChange={e => {
+                                                            const raw = e.target.value;
+                                                            setEvalAssessments(p => p.map((x, j) => {
+                                                                if (j !== i) return x;
+                                                                if (raw === "") return { ...x, maxMark: 0 };
+                                                                const parsed = parseFloat(raw);
+                                                                return Number.isNaN(parsed) ? x : { ...x, maxMark: parsed };
+                                                            }));
+                                                        }}
+                                                        onBlur={() => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, maxMark: Math.max(0, x.maxMark) } : x))}
                                                         style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
-                                                    <input type="number" min={0} max={a.maxMark} value={a.result}
-                                                        onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, result: parseFloat(e.target.value) || 0 } : x))}
+                                                    <input type="number" min={0} max={a.maxMark} value={a.result === 0 ? "" : a.result}
+                                                        onChange={e => {
+                                                            const raw = e.target.value;
+                                                            setEvalAssessments(p => p.map((x, j) => {
+                                                                if (j !== i) return x;
+                                                                if (raw === "") return { ...x, result: 0 };
+                                                                const parsed = parseFloat(raw);
+                                                                return Number.isNaN(parsed) ? x : { ...x, result: parsed };
+                                                            }));
+                                                        }}
+                                                        onBlur={() => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, result: Math.max(0, Math.min(x.result, x.maxMark || 0)) } : x))}
                                                         style={{ width: "100%", padding: "0.3rem 0.5rem", border: `1.5px solid ${a.result > a.maxMark ? "var(--danger)" : "var(--gray-200)"}`, borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const, background: a.result > a.maxMark ? "var(--danger-light)" : "#fff" }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.4rem", textAlign: "center" as const }}>
@@ -1088,8 +1106,27 @@ export default function TeacherExams() {
                                 <h3 className="card-title">Question {activeQ + 1} of {questions.length}</h3>
                                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                                     <label style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>Points:</label>
-                                    <input type="number" min={1} max={20} value={q.points} onChange={e => updateQ({ points: parseInt(e.target.value) || 1 })}
-                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.85rem", textAlign: "center" as const }} />
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={20}
+                                        value={q.points === 0 ? "" : q.points}
+                                        onChange={e => {
+                                            const raw = e.target.value;
+                                            if (raw === "") {
+                                                updateQ({ points: 0 });
+                                                return;
+                                            }
+                                            const parsed = parseInt(raw, 10);
+                                            if (!Number.isNaN(parsed)) updateQ({ points: parsed });
+                                        }}
+                                        onBlur={() => {
+                                            if (!q.points || q.points < 1) updateQ({ points: 1 });
+                                            if (q.points > 20) updateQ({ points: 20 });
+                                        }}
+                                        onFocus={(e) => e.currentTarget.select()}
+                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.85rem", textAlign: "center" as const }}
+                                    />
                                     {questions.length > 1 && (
                                         <button onClick={() => removeQuestion(activeQ)} style={{ padding: "0.3rem 0.65rem", borderRadius: 8, border: "1.5px solid var(--danger-light)", background: "var(--danger-light)", color: "var(--danger)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>Remove</button>
                                     )}
