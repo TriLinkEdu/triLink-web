@@ -1,6 +1,33 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const TEACHER_SECURITY_STORAGE_KEY = "trilink-teacher-security-v1";
+const DEFAULT_TEACHER_PASSWORD = "Teacher@123!";
+
+type TwoFactorAction = "enable" | "disable";
+
+interface PersistedSecurity {
+    password: string;
+    twoFactorEnabled: boolean;
+    recoveryEmail: string;
+}
+
+function generateCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function getPasswordIssues(current: string, next: string) {
+    const issues: string[] = [];
+    if (next.length < 12) issues.push("At least 12 characters");
+    if (!/[A-Z]/.test(next)) issues.push("At least one uppercase letter");
+    if (!/[a-z]/.test(next)) issues.push("At least one lowercase letter");
+    if (!/[0-9]/.test(next)) issues.push("At least one number");
+    if (!/[^A-Za-z0-9]/.test(next)) issues.push("At least one special character");
+    if (/\s/.test(next)) issues.push("No spaces allowed");
+    if (next === current) issues.push("New password must be different from current password");
+    return issues;
+}
 
 type Tab = "profile" | "security" | "notifications" | "appearance";
 
@@ -160,7 +187,14 @@ export default function TeacherSettings() {
     // Security state
     const [passwords, setPasswords] = useState({ current: "", newPass: "", confirm: "" });
     const [showPasswords, setShowPasswords] = useState({ current: false, newPass: false, confirm: false });
+    const [storedPassword, setStoredPassword] = useState(DEFAULT_TEACHER_PASSWORD);
     const [twoFactor, setTwoFactor] = useState(false);
+    const [recoveryEmail, setRecoveryEmail] = useState(profile.email);
+    const [twoFactorAction, setTwoFactorAction] = useState<TwoFactorAction | null>(null);
+    const [twoFactorPendingCode, setTwoFactorPendingCode] = useState<string | null>(null);
+    const [twoFactorCodeInput, setTwoFactorCodeInput] = useState("");
+    const [twoFactorDisablePassword, setTwoFactorDisablePassword] = useState("");
+    const [twoFactorCodeExpiresAt, setTwoFactorCodeExpiresAt] = useState<number | null>(null);
 
     // Notifications state
     const [notifications, setNotifications] = useState({
@@ -183,6 +217,35 @@ export default function TeacherSettings() {
         { label: "Homeroom", value: profile.homeroomClass },
         { label: "Office", value: profile.officeRoom },
     ];
+    const passwordIssues = useMemo(() => getPasswordIssues(storedPassword, passwords.newPass), [passwords.newPass, storedPassword]);
+
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(TEACHER_SECURITY_STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as Partial<PersistedSecurity>;
+            if (parsed.password && typeof parsed.password === "string") {
+                setStoredPassword(parsed.password);
+            }
+            if (typeof parsed.twoFactorEnabled === "boolean") {
+                setTwoFactor(parsed.twoFactorEnabled);
+            }
+            if (parsed.recoveryEmail && typeof parsed.recoveryEmail === "string") {
+                setRecoveryEmail(parsed.recoveryEmail);
+            }
+        } catch {
+            // Ignore invalid persisted security state.
+        }
+    }, []);
+
+    useEffect(() => {
+        const payload: PersistedSecurity = {
+            password: storedPassword,
+            twoFactorEnabled: twoFactor,
+            recoveryEmail,
+        };
+        window.localStorage.setItem(TEACHER_SECURITY_STORAGE_KEY, JSON.stringify(payload));
+    }, [storedPassword, twoFactor, recoveryEmail]);
 
     function showToast(msg: string) {
         setToast(msg);
@@ -202,16 +265,67 @@ export default function TeacherSettings() {
             showToast("Please fill in all password fields.");
             return;
         }
-        if (passwords.newPass.length < 8) {
-            showToast("New password must be at least 8 characters.");
+        if (passwords.current !== storedPassword) {
+            showToast("Current password is incorrect.");
+            return;
+        }
+        if (passwordIssues.length > 0) {
+            showToast(`Password requirements not met: ${passwordIssues[0]}.`);
             return;
         }
         if (passwords.newPass !== passwords.confirm) {
             showToast("New passwords do not match.");
             return;
         }
+        setStoredPassword(passwords.newPass);
         setPasswords({ current: "", newPass: "", confirm: "" });
+        setShowPasswords({ current: false, newPass: false, confirm: false });
         showToast("Password changed successfully!");
+    }
+
+    function requestTwoFactorCode(action: TwoFactorAction) {
+        if (action === "disable" && twoFactorDisablePassword !== storedPassword) {
+            showToast("Enter your current password to disable 2FA.");
+            return;
+        }
+        if (action === "enable" && !recoveryEmail.trim()) {
+            showToast("Enter a recovery email before enabling 2FA.");
+            return;
+        }
+        const code = generateCode();
+        setTwoFactorAction(action);
+        setTwoFactorPendingCode(code);
+        setTwoFactorCodeExpiresAt(Date.now() + 5 * 60 * 1000);
+        setTwoFactorCodeInput("");
+        // Demo behavior in this prototype app: we surface the OTP in-app.
+        showToast(`Verification code: ${code} (valid for 5 minutes)`);
+    }
+
+    function verifyTwoFactorCode() {
+        if (!twoFactorPendingCode || !twoFactorAction) {
+            showToast("Request a verification code first.");
+            return;
+        }
+        if (!twoFactorCodeExpiresAt || Date.now() > twoFactorCodeExpiresAt) {
+            setTwoFactorPendingCode(null);
+            setTwoFactorCodeInput("");
+            setTwoFactorAction(null);
+            showToast("Verification code expired. Request a new one.");
+            return;
+        }
+        if (twoFactorCodeInput.trim() !== twoFactorPendingCode) {
+            showToast("Invalid verification code.");
+            return;
+        }
+
+        const enabling = twoFactorAction === "enable";
+        setTwoFactor(enabling);
+        setTwoFactorPendingCode(null);
+        setTwoFactorCodeInput("");
+        setTwoFactorAction(null);
+        setTwoFactorDisablePassword("");
+        setTwoFactorCodeExpiresAt(null);
+        showToast(enabling ? "Two-factor authentication enabled." : "Two-factor authentication disabled.");
     }
 
     function toggleNotif(key: keyof typeof notifications) {
@@ -375,7 +489,7 @@ export default function TeacherSettings() {
                                     <h3 className="card-title">Change Password</h3>
                                 </div>
                                 <p style={{ fontSize: "0.875rem", color: "var(--gray-500)", marginBottom: "1.25rem" }}>
-                                    Use a strong password with at least 8 characters including letters and numbers.
+                                    Use a strong password with at least 12 characters including upper/lower letters, numbers, and symbols.
                                 </p>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                                     {(
@@ -416,6 +530,14 @@ export default function TeacherSettings() {
                                             </div>
                                         </div>
                                     ))}
+                                    <div style={{ padding: "0.75rem 0.9rem", borderRadius: "var(--radius-md)", background: "var(--gray-50)", border: "1px solid var(--gray-200)", fontSize: "0.78rem" }}>
+                                        <div style={{ fontWeight: 700, color: "var(--gray-600)", marginBottom: "0.4rem" }}>Password requirements</div>
+                                        <div style={{ color: passwordIssues.length === 0 && passwords.newPass ? "#065f46" : "var(--gray-500)" }}>
+                                            {passwords.newPass
+                                                ? (passwordIssues.length === 0 ? "All requirements satisfied." : passwordIssues.join(" · "))
+                                                : "Start typing a new password to see validation."}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.25rem" }}>
                                     <button className="btn btn-primary" onClick={handleChangePassword}>
@@ -427,26 +549,91 @@ export default function TeacherSettings() {
                             <div className="card">
                                 <div className="card-header">
                                     <h3 className="card-title">Two-Factor Authentication</h3>
-                                    <Toggle value={twoFactor} onChange={() => setTwoFactor(!twoFactor)} />
+                                    <span className={`badge ${twoFactor ? "badge-success" : "badge-warning"}`}>
+                                        {twoFactor ? "Enabled" : "Disabled"}
+                                    </span>
                                 </div>
                                 <p style={{ fontSize: "0.875rem", color: "var(--gray-500)" }}>
                                     Add an extra layer of security by requiring a verification code in addition to your password when signing in.
                                 </p>
-                                {twoFactor && (
-                                    <div
-                                        style={{
-                                            marginTop: "1rem",
-                                            padding: "0.875rem 1rem",
-                                            background: "var(--success-light)",
-                                            borderRadius: "var(--radius-md)",
-                                            fontSize: "0.875rem",
-                                            color: "#065f46",
-                                            fontWeight: 500,
-                                        }}
-                                    >
-                                        ✓ Two-factor authentication is enabled on your account.
+                                <div style={{ marginTop: "1rem", display: "grid", gap: "0.75rem" }}>
+                                    <div className="input-group" style={{ marginBottom: 0 }}>
+                                        <label>Recovery Email</label>
+                                        <div className="input-field">
+                                            <input
+                                                type="email"
+                                                value={recoveryEmail}
+                                                onChange={(e) => setRecoveryEmail(e.target.value)}
+                                                placeholder="security@school.edu"
+                                            />
+                                        </div>
                                     </div>
-                                )}
+
+                                    {!twoFactor && (
+                                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                            <button className="btn btn-primary" onClick={() => requestTwoFactorCode("enable")}>Send Setup Code</button>
+                                        </div>
+                                    )}
+
+                                    {twoFactor && (
+                                        <div className="input-group" style={{ marginBottom: 0 }}>
+                                            <label>Current Password (required to disable)</label>
+                                            <div className="input-field">
+                                                <input
+                                                    type="password"
+                                                    value={twoFactorDisablePassword}
+                                                    onChange={(e) => setTwoFactorDisablePassword(e.target.value)}
+                                                    placeholder="Enter current password"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {twoFactor && (
+                                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                            <button className="btn btn-danger" onClick={() => requestTwoFactorCode("disable")}>Send Disable Code</button>
+                                        </div>
+                                    )}
+
+                                    {twoFactorPendingCode && (
+                                        <>
+                                            <div className="input-group" style={{ marginBottom: 0 }}>
+                                                <label>Verification Code</label>
+                                                <div className="input-field">
+                                                    <input
+                                                        value={twoFactorCodeInput}
+                                                        onChange={(e) => setTwoFactorCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                                        placeholder="Enter 6-digit code"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                                <button className="btn btn-primary" onClick={verifyTwoFactorCode}>Verify Code</button>
+                                                <button className="btn btn-secondary" onClick={() => {
+                                                    setTwoFactorPendingCode(null);
+                                                    setTwoFactorCodeInput("");
+                                                    setTwoFactorAction(null);
+                                                    setTwoFactorCodeExpiresAt(null);
+                                                }}>Cancel</button>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {twoFactor && !twoFactorPendingCode && (
+                                        <div
+                                            style={{
+                                                padding: "0.875rem 1rem",
+                                                background: "var(--success-light)",
+                                                borderRadius: "var(--radius-md)",
+                                                fontSize: "0.875rem",
+                                                color: "#065f46",
+                                                fontWeight: 500,
+                                            }}
+                                        >
+                                            ✓ Two-factor authentication is enabled on your account.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="card">

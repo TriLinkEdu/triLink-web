@@ -7,7 +7,12 @@ import {
 import { useCalendarStore, EventType, CalendarEvent } from "@/store/calendarStore";
 
 const TODAY = new Date();
-const todayISO = TODAY.toISOString().slice(0, 10);
+const toLocalISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseLocalISODate = (iso: string) => {
+    const [y, m, day] = iso.split("-").map(Number);
+    return new Date(y, m - 1, day);
+};
+const todayISO = toLocalISODate(TODAY);
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -46,6 +51,7 @@ export default function TeacherCalendar() {
     const [showModal, setShowModal] = useState(false);
     const [form,      setForm]      = useState(BLANK_FORM(todayISO));
     const [toasts,    setToasts]    = useState<Toast[]>([]);
+    const [pastDatePopup, setPastDatePopup] = useState<string | null>(null);
 
     const initialEvents = useRef(events);
 
@@ -53,7 +59,7 @@ export default function TeacherCalendar() {
     useEffect(() => {
         const todayEvts  = initialEvents.current.filter(e => e.date === todayISO);
         const upcomingEvts = initialEvents.current.filter(e => {
-            const diff = new Date(e.date).getTime() - new Date(todayISO).getTime();
+            const diff = parseLocalISODate(e.date).getTime() - parseLocalISODate(todayISO).getTime();
             return diff > 0 && diff <= 7 * 864e5;
         });
         const newToasts: Toast[] = [
@@ -88,7 +94,11 @@ export default function TeacherCalendar() {
         .filter(e => e.date >= todayISO)
         .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? "").localeCompare(b.time ?? ""));
 
+    const isPastDate = (date: string) => parseLocalISODate(date).getTime() < parseLocalISODate(todayISO).getTime();
+
     const selDayEvents: CalendarEvent[] = selDay !== null ? eventsOnDay(selDay) : [];
+    const selectedDayISO = selDay !== null ? dayISO(selDay) : null;
+    const selectedDayIsPast = selectedDayISO ? isPastDate(selectedDayISO) : false;
 
     function navMonth(dir: -1 | 1) {
         let m = viewMonth + dir, y = viewYear;
@@ -102,13 +112,25 @@ export default function TeacherCalendar() {
         const date = day
             ? `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
             : todayISO;
+        if (isPastDate(date)) {
+            setPastDatePopup("You cannot add an event to a past date.");
+            return;
+        }
         setForm(BLANK_FORM(date));
         setShowModal(true);
     }
 
     function handleAdd() {
         if (!form.title.trim() || !form.date) return;
-        addEvent({ title: form.title.trim(), date: form.date, time: form.time || undefined, type: form.type, description: form.description || undefined });
+        if (isPastDate(form.date)) {
+            setPastDatePopup("You cannot add an event to a past date.");
+            return;
+        }
+        const added = addEvent({ title: form.title.trim(), date: form.date, time: form.time || undefined, type: form.type, description: form.description || undefined });
+        if (!added) {
+            setPastDatePopup("You cannot add an event to a past date.");
+            return;
+        }
         const dateParts = form.date.split("-");
         const toast: Toast = {
             id: `t-added-${Date.now()}`, type: form.type,
@@ -189,7 +211,9 @@ export default function TeacherCalendar() {
                                         position: "relative",
                                     }}
                                     onClick={() => setSelDay(selDay === day ? null : day)}
-                                    onDoubleClick={() => openModal(day)}
+                                    onDoubleClick={() => {
+                                        if (!past) openModal(day);
+                                    }}
                                     title={dayEvts.length > 0 ? `${dayEvts.length} event(s) · double-click to add` : "Double-click to add event"}
                                 >
                                     <span style={{ fontSize: "0.875rem", fontWeight: today ? 700 : 500 }}>{day}</span>
@@ -227,10 +251,23 @@ export default function TeacherCalendar() {
                                         <span style={{ fontSize: "0.68rem", background: "var(--primary-500)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>Today</span>
                                     )}
                                 </h4>
-                                <button className="btn btn-primary btn-sm" onClick={() => openModal(selDay)} style={{ display: "flex", alignItems: "center", gap: 4 }}><Plus size={14} strokeWidth={2.5} /> Add</button>
+                                {!selectedDayIsPast && (
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => openModal(selDay)}
+                                        style={{ display: "flex", alignItems: "center", gap: 4 }}
+                                    ><Plus size={14} strokeWidth={2.5} /> Add</button>
+                                )}
+                                {selectedDayIsPast && (
+                                    <span style={{ fontSize: "0.68rem", background: "var(--gray-200)", color: "var(--gray-600)", borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>
+                                        Past date (view only)
+                                    </span>
+                                )}
                             </div>
                             {selDayEvents.length === 0 ? (
-                                <p style={{ fontSize: "0.8rem", color: "var(--gray-400)", textAlign: "center", padding: "0.5rem" }}>No events · double-click calendar day to add one</p>
+                                <p style={{ fontSize: "0.8rem", color: "var(--gray-400)", textAlign: "center", padding: "0.5rem" }}>
+                                    {selectedDayIsPast ? "No events were recorded for this past date." : "No events · double-click calendar day to add one"}
+                                </p>
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                                     {selDayEvents.map(ev => (
@@ -324,7 +361,16 @@ export default function TeacherCalendar() {
                                         type="date"
                                         style={INPUT_STYLE}
                                         value={form.date}
-                                        onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                                        min={todayISO}
+                                        onChange={e => {
+                                            const nextDate = e.target.value;
+                                            if (isPastDate(nextDate)) {
+                                                setPastDatePopup("You cannot add an event to a past date.");
+                                                setForm(p => ({ ...p, date: todayISO }));
+                                                return;
+                                            }
+                                            setForm(p => ({ ...p, date: nextDate }));
+                                        }}
                                     />
                                 </div>
                                 <div>
@@ -366,6 +412,23 @@ export default function TeacherCalendar() {
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleAdd} disabled={!form.title.trim() || !form.date}>Add Event</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pastDatePopup && (
+                <div className="modal-overlay" onClick={() => setPastDatePopup(null)}>
+                    <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Date Not Allowed</h3>
+                            <button className="modal-close" onClick={() => setPastDatePopup(null)}>✕</button>
+                        </div>
+                        <div className="modal-body" style={{ color: "var(--gray-600)", fontSize: "0.9rem" }}>
+                            {pastDatePopup}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-primary" onClick={() => setPastDatePopup(null)}>OK</button>
                         </div>
                     </div>
                 </div>

@@ -14,11 +14,12 @@ export interface CalendarEvent {
 
 interface CalendarStore {
     events: CalendarEvent[];
-    addEvent: (e: Omit<CalendarEvent, "id">) => void;
+    addEvent: (e: Omit<CalendarEvent, "id">) => boolean;
     removeEvent: (id: string) => void;
 }
 
 const mkId = () => Math.random().toString(36).slice(2, 9);
+const toLocalISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const SEED: CalendarEvent[] = [
     { id: "ev-1", title: "Grade 11-A Math Class",      date: "2026-03-09", time: "08:00", type: "class",    description: "Chapter 6: Integration techniques" },
@@ -35,8 +36,12 @@ export const useCalendarStore = create<CalendarStore>()(
     persist(
         (set) => ({
             events: SEED,
-            addEvent: (e) =>
-                set((s) => ({ events: [...s.events, { ...e, id: mkId() }] })),
+            addEvent: (e) => {
+                const todayISO = toLocalISODate(new Date());
+                if (e.date < todayISO) return false;
+                set((s) => ({ events: [...s.events, { ...e, id: mkId() }] }));
+                return true;
+            },
             removeEvent: (id) =>
                 set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
         }),
