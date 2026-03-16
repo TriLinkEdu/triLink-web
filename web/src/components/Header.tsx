@@ -1,14 +1,28 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 
 interface HeaderProps {
     userName: string;
     userRole: string;
     userInitials: string;
+    userProfileHref?: string;
 }
 
-export default function Header({ userName, userRole, userInitials }: HeaderProps) {
+export default function Header({ userName, userRole, userInitials, userProfileHref }: HeaderProps) {
     const [searchFocused, setSearchFocused] = useState(false);
+
+    const userBlock = (
+        <div className="header-user">
+            <div className="header-user-info">
+                <div className="header-user-name">{userName}</div>
+                <div className="header-user-role">{userRole}</div>
+            </div>
+            <div className="avatar avatar-initials" style={{ width: 36, height: 36, fontSize: "0.8rem" }}>
+                {userInitials}
+            </div>
+        </div>
+    );
 
     return (
         <header className="top-header">
@@ -40,15 +54,7 @@ export default function Header({ userName, userRole, userInitials }: HeaderProps
                     </svg>
                 </button>
 
-                <div className="header-user">
-                    <div className="header-user-info">
-                        <div className="header-user-name">{userName}</div>
-                        <div className="header-user-role">{userRole}</div>
-                    </div>
-                    <div className="avatar avatar-initials" style={{ width: 36, height: 36, fontSize: "0.8rem" }}>
-                        {userInitials}
-                    </div>
-                </div>
+                {userProfileHref ? <Link href={userProfileHref}>{userBlock}</Link> : userBlock}
             </div>
         </header>
     );

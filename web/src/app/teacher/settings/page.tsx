@@ -113,6 +113,29 @@ function NotificationRow({ label, description, value, onChange }: {
     );
 }
 
+function ProfileInput({
+    label,
+    value,
+    onChange,
+    type = "text",
+    placeholder,
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: string;
+    placeholder?: string;
+}) {
+    return (
+        <div className="input-group">
+            <label>{label}</label>
+            <div className="input-field">
+                <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+            </div>
+        </div>
+    );
+}
+
 export default function TeacherSettings() {
     const [activeTab, setActiveTab] = useState<Tab>("profile");
     const [toast, setToast] = useState<string | null>(null);
@@ -123,9 +146,15 @@ export default function TeacherSettings() {
         firstName: "Solomon",
         lastName: "Tesfaye",
         email: "solomon@school.edu",
-        phone: "+251 911 999 888",
+        phone: "+251 912 345 678",
+        subject: "Mathematics",
         department: "Mathematics",
-        bio: "Experienced mathematics teacher with over 8 years of teaching secondary school students.",
+        homeroomClass: "Grade 11-A",
+        experience: "8 Years Experience",
+        country: "Ethiopia",
+        cityState: "Addis Ababa",
+        postalCode: "1000",
+        officeRoom: "Block B, Room 12",
     });
 
     // Security state
@@ -149,6 +178,11 @@ export default function TeacherSettings() {
     const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
     const [language, setLanguage] = useState("en");
     const [compactMode, setCompactMode] = useState(false);
+    const profileQuickStats = [
+        { label: "Department", value: profile.department },
+        { label: "Homeroom", value: profile.homeroomClass },
+        { label: "Office", value: profile.officeRoom },
+    ];
 
     function showToast(msg: string) {
         setToast(msg);
@@ -260,23 +294,38 @@ export default function TeacherSettings() {
                     {activeTab === "profile" && (
                         <>
                             <div className="card">
-                                <div className="card-header">
-                                    <h3 className="card-title">Profile Information</h3>
-                                </div>
-
-                                {/* Avatar */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", marginBottom: "1.5rem" }}>
-                                    <div
-                                        className="avatar avatar-xl avatar-initials"
-                                        style={{ fontSize: "1.5rem", flexShrink: 0 }}
-                                    >
-                                        {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
+                                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.9fr)", gap: "1rem", alignItems: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+                                        <div
+                                            className="avatar avatar-xl avatar-initials"
+                                            style={{ fontSize: "1.5rem", flexShrink: 0, background: "linear-gradient(135deg, #ea580c, #dc2626)" }}
+                                        >
+                                            {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--gray-900)" }}>
+                                                {profile.firstName} {profile.lastName}
+                                            </h3>
+                                            <p style={{ fontSize: "0.925rem", color: "var(--gray-500)", marginTop: "0.15rem" }}>
+                                                {profile.subject} Teacher
+                                            </p>
+                                            <p style={{ fontSize: "0.875rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>
+                                                {profile.cityState}, {profile.country}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p style={{ fontSize: "0.875rem", color: "var(--gray-600)", marginBottom: "0.5rem" }}>
-                                            Profile photo helps students and parents recognize you.
-                                        </p>
-                                        <div style={{ display: "flex", gap: "0.5rem" }}>
+
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.65rem" }}>
+                                            {profileQuickStats.map((item) => (
+                                                <div key={item.label} style={{ padding: "0.75rem 0.85rem", border: "1px solid var(--gray-200)", background: "#fff", borderRadius: "var(--radius-md)" }}>
+                                                    <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--gray-400)", textTransform: "uppercase" }}>{item.label}</div>
+                                                    <div style={{ marginTop: "0.35rem", fontSize: "0.9rem", fontWeight: 600, color: "var(--gray-800)" }}>{item.value}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
                                             <button className="btn btn-outline btn-sm" onClick={() => fileInputRef.current?.click()}>
                                                 Upload Photo
                                             </button>
@@ -284,91 +333,35 @@ export default function TeacherSettings() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Form grid */}
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                                    <div className="input-group">
-                                        <label>First Name</label>
-                                        <div className="input-field">
-                                            <input
-                                                value={profile.firstName}
-                                                onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
-                                                placeholder="First name"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Last Name</label>
-                                        <div className="input-field">
-                                            <input
-                                                value={profile.lastName}
-                                                onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
-                                                placeholder="Last name"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Email Address</label>
-                                        <div className="input-field">
-                                            <input
-                                                type="email"
-                                                value={profile.email}
-                                                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                                                placeholder="email@school.edu"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Phone Number</label>
-                                        <div className="input-field">
-                                            <input
-                                                value={profile.phone}
-                                                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                                                placeholder="+251 9XX XXX XXX"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="input-group">
-                                        <label>Department</label>
-                                        <div className="input-field">
-                                            <input
-                                                value={profile.department}
-                                                onChange={(e) => setProfile({ ...profile, department: e.target.value })}
-                                                placeholder="e.g. Mathematics"
-                                            />
-                                        </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.8fr) minmax(280px, 1fr)", gap: "1rem", alignItems: "start" }}>
+                                <div className="card">
+                                    <h3 className="card-title" style={{ marginBottom: "1rem" }}>Personal Information</h3>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.85rem" }}>
+                                        <ProfileInput label="First Name" value={profile.firstName} onChange={(value) => setProfile({ ...profile, firstName: value })} placeholder="First name" />
+                                        <ProfileInput label="Last Name" value={profile.lastName} onChange={(value) => setProfile({ ...profile, lastName: value })} placeholder="Last name" />
+                                        <ProfileInput label="Email Address" type="email" value={profile.email} onChange={(value) => setProfile({ ...profile, email: value })} placeholder="teacher@school.edu" />
+                                        <ProfileInput label="Phone no" value={profile.phone} onChange={(value) => setProfile({ ...profile, phone: value })} placeholder="+251 9XX XXX XXX" />
+                                        <ProfileInput label="Subject" value={profile.subject} onChange={(value) => setProfile({ ...profile, subject: value })} placeholder="Mathematics" />
+                                        <ProfileInput label="Experience" value={profile.experience} onChange={(value) => setProfile({ ...profile, experience: value })} placeholder="Years of experience" />
                                     </div>
                                 </div>
 
-                                <div className="input-group" style={{ marginTop: "1rem" }}>
-                                    <label>Bio</label>
-                                    <div
-                                        className="input-field"
-                                        style={{ alignItems: "flex-start", padding: "0.75rem 1rem" }}
-                                    >
-                                        <textarea
-                                            rows={3}
-                                            value={profile.bio}
-                                            onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                                            placeholder="A short bio about yourself..."
-                                            style={{
-                                                flex: 1,
-                                                resize: "none",
-                                                fontSize: "0.9375rem",
-                                                color: "var(--gray-800)",
-                                                background: "transparent",
-                                                fontFamily: "inherit",
-                                                outline: "none",
-                                                border: "none",
-                                                lineHeight: 1.6,
-                                            }}
-                                        />
+                                <div className="card">
+                                    <h3 className="card-title" style={{ marginBottom: "1rem" }}>School Details</h3>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.85rem" }}>
+                                        <ProfileInput label="Department" value={profile.department} onChange={(value) => setProfile({ ...profile, department: value })} placeholder="Mathematics" />
+                                        <ProfileInput label="Homeroom Class" value={profile.homeroomClass} onChange={(value) => setProfile({ ...profile, homeroomClass: value })} placeholder="Grade 11-A" />
+                                        <ProfileInput label="Country" value={profile.country} onChange={(value) => setProfile({ ...profile, country: value })} placeholder="Country" />
+                                        <ProfileInput label="City / State" value={profile.cityState} onChange={(value) => setProfile({ ...profile, cityState: value })} placeholder="City / State" />
+                                        <ProfileInput label="Postal Code" value={profile.postalCode} onChange={(value) => setProfile({ ...profile, postalCode: value })} placeholder="Postal code" />
+                                        <ProfileInput label="Office Room" value={profile.officeRoom} onChange={(value) => setProfile({ ...profile, officeRoom: value })} placeholder="Office room" />
                                     </div>
-                                </div>
-
-                                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1.25rem" }}>
-                                    <button className="btn btn-secondary">Cancel</button>
-                                    <button className="btn btn-primary" onClick={handleSaveProfile}>Save Changes</button>
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+                                        <button className="btn btn-secondary">Cancel</button>
+                                        <button className="btn btn-primary" onClick={handleSaveProfile}>Save Changes</button>
+                                    </div>
                                 </div>
                             </div>
                         </>

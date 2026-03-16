@@ -54,7 +54,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <div>
             <Sidebar role="Teacher" items={teacherNavItems} />
             <div className="main-content">
-                <Header userName="Mr. Solomon" userRole="Mathematics Teacher" userInitials="MS" />
+                <Header userName="Mr. Solomon" userRole="Mathematics Teacher" userInitials="MS" userProfileHref="/teacher/profile" />
                 {children}
             </div>
         </div>

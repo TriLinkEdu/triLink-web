@@ -21,5 +21,5 @@ const adminNavItems = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     if (pathname === "/admin/login") return <>{children}</>;
-    return <div><Sidebar role="Admin" items={adminNavItems} /><div className="main-content"><Header userName="Admin User" userRole="System Administrator" userInitials="AU" />{children}</div></div>;
+    return <div><Sidebar role="Admin" items={adminNavItems} /><div className="main-content"><Header userName="Admin User" userRole="System Administrator" userInitials="AU" userProfileHref="/admin/profile" />{children}</div></div>;
 }
