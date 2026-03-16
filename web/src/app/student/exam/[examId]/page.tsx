@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useExamStore } from "@/store/examStore";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
@@ -19,7 +19,6 @@ interface ExamData {
     type: string;
     title: string;
     duration: number;
-    minimumTime: number;
     totalQuestions: number;
     questions: Question[];
 }
@@ -37,12 +36,37 @@ function getMockExam(): ExamData {
         { id: 9, order: 9, type: "mcq", text: "Which test is used to determine if an infinite series converges?", options: ["Ratio test", "Mean test", "Mode test", "Range test"] },
         { id: 10, order: 10, type: "truefalse", text: "The second derivative test can determine concavity of a function." },
     ];
-    return { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", duration: 120, minimumTime: 60, totalQuestions: questions.length, questions };
+    return { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", duration: 120, totalQuestions: questions.length, questions };
 }
 
-export default function ExamSession({ params }: { params: Promise<{ examId: string }> }) {
+const STUDENT_EXAM_META: Record<number, { course: string; type: string; title: string; duration: number }> = {
+    1: { course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", duration: 120 },
+    2: { course: "Physics", type: "Quiz", title: "Ch.6 Mechanics Quiz", duration: 30 },
+    3: { course: "Chemistry", type: "Test", title: "Organic Chemistry Test", duration: 60 },
+    4: { course: "English", type: "Quiz", title: "Grammar & Vocabulary Quiz", duration: 20 },
+    5: { course: "Biology", type: "Test", title: "Cell Biology Test", duration: 45 },
+    6: { course: "Mathematics", type: "Quiz", title: "Integration Quick Quiz", duration: 15 },
+    7: { course: "Physics", type: "Final", title: "Semester Final Exam", duration: 180 },
+};
+
+function buildExamById(examId: number): ExamData {
+    const base = getMockExam();
+    const meta = STUDENT_EXAM_META[examId] ?? STUDENT_EXAM_META[1];
+    return {
+        ...base,
+        id: examId,
+        course: meta.course,
+        type: meta.type,
+        title: meta.title,
+        duration: meta.duration,
+    };
+}
+
+export default function ExamSession() {
     const router = useRouter();
-    const exam = getMockExam();
+    const params = useParams<{ examId: string }>();
+    const examId = Number(params?.examId ?? 1);
+    const exam = buildExamById(Number.isNaN(examId) ? 1 : examId);
 
     const [currentQ, setCurrentQ] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -61,7 +85,7 @@ export default function ExamSession({ params }: { params: Promise<{ examId: stri
 
     const question = exam.questions[currentQ];
     const answeredCount = Object.keys(answers).length;
-    const minimumTimeSeconds = exam.minimumTime * 60;
+    const minimumTimeSeconds = Math.floor((exam.duration * 60) / 2);
 
     useEffect(() => {
         if (submitted) return;
@@ -370,12 +394,12 @@ export default function ExamSession({ params }: { params: Promise<{ examId: stri
                         <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem", color: "var(--danger)" }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" x2="14" y1="2" y2="2" /><line x1="12" x2="15" y1="14" y2="11" /><circle cx="12" cy="14" r="8" /></svg></div>
                         <h2 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: "0.5rem", color: "var(--danger)" }}>Cannot Submit Yet</h2>
                         <p style={{ color: "var(--gray-600)", marginBottom: "1rem", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                            You must remain for at least <strong>{exam.minimumTime} minutes</strong>.
+                            You must remain for at least <strong>{formatTime(minimumTimeSeconds)}</strong>.
                         </p>
                         <div style={{ background: "var(--danger-light)", borderRadius: 12, padding: "1rem", marginBottom: "1.5rem", color: "#991b1b", fontSize: "0.85rem" }}>
                             <div>Time spent: <strong>{formatTime(timeSpent)}</strong></div>
                             <div>Minimum: <strong>{formatTime(minimumTimeSeconds)}</strong></div>
-                            <div>Remaining: <strong>{formatTime(minimumTimeSeconds - timeSpent)}</strong></div>
+                            <div>Remaining: <strong>{formatTime(Math.max(0, minimumTimeSeconds - timeSpent))}</strong></div>
                         </div>
                         <button onClick={() => setShowEarlyWarning(false)} style={{ padding: "0.75rem 2rem", borderRadius: 12, background: "var(--primary-500)", border: "none", fontWeight: 700, cursor: "pointer", color: "#fff" }}>OK, Continue Exam</button>
                     </div>

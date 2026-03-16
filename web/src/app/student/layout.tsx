@@ -38,17 +38,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                         fontSize: "0.8rem", fontWeight: 600, textDecoration: "none",
                         border: "1px solid transparent",
                     }}>Exams</a>
-                    <a href="/student/chat" style={{
-                        padding: "0.35rem 0.7rem", borderRadius: "8px",
-                        background: pathname === "/student/chat" ? "var(--primary-50)" : "transparent",
-                        color: pathname === "/student/chat" ? "var(--primary-600)" : "var(--gray-600)",
-                        fontSize: "0.8rem", fontWeight: 600, textDecoration: "none",
-                        border: "1px solid transparent",
-                        display: "flex", alignItems: "center", gap: "0.35rem",
-                    }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        Chat
-                    </a>
                     <div className="student-header-user-info">
                         <div style={{
                             width: 34, height: 34, borderRadius: "10px",
