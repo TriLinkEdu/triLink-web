@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type AttendanceStatus = "present" | "absent" | "excused";
 
@@ -144,72 +145,77 @@ interface AttendanceStore {
     revertRecord: (recordId: string) => void;
 }
 
-export const useAttendanceStore = create<AttendanceStore>((set) => ({
-    classes: DEFAULT_CLASSES,
-    studentsByClass: DEFAULT_STUDENTS,
-    sessions: SEED_SESSIONS,
-    records: SEED_RECORDS,
+export const useAttendanceStore = create<AttendanceStore>()(
+    persist(
+        (set) => ({
+            classes: DEFAULT_CLASSES,
+            studentsByClass: DEFAULT_STUDENTS,
+            sessions: SEED_SESSIONS,
+            records: SEED_RECORDS,
 
-    addClass: (c) =>
-        set((state) => ({
-            classes: [...state.classes, { ...c, id: `cls-${Date.now()}` }],
-            studentsByClass: { ...state.studentsByClass, [c.name]: [] },
-        })),
+            addClass: (c) =>
+                set((state) => ({
+                    classes: [...state.classes, { ...c, id: `cls-${Date.now()}` }],
+                    studentsByClass: { ...state.studentsByClass, [c.name]: [] },
+                })),
 
-    submitSession: ({ className, date, teacherName, entries }) =>
-        set((state) => {
-            const existing = state.sessions.find(s => s.className === className && s.date === date);
-            const sessionId = existing?.id ?? `sess-${Date.now()}`;
-            const newSession: AttendanceSession = {
-                id: sessionId,
-                className,
-                date,
-                teacherName,
-                entries,
-                submittedAt: new Date().toISOString(),
-                locked: true,
-                unlockGranted: false,
-            };
-            const sessions = existing
-                ? state.sessions.map(s => s.id === existing.id ? newSession : s)
-                : [...state.sessions, newSession];
+            submitSession: ({ className, date, teacherName, entries }) =>
+                set((state) => {
+                    const existing = state.sessions.find(s => s.className === className && s.date === date);
+                    const sessionId = existing?.id ?? `sess-${Date.now()}`;
+                    const newSession: AttendanceSession = {
+                        id: sessionId,
+                        className,
+                        date,
+                        teacherName,
+                        entries,
+                        submittedAt: new Date().toISOString(),
+                        locked: true,
+                        unlockGranted: false,
+                    };
+                    const sessions = existing
+                        ? state.sessions.map(s => s.id === existing.id ? newSession : s)
+                        : [...state.sessions, newSession];
 
-            const kept = state.records.filter(r => !(r.className === className && r.date === date));
-            const newRecords: SubmittedRecord[] = entries.map((e, i) => ({
-                id: `${sessionId}-r${i}`,
-                sessionId,
-                studentName: e.studentName,
-                studentId: e.studentId,
-                className,
-                date,
-                teacherName,
-                status: e.status,
-                excuseNote: e.excuseNote,
-                corrected: false,
-            }));
-            return { sessions, records: [...kept, ...newRecords] };
+                    const kept = state.records.filter(r => !(r.className === className && r.date === date));
+                    const newRecords: SubmittedRecord[] = entries.map((e, i) => ({
+                        id: `${sessionId}-r${i}`,
+                        sessionId,
+                        studentName: e.studentName,
+                        studentId: e.studentId,
+                        className,
+                        date,
+                        teacherName,
+                        status: e.status,
+                        excuseNote: e.excuseNote,
+                        corrected: false,
+                    }));
+                    return { sessions, records: [...kept, ...newRecords] };
+                }),
+
+            unlockSession: (sessionId) =>
+                set((state) => ({
+                    sessions: state.sessions.map(s => s.id === sessionId ? { ...s, unlockGranted: true } : s),
+                })),
+
+            correctRecord: (recordId, status, reason) =>
+                set((state) => ({
+                    records: state.records.map(r =>
+                        r.id === recordId
+                            ? { ...r, corrected: true, correctedStatus: status, correctionReason: reason, correctedBy: "Admin User" }
+                            : r
+                    ),
+                })),
+
+            revertRecord: (recordId) =>
+                set((state) => ({
+                    records: state.records.map(r =>
+                        r.id === recordId
+                            ? { ...r, corrected: false, correctedStatus: undefined, correctionReason: undefined, correctedBy: undefined }
+                            : r
+                    ),
+                })),
         }),
-
-    unlockSession: (sessionId) =>
-        set((state) => ({
-            sessions: state.sessions.map(s => s.id === sessionId ? { ...s, unlockGranted: true } : s),
-        })),
-
-    correctRecord: (recordId, status, reason) =>
-        set((state) => ({
-            records: state.records.map(r =>
-                r.id === recordId
-                    ? { ...r, corrected: true, correctedStatus: status, correctionReason: reason, correctedBy: "Admin User" }
-                    : r
-            ),
-        })),
-
-    revertRecord: (recordId) =>
-        set((state) => ({
-            records: state.records.map(r =>
-                r.id === recordId
-                    ? { ...r, corrected: false, correctedStatus: undefined, correctionReason: undefined, correctedBy: undefined }
-                    : r
-            ),
-        })),
-}));
+        { name: "trilink-attendance-v1" }
+    )
+);

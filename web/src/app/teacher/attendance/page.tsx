@@ -16,6 +16,7 @@ export default function TeacherAttendance() {
     const [showMoreDropdown, setShowMoreDropdown] = useState(false);
     const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
     const [toast, setToast] = useState<string | null>(null);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const moreRef = useRef<HTMLDivElement>(null);
 
     // keep selectedClass valid when myClasses changes
@@ -117,7 +118,7 @@ export default function TeacherAttendance() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-    const handleSubmit = () => {
+    const confirmSubmit = () => {
         const entries = students.map(s => ({
             studentId: s.id,
             studentName: s.name,
@@ -128,6 +129,11 @@ export default function TeacherAttendance() {
         setDrafts(prev => { const n = { ...prev }; delete n[selectedClass]; return n; });
         submitSession({ className: selectedClass, date: today, teacherName: "Mr. Solomon", entries });
         showToast(isUnlockedForEdit ? "Attendance re-submitted and locked." : "Attendance submitted successfully!");
+        setShowSubmitConfirm(false);
+    };
+
+    const handleSubmit = () => {
+        setShowSubmitConfirm(true);
     };
 
     // Close dropdown on outside click
@@ -156,6 +162,28 @@ export default function TeacherAttendance() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                     </div>
                     <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{toast}</span>
+                </div>
+            )}
+
+            {showSubmitConfirm && (
+                <div className="modal-overlay" onClick={() => setShowSubmitConfirm(false)}>
+                    <div className="modal" style={{ maxWidth: 520, width: "92%" }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Confirm Attendance Submission</h3>
+                            <button className="modal-close" onClick={() => setShowSubmitConfirm(false)} aria-label="Close confirmation">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ fontSize: "0.9rem", color: "var(--gray-700)", lineHeight: 1.7 }}>
+                            {isUnlockedForEdit
+                                ? `Re-submit attendance for ${selectedClass} on ${today}. This will lock the updated attendance record.`
+                                : `Submit attendance for ${selectedClass} on ${today}. After submission, this session will be locked.`}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowSubmitConfirm(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={confirmSubmit}>Confirm Submit</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
