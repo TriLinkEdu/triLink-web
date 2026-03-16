@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
     useChatStore, fmtTs, fmtTime,
     Conversation, ChatParticipant, SECTION_STUDENTS,
@@ -39,9 +39,147 @@ const IconUsers = () => (
     </svg>
 );
 
+const IconSpark = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
+    </svg>
+);
+
+const ConversationList = memo(function ConversationList({
+    conversations,
+    activeId,
+    onSelect,
+}: {
+    conversations: Conversation[];
+    activeId: string;
+    onSelect: (id: string) => void;
+}) {
+    return (
+        <div className="chat-list">
+            {conversations.length === 0 && (
+                <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: "var(--gray-400)", fontSize: "0.8rem" }}>
+                    No conversations
+                </div>
+            )}
+            {conversations.map((conv) => {
+                const other = conv.type === "private" ? conv.participants.find((p) => p.id !== ME.id) : null;
+                const initials = conv.type === "group" ? (conv.section ?? "GR") : (other?.initials ?? "?");
+                const lastMsg = conv.messages[conv.messages.length - 1];
+                const isActive = conv.id === activeId;
+
+                return (
+                    <div
+                        key={conv.id}
+                        className={`chat-list-item ${isActive ? "active" : ""}`}
+                        onClick={() => onSelect(conv.id)}
+                        style={{ borderRadius: 16, margin: "0.35rem 0.55rem", border: isActive ? "1px solid rgba(37,99,235,0.18)" : "1px solid transparent" }}
+                    >
+                        <div
+                            className="avatar avatar-initials"
+                            style={{
+                                width: 42, height: 42, fontSize: "0.72rem", flexShrink: 0,
+                                background: conv.type === "group"
+                                    ? "linear-gradient(135deg, #0f766e, #14b8a6)"
+                                    : `linear-gradient(135deg, ${ROLE_COLOR[other?.role ?? "teacher"]}, ${ROLE_COLOR[other?.role ?? "teacher"]}bb)`,
+                                boxShadow: isActive ? "0 10px 24px rgba(15, 23, 42, 0.12)" : "none",
+                            }}
+                        >
+                            {initials}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                                <span style={{ fontWeight: 700, fontSize: "0.88rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--gray-900)" }}>
+                                    {conv.title}
+                                </span>
+                                <span style={{ fontSize: "0.68rem", color: "var(--gray-400)", flexShrink: 0 }}>
+                                    {fmtTs(conv.lastTs)}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                                {conv.type === "group" && (
+                                    <span style={{ fontSize: "0.62rem", background: "#ccfbf1", color: "#0f766e", borderRadius: "999px", padding: "2px 7px", fontWeight: 700, flexShrink: 0 }}>
+                                        GROUP
+                                    </span>
+                                )}
+                                {conv.parentVisible && (
+                                    <span style={{ fontSize: "0.62rem", background: "var(--warning-light)", color: "#92400e", borderRadius: "999px", padding: "2px 7px", fontWeight: 700, flexShrink: 0 }}>
+                                        PARENT
+                                    </span>
+                                )}
+                                <span style={{ fontSize: "0.78rem", color: "var(--gray-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {lastMsg?.text ?? "No messages yet"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+});
+
+const MessageList = memo(function MessageList({
+    conversation,
+    endRef,
+}: {
+    conversation: Conversation;
+    endRef: React.RefObject<HTMLDivElement | null>;
+}) {
+    return (
+        <div className="chat-messages" style={{ background: "radial-gradient(circle at top left, rgba(14,165,233,0.08), transparent 28%), linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)" }}>
+            {conversation.messages.map((msg) => {
+                const isMe = msg.senderId === ME.id;
+                const senderParticipant = conversation.participants.find((p) => p.id === msg.senderId);
+                return (
+                    <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: "0.25rem" }}>
+                        {!isMe && conversation.type === "group" && (
+                            <div
+                                className="avatar avatar-initials"
+                                style={{ width: 28, height: 28, fontSize: "0.6rem", flexShrink: 0, marginRight: 8, alignSelf: "flex-end", background: ROLE_COLOR[msg.senderRole] + "22", color: ROLE_COLOR[msg.senderRole] }}
+                            >
+                                {senderParticipant?.initials ?? "?"}
+                            </div>
+                        )}
+                        <div style={{ maxWidth: "72%" }}>
+                            {!isMe && conversation.type === "group" && (
+                                <div style={{ fontSize: "0.68rem", color: "var(--gray-500)", marginBottom: 4, paddingLeft: 2 }}>
+                                    {msg.senderName}
+                                </div>
+                            )}
+                            <div style={{
+                                padding: "0.7rem 0.9rem",
+                                borderRadius: isMe
+                                    ? "18px 18px 6px 18px"
+                                    : "18px 18px 18px 6px",
+                                    background: isMe
+                                        ? "#2563eb"
+                                    : "#ffffff",
+                                color: isMe ? "#fff" : "var(--gray-800)",
+                                fontSize: "0.875rem",
+                                lineHeight: 1.5,
+                                border: isMe ? "none" : "1px solid rgba(148,163,184,0.18)",
+                                boxShadow: isMe ? "0 12px 28px rgba(37, 99, 235, 0.2)" : "0 10px 24px rgba(15, 23, 42, 0.06)",
+                            }}>
+                                {msg.text}
+                            </div>
+                            <div style={{ fontSize: "0.65rem", color: "var(--gray-400)", marginTop: 4, textAlign: isMe ? "right" : "left" }}>
+                                {fmtTime(msg.ts)}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+            <div ref={endRef} />
+        </div>
+    );
+});
+
 export default function TeacherChat() {
-    const { conversations, sendMessage, createGroup } = useChatStore();
-    const myConvs = conversations.filter((c) => c.participants.some((p) => p.id === ME.id));
+    const { conversations, sendMessage, createGroup, markConversationRead } = useChatStore();
+    const myConvs = useMemo(
+        () => conversations.filter((c) => c.participants.some((p) => p.id === ME.id)),
+        [conversations]
+    );
 
     const [filter, setFilter] = useState<Filter>("all");
     const [activeId, setActiveId] = useState<string>(myConvs[0]?.id ?? "");
@@ -52,12 +190,35 @@ export default function TeacherChat() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const filtered = myConvs.filter((c) => filter === "all" || c.type === filter);
-    const active = myConvs.find((c) => c.id === activeId);
+    const filtered = useMemo(
+        () => myConvs.filter((c) => filter === "all" || c.type === filter),
+        [filter, myConvs]
+    );
+    const active = useMemo(
+        () => myConvs.find((c) => c.id === activeId),
+        [activeId, myConvs]
+    );
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: active?.messages.length ? "auto" : "smooth" });
     }, [activeId, active?.messages.length]);
+
+    useEffect(() => {
+        if (activeId) {
+            markConversationRead(activeId);
+        }
+    }, [activeId, markConversationRead]);
+
+    useEffect(() => {
+        if (filtered.length === 0) {
+            if (activeId) setActiveId("");
+            return;
+        }
+
+        if (!activeId || !filtered.some((conv) => conv.id === activeId)) {
+            setActiveId(filtered[0].id);
+        }
+    }, [activeId, filtered]);
 
     function handleSend() {
         if (!draft.trim() || !activeId) return;
@@ -80,18 +241,20 @@ export default function TeacherChat() {
         setSelectedStudents([]);
     }
 
-    function getOther(conv: Conversation): ChatParticipant | undefined {
-        return conv.participants.find((p) => p.id !== ME.id);
-    }
-
     return (
-        <div className="page-wrapper" style={{ padding: 0, height: "calc(100vh - 64px)" }}>
+        <div className="page-wrapper" style={{ padding: 0, height: "calc(100vh - 64px)", background: "linear-gradient(180deg, #f8fbff 0%, #eef7f8 100%)" }}>
             <div className="chat-layout">
                 {/* ── Sidebar ── */}
-                <div className="chat-sidebar">
+                <div className="chat-sidebar" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,250,252,0.96) 100%)", backdropFilter: "blur(10px)" }}>
                     <div style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--gray-100)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Messages</h2>
+                            <div>
+                                <h2 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>Messages</h2>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: "0.72rem", color: "var(--gray-500)" }}>
+                                    <IconSpark />
+                                    {filtered.length} active conversation{filtered.length === 1 ? "" : "s"}
+                                </div>
+                            </div>
                             <button
                                 className="btn btn-primary"
                                 style={{ fontSize: "0.72rem", padding: "0.3rem 0.65rem" }}
@@ -101,18 +264,24 @@ export default function TeacherChat() {
                             </button>
                         </div>
                         {/* Filter tabs */}
-                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                        <div style={{ display: "flex", gap: "0.35rem", padding: "0.2rem", borderRadius: 999, background: "var(--gray-50)", border: "1px solid var(--gray-200)" }}>
                             {(["all", "private", "group"] as Filter[]).map((f) => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
                                     style={{
-                                        flex: 1, padding: "0.3rem 0", fontSize: "0.72rem", fontWeight: 500,
-                                        borderRadius: "var(--radius)", border: "1px solid", cursor: "pointer",
-                                        background: filter === f ? "var(--primary-500)" : "transparent",
-                                        color: filter === f ? "#fff" : "var(--gray-500)",
-                                        borderColor: filter === f ? "var(--primary-500)" : "var(--gray-200)",
+                                        flex: 1,
+                                        padding: "0.42rem 0.1rem",
+                                        fontSize: "0.72rem",
+                                        fontWeight: filter === f ? 700 : 600,
+                                        borderRadius: 999,
+                                        border: "1px solid transparent",
+                                        cursor: "pointer",
+                                        background: filter === f ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "transparent",
+                                        color: filter === f ? "#fff" : "var(--gray-600)",
+                                        boxShadow: filter === f ? "0 8px 18px rgba(37, 99, 235, 0.22)" : "none",
                                         textTransform: "capitalize",
+                                        transition: "all var(--transition-fast)",
                                     }}
                                 >
                                     {f === "all" ? `All (${myConvs.length})` : f === "private" ? "Private" : "Groups"}
@@ -121,71 +290,14 @@ export default function TeacherChat() {
                         </div>
                     </div>
 
-                    <div className="chat-list">
-                        {filtered.length === 0 && (
-                            <div style={{ padding: "2rem 1.25rem", textAlign: "center", color: "var(--gray-400)", fontSize: "0.8rem" }}>
-                                No conversations
-                            </div>
-                        )}
-                        {filtered.map((conv) => {
-                            const other = conv.type === "private" ? getOther(conv) : null;
-                            const initials = conv.type === "group" ? (conv.section ?? "GR") : (other?.initials ?? "?");
-                            const lastMsg = conv.messages[conv.messages.length - 1];
-                            const isActive = conv.id === activeId;
-
-                            return (
-                                <div
-                                    key={conv.id}
-                                    className={`chat-list-item ${isActive ? "active" : ""}`}
-                                    onClick={() => setActiveId(conv.id)}
-                                >
-                                    <div
-                                        className="avatar avatar-initials"
-                                        style={{
-                                            width: 40, height: 40, fontSize: "0.72rem", flexShrink: 0,
-                                            background: conv.type === "group"
-                                                ? "linear-gradient(135deg, #7c3aed, var(--primary-500))"
-                                                : `linear-gradient(135deg, ${ROLE_COLOR[other?.role ?? "teacher"]}, ${ROLE_COLOR[other?.role ?? "teacher"]}bb)`,
-                                        }}
-                                    >
-                                        {initials}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                                            <span style={{ fontWeight: 600, fontSize: "0.875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {conv.title}
-                                            </span>
-                                            <span style={{ fontSize: "0.68rem", color: "var(--gray-400)", flexShrink: 0, marginLeft: 4 }}>
-                                                {fmtTs(conv.lastTs)}
-                                            </span>
-                                        </div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                                            {conv.type === "group" && (
-                                                <span style={{ fontSize: "0.62rem", background: "#ede9fe", color: "#7c3aed", borderRadius: "4px", padding: "1px 5px", fontWeight: 700, flexShrink: 0 }}>
-                                                    GROUP
-                                                </span>
-                                            )}
-                                            {conv.parentVisible && (
-                                                <span style={{ fontSize: "0.62rem", background: "var(--warning-light)", color: "#92400e", borderRadius: "4px", padding: "1px 5px", fontWeight: 700, flexShrink: 0 }}>
-                                                    👁 PARENT
-                                                </span>
-                                            )}
-                                            <span style={{ fontSize: "0.78rem", color: "var(--gray-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {lastMsg?.text ?? "No messages yet"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <ConversationList conversations={filtered} activeId={activeId} onSelect={setActiveId} />
                 </div>
 
                 {/* ── Main Panel ── */}
                 {active ? (
-                    <div className="chat-main">
+                    <div className="chat-main" style={{ background: "rgba(255,255,255,0.72)", backdropFilter: "blur(8px)" }}>
                         {/* Header */}
-                        <div style={{ padding: "0.875rem 1.5rem", borderBottom: "1px solid var(--gray-100)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{ padding: "0.95rem 1.5rem", borderBottom: "1px solid var(--gray-100)", display: "flex", alignItems: "center", gap: "0.75rem", background: "rgba(255,255,255,0.84)" }}>
                             {active.type === "group" ? (
                                 <>
                                     <div
@@ -239,52 +351,10 @@ export default function TeacherChat() {
                         )}
 
                         {/* Messages */}
-                        <div className="chat-messages">
-                            {active.messages.map((msg) => {
-                                const isMe = msg.senderId === ME.id;
-                                const senderParticipant = active.participants.find((p) => p.id === msg.senderId);
-                                return (
-                                    <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: "0.875rem" }}>
-                                        {!isMe && active.type === "group" && (
-                                            <div
-                                                className="avatar avatar-initials"
-                                                style={{ width: 28, height: 28, fontSize: "0.6rem", flexShrink: 0, marginRight: 7, alignSelf: "flex-end", background: ROLE_COLOR[msg.senderRole] + "22", color: ROLE_COLOR[msg.senderRole] }}
-                                            >
-                                                {senderParticipant?.initials ?? "?"}
-                                            </div>
-                                        )}
-                                        <div style={{ maxWidth: "68%" }}>
-                                            {!isMe && active.type === "group" && (
-                                                <div style={{ fontSize: "0.68rem", color: "var(--gray-500)", marginBottom: 2, paddingLeft: 2 }}>
-                                                    {msg.senderName}
-                                                </div>
-                                            )}
-                                            <div style={{
-                                                padding: "0.6rem 0.875rem",
-                                                borderRadius: isMe
-                                                    ? "var(--radius-lg) var(--radius-lg) 4px var(--radius-lg)"
-                                                    : "var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px",
-                                                background: isMe
-                                                    ? "linear-gradient(135deg, var(--primary-500), var(--primary-600))"
-                                                    : "var(--gray-100)",
-                                                color: isMe ? "#fff" : "var(--gray-800)",
-                                                fontSize: "0.875rem",
-                                                lineHeight: 1.5,
-                                            }}>
-                                                {msg.text}
-                                            </div>
-                                            <div style={{ fontSize: "0.65rem", color: "var(--gray-400)", marginTop: 3, textAlign: isMe ? "right" : "left" }}>
-                                                {fmtTime(msg.ts)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <div ref={messagesEndRef} />
-                        </div>
+                        <MessageList conversation={active} endRef={messagesEndRef} />
 
                         {/* Input area */}
-                        <div className="chat-input-area">
+                        <div className="chat-input-area" style={{ background: "rgba(255,255,255,0.9)" }}>
                             <input
                                 className="chat-input"
                                 placeholder="Type a message…"

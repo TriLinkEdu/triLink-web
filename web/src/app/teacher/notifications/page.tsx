@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
     MessageSquare, Calendar, Megaphone, ClipboardList,
@@ -222,25 +222,41 @@ export default function TeacherNotifications() {
         return items.sort((a, b) => b.sortMs - a.sortMs);
     }, [events, announcements, conversations]);
 
-    // keep total in sync so the sidebar badge is accurate
-    useMemo(() => { setTotal(allNotifs.length); }, [allNotifs.length, setTotal]);
+    useEffect(() => {
+        setTotal(allNotifs.length);
+    }, [allNotifs.length, setTotal]);
 
-    const readSet = new Set(readIds);
+    const readSet = useMemo(() => new Set(readIds), [readIds]);
 
-    const filtered = activeTab === "all"
-        ? allNotifs
-        : allNotifs.filter((n) => n.category === activeTab);
+    const counts = useMemo(() => {
+        const next: Record<FilterTab, number> = {
+            all: 0,
+            message: 0,
+            calendar: 0,
+            announcement: 0,
+            exam: 0,
+        };
 
-    function unreadCount(tab: FilterTab): number {
-        const list = tab === "all" ? allNotifs : allNotifs.filter((n) => n.category === tab);
-        return list.filter((n) => !readSet.has(n.id)).length;
-    }
+        for (const notif of allNotifs) {
+            if (!readSet.has(notif.id)) {
+                next.all += 1;
+                next[notif.category] += 1;
+            }
+        }
+
+        return next;
+    }, [allNotifs, readSet]);
+
+    const filtered = useMemo(
+        () => activeTab === "all" ? allNotifs : allNotifs.filter((n) => n.category === activeTab),
+        [activeTab, allNotifs]
+    );
 
     function handleMarkAll() {
         markAllRead(allNotifs.map((n) => n.id));
     }
 
-    const totalUnread = unreadCount("all");
+    const totalUnread = counts.all;
 
     return (
         <div className="page-wrapper">
@@ -289,7 +305,7 @@ export default function TeacherNotifications() {
                 }}
             >
                 {FILTER_TABS.map(({ key, label, Icon }) => {
-                    const uc = unreadCount(key);
+                    const uc = counts[key];
                     const active = activeTab === key;
                     return (
                         <button

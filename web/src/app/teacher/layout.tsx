@@ -3,12 +3,18 @@ import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useChatStore } from "@/store/chatStore";
 
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { total, readIds } = useNotificationStore();
+    const { conversations, readConversationIds } = useChatStore();
     const notifUnread = Math.max(0, total - readIds.length);
+    const chatUnread = conversations.filter((conversation) => {
+        const lastMessage = conversation.messages[conversation.messages.length - 1];
+        return lastMessage && lastMessage.senderId !== "teacher-1" && !readConversationIds.includes(conversation.id);
+    }).length;
     if (pathname === "/teacher/login") return <>{children}</>;
 
     const teacherNavItems = [
@@ -37,7 +43,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0" /></svg>,
         },
         {
-            label: "Chat", href: "/teacher/chat", badge: 3,
+            label: "Chat", href: "/teacher/chat", badge: chatUnread,
             icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>,
         },
         {

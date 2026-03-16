@@ -34,8 +34,10 @@ export interface Conversation {
 
 interface ChatStore {
     conversations: Conversation[];
+    readConversationIds: string[];
     sendMessage: (convId: string, msg: Omit<ChatMessage, "id" | "ts">) => void;
     createGroup: (section: string, participants: ChatParticipant[]) => void;
+    markConversationRead: (convId: string) => void;
 }
 
 const mkId = () => Math.random().toString(36).slice(2, 9);
@@ -122,6 +124,15 @@ export const useChatStore = create<ChatStore>()(
     persist(
         (set) => ({
             conversations: SEED,
+            readConversationIds: [],
+
+            markConversationRead(convId) {
+                set((s) => ({
+                    readConversationIds: s.readConversationIds.includes(convId)
+                        ? s.readConversationIds
+                        : [...s.readConversationIds, convId],
+                }));
+            },
 
             sendMessage(convId, msg) {
                 const message: ChatMessage = {
@@ -135,6 +146,7 @@ export const useChatStore = create<ChatStore>()(
                             ? { ...c, messages: [...c.messages, message], lastTs: message.ts }
                             : c
                     ),
+                    readConversationIds: [...new Set([...s.readConversationIds, convId])],
                 }));
             },
 
@@ -159,7 +171,10 @@ export const useChatStore = create<ChatStore>()(
                     parentVisible: false,
                     lastTs: new Date().toISOString(),
                 };
-                set((s) => ({ conversations: [conv, ...s.conversations] }));
+                set((s) => ({
+                    conversations: [conv, ...s.conversations],
+                    readConversationIds: [...new Set([...s.readConversationIds, conv.id])],
+                }));
             },
         }),
         { name: "trilink-chat-v1" }
