@@ -11,6 +11,7 @@ interface Question {
     text: string;
     options?: string[];
     order: number;
+    correctAnswer?: string;
 }
 
 interface ExamData {
@@ -62,11 +63,35 @@ function buildExamById(examId: number): ExamData {
     };
 }
 
+function buildPublishedExamById(examId: number, publishedExams: ReturnType<typeof useExamStore.getState>["publishedExams"]): ExamData | null {
+    const published = publishedExams.find((e) => e.id === examId);
+    if (!published) return null;
+
+    return {
+        id: published.id,
+        course: published.course,
+        type: published.type,
+        title: published.title,
+        duration: published.duration,
+        totalQuestions: published.totalQuestions,
+        questions: published.questions.map((q) => ({
+            id: q.id,
+            order: q.order,
+            type: "mcq",
+            text: q.text,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+        })),
+    };
+}
+
 export default function ExamSession() {
     const router = useRouter();
     const params = useParams<{ examId: string }>();
     const examId = Number(params?.examId ?? 1);
-    const exam = buildExamById(Number.isNaN(examId) ? 1 : examId);
+    const publishedExams = useExamStore(s => s.publishedExams);
+    const safeExamId = Number.isNaN(examId) ? 1 : examId;
+    const exam = buildPublishedExamById(safeExamId, publishedExams) ?? buildExamById(safeExamId);
 
     const [currentQ, setCurrentQ] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -81,11 +106,24 @@ export default function ExamSession() {
     const [showReport, setShowReport] = useState(false);
     const tabViolationsRef = useRef(0);
     const submittedRef = useRef(false);
-    const { setResult } = useExamStore();
+    const { setResult, markExamCompleted } = useExamStore();
 
     const question = exam.questions[currentQ];
     const answeredCount = Object.keys(answers).length;
     const minimumTimeSeconds = Math.floor((exam.duration * 60) / 2);
+
+    useEffect(() => {
+        setTimeLeft(exam.duration * 60);
+        setTimeSpent(0);
+        setCurrentQ(0);
+        setAnswers({});
+        setFlagged(new Set());
+        setSubmitted(false);
+        setShowConfirm(false);
+        setShowEarlyWarning(false);
+        setShowReport(false);
+        submittedRef.current = false;
+    }, [exam.id, exam.duration]);
 
     useEffect(() => {
         if (submitted) return;
@@ -146,11 +184,17 @@ export default function ExamSession() {
     useEffect(() => {
         if (!submitted) return;
         submittedRef.current = true;
-        const correctAnswers: Record<number, string> = {
+        const fallbackCorrectAnswers: Record<number, string> = {
             1: "6x + 2", 2: "Division by zero rule", 3: "True", 4: "cos(x)",
             5: "1", 6: "True", 7: "f'(g(x)) \u00b7 g'(x)", 8: "v du",
             9: "Ratio test", 10: "True",
         };
+        const score = Math.round((exam.questions.reduce((sum, q) => {
+            const expected = (q.correctAnswer ?? fallbackCorrectAnswers[q.id] ?? "").trim();
+            const actual = (answers[q.id] ?? "").trim();
+            return sum + (expected && expected.toLowerCase() === actual.toLowerCase() ? 1 : 0);
+        }, 0) / Math.max(1, exam.totalQuestions)) * 100);
+
         setResult({
             examId: exam.id,
             examTitle: exam.title,
@@ -165,10 +209,11 @@ export default function ExamSession() {
                 type: q.type,
                 text: q.text,
                 options: q.options,
-                correctAnswer: correctAnswers[q.id] || "",
+                correctAnswer: q.correctAnswer ?? fallbackCorrectAnswers[q.id] ?? "",
                 studentAnswer: answers[q.id] || "",
             })),
         });
+        markExamCompleted({ examId: exam.id, score, completedAt: new Date().toISOString() });
         router.push(`/student/result/${exam.id}`);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [submitted]);

@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { useExamStore } from "@/store/examStore";
+import { useAnnouncementStore } from "@/store/announcementStore";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { createPortal } from "react-dom";
@@ -615,17 +616,110 @@ export default function TeacherExams() {
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [showScheduleConfirm, setShowScheduleConfirm] = useState(false);
+    const [scheduledOpenAt, setScheduledOpenAt] = useState("");
     const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3000); };
 
     const addQuestion = () => { setQuestions(p => [...p, blankQ()]); setActiveQ(questions.length); };
     const removeQuestion = (idx: number) => { if (questions.length === 1) return; setQuestions(p => p.filter((_, i) => i !== idx)); setActiveQ(Math.min(idx, questions.length - 2)); };
 
-    const handlePublish = () => {
-        if (!quizTitle.trim()) { showToast("Enter a quiz title", false); return; }
+    const getQuizValidationError = () => {
+        if (!quizTitle.trim()) return "Enter a quiz title";
         const bad = questions.filter(qq => !qq.correct || !qq.text.trim());
-        if (bad.length) { showToast(`${bad.length} question(s) incomplete`, false); return; }
-        showToast(`"${quizTitle}" published to ${classGroup} ✓`);
-        setQuizTitle(""); setQuestions([blankQ()]); setActiveQ(0);
+        if (bad.length) return `${bad.length} question(s) incomplete`;
+        return null;
+    };
+
+    const addCurrentQuizToBank = () => {
+        setBank((prev) => {
+            let nextId = prev.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+            const next = [...prev];
+            for (const qq of questions) {
+                if (!qq.text.trim()) continue;
+                const exists = next.some((b) => b.q.trim().toLowerCase() === qq.text.trim().toLowerCase() && b.subj === subject);
+                if (exists) continue;
+                next.push({ id: nextId++, q: qq.text.trim(), subj: subject, type: "Multiple Choice", used: 0 });
+            }
+            return next;
+        });
+    };
+
+    const publishQuiz = (mode: "published" | "scheduled", opensAtIso: string) => {
+        const parsedDuration = Number.parseInt(duration, 10);
+        const safeDuration = Number.isNaN(parsedDuration) ? 30 : Math.max(5, parsedDuration);
+
+        publishExamToStore({
+            id: Date.now(),
+            course: subject,
+            type: "Quiz",
+            title: quizTitle.trim(),
+            classGroup,
+            duration: safeDuration,
+            totalQuestions: questions.length,
+            mode,
+            opensAt: opensAtIso,
+            publishedAt: new Date().toISOString(),
+            questions: questions.map((qq, idx) => ({
+                id: qq.id,
+                order: idx + 1,
+                type: "mcq",
+                text: qq.text,
+                options: [qq.options.A, qq.options.B, qq.options.C, qq.options.D],
+                correctAnswer: qq.correct ? qq.options[qq.correct] : "",
+            })),
+        });
+
+        addCurrentQuizToBank();
+
+        const nowLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        if (mode === "scheduled") {
+            const scheduledLabel = new Date(opensAtIso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            addAnnouncement({
+                title: `Upcoming Quiz: ${quizTitle.trim()}`,
+                target: classGroup,
+                message: `An upcoming ${subject} quiz has been scheduled. It will open at the set time.`,
+                status: "scheduled",
+                date: nowLabel,
+                scheduledDate: scheduledLabel,
+            });
+            showToast(`"${quizTitle}" scheduled for ${scheduledLabel} ✓`);
+        } else {
+            addAnnouncement({
+                title: `New Quiz Published: ${quizTitle.trim()}`,
+                target: classGroup,
+                message: `A new ${subject} quiz is now available for students.`,
+                status: "sent",
+                date: nowLabel,
+            });
+            showToast(`"${quizTitle}" published to ${classGroup} ✓`);
+        }
+
+        setQuizTitle("");
+        setQuestions([blankQ()]);
+        setActiveQ(0);
+        setScheduledOpenAt("");
+    };
+
+    const handlePublishConfirm = () => {
+        const error = getQuizValidationError();
+        if (error) { showToast(error, false); setShowPublishConfirm(false); return; }
+        publishQuiz("published", new Date().toISOString());
+        setShowPublishConfirm(false);
+    };
+
+    const handleScheduleConfirm = () => {
+        const error = getQuizValidationError();
+        if (error) { showToast(error, false); setShowScheduleConfirm(false); return; }
+        if (!scheduledOpenAt) { showToast("Choose date and time for schedule", false); return; }
+        const opensAt = new Date(scheduledOpenAt);
+        if (Number.isNaN(opensAt.getTime()) || opensAt.getTime() <= Date.now()) {
+            showToast("Scheduled time must be in the future", false);
+            return;
+        }
+        publishQuiz("scheduled", opensAt.toISOString());
+        setShowScheduleConfirm(false);
     };
 
     // Add a bank question into the current quiz
@@ -662,8 +756,10 @@ export default function TeacherExams() {
         setIsClient(true);
     }, []);
 
-    // ── Store grade sender ──────────────────────────────────────────────────
+    // ── Store grade sender / published exams ───────────────────────────────
     const storeSendGrade = useExamStore(s => s.sendGrade);
+    const publishExamToStore = useExamStore(s => s.publishExam);
+    const addAnnouncement = useAnnouncementStore(s => s.addAnnouncement);
 
     const openEvaluate = (row: ResultRow) => {
         setEvaluating(row);
@@ -1059,6 +1155,81 @@ export default function TeacherExams() {
                 document.body
             )}
 
+            {showPublishConfirm && (
+                <div className="modal-overlay" onClick={() => setShowPublishConfirm(false)}>
+                    <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Confirm Publish</h3>
+                            <button className="modal-close" onClick={() => setShowPublishConfirm(false)} aria-label="Close confirmation">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ fontSize: "0.9rem", color: "var(--gray-700)", lineHeight: 1.65 }}>
+                            Publish <strong>{quizTitle || "this quiz"}</strong> now for <strong>{classGroup}</strong>? This will also add the questions to the exam bank.
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowPublishConfirm(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handlePublishConfirm}>Confirm Publish</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showScheduleModal && (
+                <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
+                    <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Schedule Quiz</h3>
+                            <button className="modal-close" onClick={() => setShowScheduleModal(false)} aria-label="Close schedule">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+                            <p style={{ fontSize: "0.88rem", color: "var(--gray-600)", lineHeight: 1.6 }}>
+                                Choose when this quiz should open for students. It will appear in announcements as an upcoming quiz.
+                            </p>
+                            <div className="input-group" style={{ marginBottom: 0 }}>
+                                <label>Open Date &amp; Time</label>
+                                <input
+                                    type="datetime-local"
+                                    value={scheduledOpenAt}
+                                    onChange={(e) => setScheduledOpenAt(e.target.value)}
+                                    style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowScheduleModal(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={() => {
+                                if (!scheduledOpenAt) { showToast("Choose date and time for schedule", false); return; }
+                                setShowScheduleModal(false);
+                                setShowScheduleConfirm(true);
+                            }}>Continue</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showScheduleConfirm && (
+                <div className="modal-overlay" onClick={() => setShowScheduleConfirm(false)}>
+                    <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">Confirm Schedule</h3>
+                            <button className="modal-close" onClick={() => setShowScheduleConfirm(false)} aria-label="Close confirmation">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ fontSize: "0.9rem", color: "var(--gray-700)", lineHeight: 1.65 }}>
+                            Schedule <strong>{quizTitle || "this quiz"}</strong> for <strong>{classGroup}</strong> to open at <strong>{scheduledOpenAt ? new Date(scheduledOpenAt).toLocaleString() : "-"}</strong>? This will add questions to the exam bank and create an upcoming announcement.
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowScheduleConfirm(false)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleScheduleConfirm}>Confirm Schedule</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── CSV Column Picker Modal removed ── */}
 
             <div className="page-header">
@@ -1165,8 +1336,24 @@ export default function TeacherExams() {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                                 Add Question
                             </button>
-                            <button className="btn btn-outline" onClick={() => { if (!quizTitle.trim()) { showToast("Enter a title first", false); return; } showToast("Saved to exam bank ✓"); }}>Save to Bank</button>
-                            <button className="btn btn-primary" onClick={handlePublish} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <button className="btn btn-outline" onClick={() => {
+                                if (!quizTitle.trim()) { showToast("Enter a title first", false); return; }
+                                addCurrentQuizToBank();
+                                showToast("Saved to exam bank ✓");
+                            }}>Save to Bank</button>
+                            <button className="btn btn-outline" onClick={() => {
+                                const error = getQuizValidationError();
+                                if (error) { showToast(error, false); return; }
+                                setShowScheduleModal(true);
+                            }} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+                                Schedule Quiz
+                            </button>
+                            <button className="btn btn-primary" onClick={() => {
+                                const error = getQuizValidationError();
+                                if (error) { showToast(error, false); return; }
+                                setShowPublishConfirm(true);
+                            }} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9l20-7z" /></svg>
                                 Publish Quiz
                             </button>

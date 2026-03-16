@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAnnouncementStore } from "@/store/announcementStore";
+import { useExamStore } from "@/store/examStore";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
 
@@ -36,9 +37,12 @@ export default function StudentDashboard() {
     const router = useRouter();
     const [filter, setFilter] = useState<"all" | "available" | "completed">("all");
     const { announcements } = useAnnouncementStore();
+    const publishedExams = useExamStore(s => s.publishedExams);
+    const completedExams = useExamStore(s => s.completedExams);
     const sentAnnouncements = announcements.filter(a => a.status === "sent");
+    const studentClass = "Grade 11-A";
 
-    const exams: Exam[] = [
+    const baseExams: Exam[] = [
         { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", date: "2026-02-20", time: "09:00", duration: 120, totalQuestions: 40, status: "available", room: "ICT Lab 1" },
         { id: 2, course: "Physics", type: "Quiz", title: "Ch.6 Mechanics Quiz", date: "2026-02-20", time: "14:00", duration: 30, totalQuestions: 15, status: "available", room: "ICT Lab 2" },
         { id: 3, course: "Chemistry", type: "Test", title: "Organic Chemistry Test", date: "2026-02-21", time: "10:00", duration: 60, totalQuestions: 25, status: "upcoming", room: "ICT Lab 1" },
@@ -46,6 +50,41 @@ export default function StudentDashboard() {
         { id: 5, course: "Biology", type: "Test", title: "Cell Biology Test", date: "2026-02-18", time: "09:00", duration: 45, totalQuestions: 20, status: "completed", score: 94, room: "ICT Lab 1" },
         { id: 6, course: "Mathematics", type: "Quiz", title: "Integration Quick Quiz", date: "2026-02-17", time: "10:00", duration: 15, totalQuestions: 8, status: "completed", score: 75, room: "ICT Lab 2" },
         { id: 7, course: "Physics", type: "Final", title: "Semester Final Exam", date: "2026-03-10", time: "08:00", duration: 180, totalQuestions: 60, status: "upcoming", room: "ICT Lab 1" },
+    ];
+
+    const publishedForStudent: Exam[] = publishedExams
+        .filter((e) => e.classGroup === studentClass)
+        .map((e) => {
+            const completed = completedExams.find((x) => x.examId === e.id);
+            const openSource = e.opensAt || e.publishedAt;
+            const openDate = new Date(openSource);
+            const openTimeMs = Number.isNaN(openDate.getTime()) ? Date.now() : openDate.getTime();
+            const safeOpenDate = Number.isNaN(openDate.getTime()) ? new Date() : openDate;
+            const nowMs = Date.now();
+            const status: ExamStatus = completed
+                ? "completed"
+                : openTimeMs > nowMs
+                ? "upcoming"
+                : "available";
+
+            return {
+                id: e.id,
+                course: e.course,
+                type: e.type,
+                title: e.title,
+                date: safeOpenDate.toISOString().slice(0, 10),
+                time: safeOpenDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+                duration: e.duration,
+                totalQuestions: e.totalQuestions,
+                status,
+                score: completed?.score,
+                room: "Online",
+            };
+        });
+
+    const exams: Exam[] = [
+        ...publishedForStudent,
+        ...baseExams.filter((base) => !publishedForStudent.some((p) => p.title === base.title)),
     ];
 
     const filtered = filter === "all" ? exams : exams.filter(e => filter === "available" ? (e.status === "available") : e.status === "completed");
