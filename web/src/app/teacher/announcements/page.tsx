@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { useAnnouncementStore } from "@/store/announcementStore";
+import { Announcement, useAnnouncementStore } from "@/store/announcementStore";
 
 export default function TeacherAnnouncements() {
     const { announcements, addAnnouncement } = useAnnouncementStore();
@@ -10,6 +10,7 @@ export default function TeacherAnnouncements() {
     const [showSchedule, setShowSchedule] = useState(false);
     const [scheduledDate, setScheduledDate] = useState("");
     const [toast, setToast] = useState<string | null>(null);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
     const formRef = useRef<HTMLDivElement>(null);
 
     const targets = ["All My Classes", "Grade 11-A", "Grade 11-B", "Grade 12-A"];
@@ -152,16 +153,118 @@ export default function TeacherAnnouncements() {
                     <p style={{ fontSize: "0.875rem", color: "var(--gray-400)", textAlign: "center", padding: "1rem 0" }}>No announcements yet.</p>
                 )}
                 {announcements.map((a) => (
-                    <div key={a.id} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "0.75rem", background: "var(--gray-50)", borderRadius: "var(--radius-md)", marginBottom: "0.5rem", gap: "0.5rem" }}>
+                    <button
+                        key={a.id}
+                        onClick={() => setSelectedAnnouncement(a)}
+                        style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                            width: "100%",
+                            padding: "0.85rem 0.95rem",
+                            background: "var(--gray-50)",
+                            borderRadius: "var(--radius-md)",
+                            marginBottom: "0.5rem",
+                            gap: "0.75rem",
+                            border: "1px solid var(--gray-100)",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            transition: "all var(--transition-fast)",
+                        }}
+                    >
                         <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{a.title}</div>
                             <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", margin: "0.2rem 0" }}>To: {a.target} · {a.status === "scheduled" ? `Scheduled: ${a.scheduledDate}` : a.date}</div>
-                            <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem" }}>{a.message}</div>
+                            <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.message}</div>
                         </div>
-                        <span className={`badge ${a.status === "sent" ? "badge-success" : "badge-warning"}`} style={{ flexShrink: 0 }}>{a.status}</span>
-                    </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.45rem", flexShrink: 0 }}>
+                            <span className={`badge ${a.status === "sent" ? "badge-success" : "badge-warning"}`}>{a.status}</span>
+                            <span style={{ fontSize: "0.72rem", color: "var(--primary-600)", fontWeight: 600 }}>View details</span>
+                        </div>
+                    </button>
                 ))}
             </div>
+
+            {selectedAnnouncement && (
+                <div className="modal-overlay" onClick={() => setSelectedAnnouncement(null)}>
+                    <div className="modal" style={{ maxWidth: 720, width: "92%", overflow: "hidden", padding: 0 }} onClick={(e) => e.stopPropagation()}>
+                        <div
+                            style={{
+                                padding: "1.4rem 1.5rem 1.2rem",
+                                background: selectedAnnouncement.status === "sent"
+                                    ? "linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #ecfeff 100%)"
+                                    : "linear-gradient(135deg, #fffbeb 0%, #fff7ed 55%, #fff 100%)",
+                                borderBottom: "1px solid var(--gray-100)",
+                                position: "relative",
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
+                                <div style={{ display: "flex", gap: "0.95rem", alignItems: "flex-start" }}>
+                                    <div
+                                        style={{
+                                            width: 46,
+                                            height: 46,
+                                            borderRadius: 14,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            background: selectedAnnouncement.status === "sent" ? "#dbeafe" : "#fef3c7",
+                                            color: selectedAnnouncement.status === "sent" ? "#2563eb" : "#b45309",
+                                            boxShadow: "0 10px 25px rgba(15, 23, 42, 0.08)",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                                    </div>
+                                    <div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.45rem" }}>
+                                            <span className={`badge ${selectedAnnouncement.status === "sent" ? "badge-success" : "badge-warning"}`}>{selectedAnnouncement.status}</span>
+                                            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--gray-400)" }}>Announcement Details</span>
+                                        </div>
+                                        <h3 className="modal-title" style={{ fontSize: "1.3rem", lineHeight: 1.25 }}>{selectedAnnouncement.title}</h3>
+                                        <div style={{ fontSize: "0.82rem", color: "var(--gray-500)", marginTop: "0.45rem", maxWidth: 520 }}>
+                                            Review the full announcement before sharing or following up with students.
+                                        </div>
+                                    </div>
+                                </div>
+                                <button className="modal-close" onClick={() => setSelectedAnnouncement(null)} aria-label="Close announcement details">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="modal-body" style={{ paddingTop: "1.2rem" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.75rem", marginBottom: "1.1rem" }}>
+                                <div style={{ border: "1px solid var(--gray-100)", borderRadius: 14, padding: "0.9rem 1rem", background: "#fff" }}>
+                                    <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--gray-400)", marginBottom: "0.35rem" }}>Audience</div>
+                                    <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--gray-800)" }}>{selectedAnnouncement.target}</div>
+                                </div>
+                                <div style={{ border: "1px solid var(--gray-100)", borderRadius: 14, padding: "0.9rem 1rem", background: "#fff" }}>
+                                    <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--gray-400)", marginBottom: "0.35rem" }}>Status</div>
+                                    <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--gray-800)", textTransform: "capitalize" }}>{selectedAnnouncement.status}</div>
+                                </div>
+                                <div style={{ border: "1px solid var(--gray-100)", borderRadius: 14, padding: "0.9rem 1rem", background: "#fff" }}>
+                                    <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--gray-400)", marginBottom: "0.35rem" }}>Date</div>
+                                    <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--gray-800)" }}>
+                                        {selectedAnnouncement.status === "scheduled" ? selectedAnnouncement.scheduledDate : selectedAnnouncement.date}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ border: "1px solid var(--gray-100)", borderRadius: 18, overflow: "hidden", background: "linear-gradient(180deg, #ffffff 0%, #fafcff 100%)" }}>
+                                <div style={{ padding: "0.85rem 1rem", borderBottom: "1px solid var(--gray-100)", background: "rgba(37, 99, 235, 0.03)" }}>
+                                    <div style={{ fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--primary-600)" }}>Message</div>
+                                </div>
+                                <div style={{ padding: "1rem 1.05rem 1.1rem", fontSize: "0.95rem", color: "var(--gray-700)", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>
+                                    {selectedAnnouncement.message}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setSelectedAnnouncement(null)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
