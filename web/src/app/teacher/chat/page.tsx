@@ -10,16 +10,16 @@ const ME: ChatParticipant = { id: "teacher-1", name: "Mr. Solomon", role: "teach
 type Filter = "all" | "private" | "group";
 
 const ROLE_COLOR: Record<string, string> = {
-    student: "var(--success)",
-    admin: "var(--warning)",
+    student: "#10b981",
+    admin: "#f59e0b",
     parent: "#7c3aed",
-    teacher: "var(--primary-500)",
+    teacher: "#3b82f6",
 };
 const ROLE_BG: Record<string, string> = {
     student: "#dcfce7",
-    admin: "var(--warning-light)",
+    admin: "#fef3c7",
     parent: "#ede9fe",
-    teacher: "var(--primary-50)",
+    teacher: "#eff6ff",
 };
 
 const IconSend = () => (
@@ -44,6 +44,179 @@ const IconSpark = () => (
         <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
     </svg>
 );
+
+interface QuickProfile {
+    name: string;
+    roleLabel: string;
+    summary: string;
+    email: string;
+    phone: string;
+    meta: string[];
+}
+
+const PARTICIPANT_DIRECTORY: Record<string, Omit<QuickProfile, "name">> = {
+    "student-1": {
+        roleLabel: "Student",
+        summary: "Consistent mathematics learner who actively asks questions and follows up on feedback.",
+        email: "abebe.kebede@student.trilink.edu",
+        phone: "+251 911 345 678",
+        meta: ["Grade 11-A", "Calculus focus", "Parent-visible chat"],
+    },
+    "student-2": {
+        roleLabel: "Student",
+        summary: "Strong class participation with a clear interest in mechanics and applied math.",
+        email: "sara.haile@student.trilink.edu",
+        phone: "+251 911 456 789",
+        meta: ["Grade 11-A", "Quiz regular", "Science track"],
+    },
+    "student-3": {
+        roleLabel: "Student",
+        summary: "Responsive in group discussions and usually among the first to complete assignments.",
+        email: "dawit.tadesse@student.trilink.edu",
+        phone: "+251 911 567 890",
+        meta: ["Grade 11-A", "Assignment complete", "Discussion active"],
+    },
+    "student-4": {
+        roleLabel: "Student",
+        summary: "Quiet but steady learner with improving performance across recent tasks.",
+        email: "meron.alemu@student.trilink.edu",
+        phone: "+251 911 678 901",
+        meta: ["Grade 11-A", "Needs confidence", "Attendance stable"],
+    },
+    "student-5": {
+        roleLabel: "Student",
+        summary: "Shows reliable attendance and works well in structured class activities.",
+        email: "yonas.bekele@student.trilink.edu",
+        phone: "+251 911 789 012",
+        meta: ["Grade 11-A", "Homework on time", "Section member"],
+    },
+    "student-6": {
+        roleLabel: "Student",
+        summary: "Performs well in short quizzes and engages effectively during revision sessions.",
+        email: "tigist.girma@student.trilink.edu",
+        phone: "+251 912 100 111",
+        meta: ["Grade 11-B", "Quiz strong", "Revision active"],
+    },
+    "student-7": {
+        roleLabel: "Student",
+        summary: "Consistent performer with strong interest in problem-solving exercises.",
+        email: "biruk.tesfaye@student.trilink.edu",
+        phone: "+251 912 100 222",
+        meta: ["Grade 11-B", "Problem solver", "Class regular"],
+    },
+    "student-8": {
+        roleLabel: "Student",
+        summary: "Works carefully and benefits from clear step-by-step explanations.",
+        email: "helen.assefa@student.trilink.edu",
+        phone: "+251 912 100 333",
+        meta: ["Grade 11-B", "Careful pace", "Needs worked examples"],
+    },
+    "student-9": {
+        roleLabel: "Student",
+        summary: "Active in lessons and often helps keep group tasks moving forward.",
+        email: "samuel.getachew@student.trilink.edu",
+        phone: "+251 912 100 444",
+        meta: ["Grade 11-B", "Group active", "Peer support"],
+    },
+    "student-10": {
+        roleLabel: "Student",
+        summary: "Senior student focused on exam preparation and final-year performance.",
+        email: "mulugeta.worku@student.trilink.edu",
+        phone: "+251 913 200 111",
+        meta: ["Grade 12-A", "Exam focus", "Senior batch"],
+    },
+    "student-11": {
+        roleLabel: "Student",
+        summary: "Balanced academic profile with dependable participation in class review sessions.",
+        email: "selam.habtamu@student.trilink.edu",
+        phone: "+251 913 200 222",
+        meta: ["Grade 12-A", "Review regular", "Balanced profile"],
+    },
+    "student-12": {
+        roleLabel: "Student",
+        summary: "Confident in discussions and tends to finish timed activities quickly.",
+        email: "robel.kifle@student.trilink.edu",
+        phone: "+251 913 200 333",
+        meta: ["Grade 12-A", "Fast finisher", "Confident speaker"],
+    },
+    "student-13": {
+        roleLabel: "Student",
+        summary: "Shows interest in structured tutoring and keeps improving across assessments.",
+        email: "hana.tesfaye@student.trilink.edu",
+        phone: "+251 914 300 111",
+        meta: ["Grade 12-B", "Tutoring responsive", "Assessment improving"],
+    },
+    "student-14": {
+        roleLabel: "Student",
+        summary: "Participates more in smaller groups and responds well to direct feedback.",
+        email: "naod.girma@student.trilink.edu",
+        phone: "+251 914 300 222",
+        meta: ["Grade 12-B", "Direct feedback", "Small-group active"],
+    },
+    "student-15": {
+        roleLabel: "Student",
+        summary: "Reliable attendance with steady effort during revision and quiz preparation.",
+        email: "lidiya.bekele@student.trilink.edu",
+        phone: "+251 914 300 333",
+        meta: ["Grade 12-B", "Reliable attendance", "Quiz prep regular"],
+    },
+    "admin-1": {
+        roleLabel: "Administration",
+        summary: "Academic office contact for schedules, deadlines, and staff coordination updates.",
+        email: "admin.office@trilink.edu",
+        phone: "+251 911 000 000",
+        meta: ["Admin Office", "Staff coordination", "School notices"],
+    },
+    "parent-1": {
+        roleLabel: "Parent",
+        summary: "Parent contact for student follow-up, progress transparency, and support coordination.",
+        email: "kebede.family@parent.trilink.edu",
+        phone: "+251 911 345 679",
+        meta: ["Parent account", "Abebe Kebede", "Transparency enabled"],
+    },
+    "teacher-1": {
+        roleLabel: "Teacher",
+        summary: "Mathematics teacher responsible for Grade 11 and Grade 12 instruction and assessment follow-up.",
+        email: "solomon@school.edu",
+        phone: "+251 912 345 678",
+        meta: ["Mathematics", "Homeroom Grade 11-A", "Room 301"],
+    },
+};
+
+function findSectionForStudent(participantId: string): string | null {
+    for (const [section, students] of Object.entries(SECTION_STUDENTS)) {
+        if (students.some((student) => student.id === participantId)) return `Grade ${section}`;
+    }
+    return null;
+}
+
+function getQuickProfile(participant: ChatParticipant, conversation?: Conversation): QuickProfile {
+    const known = PARTICIPANT_DIRECTORY[participant.id];
+    if (known) {
+        return { name: participant.name, ...known };
+    }
+
+    if (participant.role === "student") {
+        const section = conversation?.section ? `Grade ${conversation.section}` : findSectionForStudent(participant.id) ?? "Student group";
+        return {
+            name: participant.name,
+            roleLabel: "Student",
+            summary: "Student account available for class communication, assignment follow-up, and learning support.",
+            email: `${participant.name.toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "")}@student.trilink.edu`,
+            phone: "+251 900 000 000",
+            meta: [section, "Academic chat enabled", "Teacher contact"],
+        };
+    }
+
+    return {
+        name: participant.name,
+        roleLabel: participant.role.charAt(0).toUpperCase() + participant.role.slice(1),
+        summary: `${participant.role.charAt(0).toUpperCase() + participant.role.slice(1)} account available for school communication and updates.`,
+        email: `${participant.role}@trilink.edu`,
+        phone: "+251 900 000 000",
+        meta: [participant.role, "Portal user"],
+    };
+}
 
 const ConversationList = memo(function ConversationList({
     conversations,
@@ -121,9 +294,11 @@ const ConversationList = memo(function ConversationList({
 const MessageList = memo(function MessageList({
     conversation,
     endRef,
+    onOpenProfile,
 }: {
     conversation: Conversation;
     endRef: React.RefObject<HTMLDivElement | null>;
+    onOpenProfile: (participant: ChatParticipant, conversation: Conversation) => void;
 }) {
     return (
         <div className="chat-messages" style={{ background: "radial-gradient(circle at top left, rgba(14,165,233,0.08), transparent 28%), linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)" }}>
@@ -132,19 +307,28 @@ const MessageList = memo(function MessageList({
                 const senderParticipant = conversation.participants.find((p) => p.id === msg.senderId);
                 return (
                     <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: "0.25rem" }}>
-                        {!isMe && conversation.type === "group" && (
-                            <div
-                                className="avatar avatar-initials"
-                                style={{ width: 28, height: 28, fontSize: "0.6rem", flexShrink: 0, marginRight: 8, alignSelf: "flex-end", background: ROLE_COLOR[msg.senderRole] + "22", color: ROLE_COLOR[msg.senderRole] }}
+                        {!isMe && conversation.type === "group" && senderParticipant && (
+                            <button
+                                onClick={() => onOpenProfile(senderParticipant, conversation)}
+                                style={{ width: 28, height: 28, padding: 0, border: "none", background: "transparent", cursor: "pointer", marginRight: 8, alignSelf: "flex-end", flexShrink: 0 }}
+                                aria-label={`Open profile for ${senderParticipant.name}`}
                             >
-                                {senderParticipant?.initials ?? "?"}
-                            </div>
+                                <div
+                                    className="avatar avatar-initials"
+                                    style={{ width: 28, height: 28, fontSize: "0.6rem", background: ROLE_COLOR[msg.senderRole] + "22", color: ROLE_COLOR[msg.senderRole] }}
+                                >
+                                    {senderParticipant.initials}
+                                </div>
+                            </button>
                         )}
                         <div style={{ maxWidth: "72%" }}>
-                            {!isMe && conversation.type === "group" && (
-                                <div style={{ fontSize: "0.68rem", color: "var(--gray-500)", marginBottom: 4, paddingLeft: 2 }}>
+                            {!isMe && conversation.type === "group" && senderParticipant && (
+                                <button
+                                    onClick={() => onOpenProfile(senderParticipant, conversation)}
+                                    style={{ fontSize: "0.68rem", color: "var(--gray-500)", marginBottom: 4, paddingLeft: 2, border: "none", background: "transparent", cursor: "pointer" }}
+                                >
                                     {msg.senderName}
-                                </div>
+                                </button>
                             )}
                             <div style={{
                                 padding: "0.7rem 0.9rem",
@@ -187,6 +371,7 @@ export default function TeacherChat() {
     const [showNewGroup, setShowNewGroup] = useState(false);
     const [groupSection, setGroupSection] = useState("11-A");
     const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+    const [selectedProfile, setSelectedProfile] = useState<{ participant: ChatParticipant; conversation: Conversation } | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -240,6 +425,17 @@ export default function TeacherChat() {
         setShowNewGroup(false);
         setSelectedStudents([]);
     }
+
+    function openParticipantProfile(participant: ChatParticipant, conversation: Conversation) {
+        setSelectedProfile({ participant, conversation });
+    }
+
+    const activePrivateParticipant = active?.type === "private"
+        ? active.participants.find((participant) => participant.id !== ME.id) ?? null
+        : null;
+    const selectedProfileData = selectedProfile
+        ? getQuickProfile(selectedProfile.participant, selectedProfile.conversation)
+        : null;
 
     return (
         <div className="page-wrapper" style={{ padding: 0, height: "calc(100vh - 64px)", background: "linear-gradient(180deg, #f8fbff 0%, #eef7f8 100%)" }}>
@@ -322,22 +518,28 @@ export default function TeacherChat() {
                                     </span>
                                 </>
                             ) : (() => {
-                                const other = active.participants.find((p) => p.id !== ME.id)!;
+                                const other = activePrivateParticipant!;
                                 return (
                                     <>
-                                        <div
-                                            className="avatar avatar-initials"
-                                            style={{ width: 38, height: 38, fontSize: "0.72rem", background: `linear-gradient(135deg, ${ROLE_COLOR[other.role]}, ${ROLE_COLOR[other.role]}bb)` }}
+                                        <button
+                                            onClick={() => openParticipantProfile(other, active)}
+                                            style={{ display: "flex", alignItems: "center", gap: "0.75rem", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}
+                                            aria-label={`Open profile for ${other.name}`}
                                         >
-                                            {other.initials}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 600 }}>{other.name}</div>
-                                            <div style={{ fontSize: "0.74rem", color: "var(--success)", display: "flex", alignItems: "center", gap: 4 }}>
-                                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", display: "inline-block" }} />
-                                                Online
+                                            <div
+                                                className="avatar avatar-initials"
+                                                style={{ width: 38, height: 38, fontSize: "0.72rem", background: `linear-gradient(135deg, ${ROLE_COLOR[other.role]}, ${ROLE_COLOR[other.role]}bb)` }}
+                                            >
+                                                {other.initials}
                                             </div>
-                                        </div>
+                                            <div style={{ textAlign: "left" }}>
+                                                <div style={{ fontWeight: 600, color: "var(--gray-900)" }}>{other.name}</div>
+                                                <div style={{ fontSize: "0.74rem", color: "var(--success)", display: "flex", alignItems: "center", gap: 4 }}>
+                                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", display: "inline-block" }} />
+                                                    View profile
+                                                </div>
+                                            </div>
+                                        </button>
                                         <span style={{ marginLeft: "auto", fontSize: "0.74rem", borderRadius: "20px", padding: "0.2rem 0.7rem", fontWeight: 600, textTransform: "capitalize", background: ROLE_BG[other.role], color: ROLE_COLOR[other.role] }}>
                                             {other.role}
                                         </span>
@@ -355,7 +557,7 @@ export default function TeacherChat() {
                         )}
 
                         {/* Messages */}
-                        <MessageList conversation={active} endRef={messagesEndRef} />
+                        <MessageList conversation={active} endRef={messagesEndRef} onOpenProfile={openParticipantProfile} />
 
                         {/* Input area */}
                         <div className="chat-input-area" style={{ background: "rgba(255,255,255,0.9)" }}>
@@ -388,6 +590,57 @@ export default function TeacherChat() {
                     </div>
                 )}
             </div>
+
+            {selectedProfile && selectedProfileData && (
+                <div className="modal-overlay" onClick={() => setSelectedProfile(null)}>
+                    <div className="modal" style={{ maxWidth: 420, width: "90%", overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ height: 96, background: `linear-gradient(135deg, ${ROLE_COLOR[selectedProfile.participant.role]}, ${ROLE_COLOR[selectedProfile.participant.role]}cc)` }} />
+                        <div style={{ padding: "0 1.25rem 1.25rem", marginTop: -30 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
+                                <div className="avatar avatar-initials" style={{ width: 64, height: 64, fontSize: "1rem", border: "4px solid #fff", background: `linear-gradient(135deg, ${ROLE_COLOR[selectedProfile.participant.role]}, ${ROLE_COLOR[selectedProfile.participant.role]}bb)` }}>
+                                    {selectedProfile.participant.initials}
+                                </div>
+                                <button
+                                    className="btn-icon"
+                                    onClick={() => setSelectedProfile(null)}
+                                    style={{
+                                        marginTop: "0.75rem",
+                                        color: "#0f172a",
+                                        background: "#f8fafc",
+                                        border: "1px solid #cbd5e1",
+                                    }}
+                                >
+                                    <IconClose />
+                                </button>
+                            </div>
+                            <div style={{ marginTop: "0.75rem" }}>
+                                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--gray-900)" }}>{selectedProfileData.name}</div>
+                                <div style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6, padding: "0.25rem 0.65rem", borderRadius: 999, background: ROLE_BG[selectedProfile.participant.role], color: ROLE_COLOR[selectedProfile.participant.role], fontSize: "0.72rem", fontWeight: 700 }}>
+                                    {selectedProfileData.roleLabel}
+                                </div>
+                                <p style={{ marginTop: "0.9rem", fontSize: "0.85rem", lineHeight: 1.7, color: "var(--gray-600)" }}>{selectedProfileData.summary}</p>
+                            </div>
+                            <div style={{ display: "grid", gap: "0.65rem", marginTop: "1rem" }}>
+                                <div style={{ padding: "0.75rem 0.9rem", borderRadius: 12, background: "var(--gray-50)", border: "1px solid var(--gray-200)" }}>
+                                    <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</div>
+                                    <div style={{ marginTop: 4, fontSize: "0.84rem", fontWeight: 600, color: "var(--gray-800)" }}>{selectedProfileData.email}</div>
+                                </div>
+                                <div style={{ padding: "0.75rem 0.9rem", borderRadius: 12, background: "var(--gray-50)", border: "1px solid var(--gray-200)" }}>
+                                    <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Phone</div>
+                                    <div style={{ marginTop: 4, fontSize: "0.84rem", fontWeight: 600, color: "var(--gray-800)" }}>{selectedProfileData.phone}</div>
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", marginTop: "1rem" }}>
+                                {selectedProfileData.meta.map((item) => (
+                                    <span key={item} style={{ padding: "0.35rem 0.65rem", borderRadius: 999, background: "var(--gray-100)", color: "var(--gray-600)", fontSize: "0.72rem", fontWeight: 600 }}>
+                                        {item}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── New Group Modal ── */}
             {showNewGroup && (
