@@ -8,6 +8,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { createPortal } from "react-dom";
 
+const BANK_STORAGE_KEY = "trilink-teacher-exam-bank-v1";
+
 /* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
 function preprocess(tex: string): string {
     let out = tex;
@@ -603,8 +605,8 @@ export default function TeacherExams() {
 
     // Bank state (mutable so Edit/Use work)
     const [bank, setBank] = useState<BankQ[]>(INITIAL_BANK);
+    const [bankHydrated, setBankHydrated] = useState(false);
     const [bankSearch, setBankSearch] = useState("");
-    const [editingBank, setEditingBank] = useState<BankQ | null>(null);
 
     // Results
     const [results, setResults] = useState<ResultRow[]>([
@@ -728,15 +730,19 @@ export default function TeacherExams() {
         setQuestions(p => { const next = [...p, newQ]; setActiveQ(next.length - 1); return next; });
         setBank(p => p.map(b => b.id === item.id ? { ...b, used: b.used + 1 } : b));
         setActiveTab("create");
-        showToast("Question added — fill in the answer options ✓");
+        showToast("Question added from bank — publish on the portal when ready ✓");
     };
 
-    // Save edits to a bank question
-    const saveBankEdit = () => {
-        if (!editingBank) return;
-        setBank(p => p.map(b => b.id === editingBank.id ? editingBank : b));
-        setEditingBank(null);
-        showToast("Bank question updated ✓");
+    // Load a bank question directly into full quiz builder for detailed editing.
+    const editFromBank = (item: BankQ) => {
+        setActiveTab("create");
+        setSubject(item.subj);
+        setQuestions([{ ...blankQ(), text: item.q }]);
+        setActiveQ(0);
+        if (!quizTitle.trim()) {
+            setQuizTitle(`${item.subj} Quiz`);
+        }
+        showToast("Question loaded in quiz builder — you can add/remove/edit before publishing.");
     };
 
     const filteredBank = bankSearch.trim()
@@ -755,6 +761,45 @@ export default function TeacherExams() {
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    useEffect(() => {
+        if (!isClient) return;
+        try {
+            const raw = window.localStorage.getItem(BANK_STORAGE_KEY);
+            if (!raw) {
+                setBankHydrated(true);
+                return;
+            }
+            const parsed = JSON.parse(raw) as unknown;
+            if (Array.isArray(parsed)) {
+                const safe = parsed.filter((item): item is BankQ => (
+                    typeof item === "object" &&
+                    item !== null &&
+                    typeof (item as BankQ).id === "number" &&
+                    typeof (item as BankQ).q === "string" &&
+                    typeof (item as BankQ).subj === "string" &&
+                    typeof (item as BankQ).type === "string" &&
+                    typeof (item as BankQ).used === "number"
+                ));
+                if (safe.length > 0) {
+                    setBank(safe);
+                }
+            }
+        } catch {
+            // Ignore corrupted local bank cache and continue with defaults.
+        } finally {
+            setBankHydrated(true);
+        }
+    }, [isClient]);
+
+    useEffect(() => {
+        if (!isClient || !bankHydrated) return;
+        try {
+            window.localStorage.setItem(BANK_STORAGE_KEY, JSON.stringify(bank));
+        } catch {
+            // Ignore storage write failures (e.g., private mode quota restrictions).
+        }
+    }, [bank, bankHydrated, isClient]);
 
     // ── Store grade sender / published exams ───────────────────────────────
     const storeSendGrade = useExamStore(s => s.sendGrade);
@@ -961,40 +1006,6 @@ export default function TeacherExams() {
                     </div>
                     <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{toast.msg}</span>
                 </div>
-            )}
-
-            {/* Bank Edit Modal */}
-            {isClient && editingBank && createPortal(
-                <div className="modal-overlay" style={{ padding: "1rem" }}>
-                    <div className="modal" style={{ maxWidth: 600, width: "100%", maxHeight: "90vh", padding: "1.5rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                            <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Edit Bank Question</h3>
-                            <button onClick={() => setEditingBank(null)} style={{ width: 30, height: 30, borderRadius: 7, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gray-500)" }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <LatexField label="Question Text" value={editingBank.q} onChange={v => setEditingBank({ ...editingBank, q: v })} rows={4} placeholder="Edit question text…" />
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
-                            <div>
-                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.35rem" }}>Subject</label>
-                                <select value={editingBank.subj} onChange={e => setEditingBank({ ...editingBank, subj: e.target.value })} style={{ width: "100%", padding: "0.6rem 0.8rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.875rem", background: "#fff" }}>
-                                    <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.35rem" }}>Type</label>
-                                <select value={editingBank.type} onChange={e => setEditingBank({ ...editingBank, type: e.target.value })} style={{ width: "100%", padding: "0.6rem 0.8rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.875rem", background: "#fff" }}>
-                                    <option>Multiple Choice</option><option>Short Answer</option><option>Problem Solving</option><option>True/False</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                            <button className="btn btn-secondary" onClick={() => setEditingBank(null)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={saveBankEdit}>Save Changes</button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
             )}
 
             {/* ── Evaluate Modal ── */}
@@ -1425,7 +1436,7 @@ export default function TeacherExams() {
                                         <td style={{ fontSize: "0.85rem" }}>{item.used}×</td>
                                         <td>
                                             <div style={{ display: "flex", gap: "0.375rem" }}>
-                                                <button className="btn btn-outline btn-sm" onClick={() => setEditingBank({ ...item })}>Edit</button>
+                                                <button className="btn btn-outline btn-sm" onClick={() => editFromBank(item)}>Edit</button>
                                                 <button className="btn btn-secondary btn-sm" onClick={() => useFromBank(item)}>Use</button>
                                             </div>
                                         </td>
