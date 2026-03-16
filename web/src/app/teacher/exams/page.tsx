@@ -1,10 +1,11 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { useExamStore } from "@/store/examStore";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { createPortal } from "react-dom";
 
 /* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
 function preprocess(tex: string): string {
@@ -583,6 +584,7 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
 }
 
 export default function TeacherExams() {
+    const [isClient, setIsClient] = useState(false);
     const [activeTab, setActiveTab] = useState<"create" | "bank" | "results">("create");
 
     // Quiz meta
@@ -655,6 +657,10 @@ export default function TeacherExams() {
     const evalTotalResult = evalAssessments.reduce((s, a) => s + a.result, 0);
     const evalScore       = calcScore(evalAssessments);
     const evalGrade       = autoGrade(evalScore);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     // ── Store grade sender ──────────────────────────────────────────────────
     const storeSendGrade = useExamStore(s => s.sendGrade);
@@ -862,9 +868,9 @@ export default function TeacherExams() {
             )}
 
             {/* Bank Edit Modal */}
-            {editingBank && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-                    <div style={{ background: "#fff", borderRadius: 16, padding: "1.5rem", width: "100%", maxWidth: 600, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
+            {isClient && editingBank && createPortal(
+                <div className="modal-overlay" style={{ padding: "1rem" }}>
+                    <div className="modal" style={{ maxWidth: 600, width: "100%", maxHeight: "90vh", padding: "1.5rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
                             <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Edit Bank Question</h3>
                             <button onClick={() => setEditingBank(null)} style={{ width: 30, height: 30, borderRadius: 7, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gray-500)" }}>
@@ -891,13 +897,14 @@ export default function TeacherExams() {
                             <button className="btn btn-primary" onClick={saveBankEdit}>Save Changes</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ── Evaluate Modal ── */}
-            {evaluating && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", overflowY: "auto" }}>
-                    <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 820, boxShadow: "0 28px 90px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", maxHeight: "95vh" }}>
+            {isClient && evaluating && createPortal(
+                <div className="modal-overlay" style={{ padding: "1rem", overflowY: "auto", alignItems: "center" }}>
+                    <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 820, boxShadow: "0 28px 90px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", maxHeight: "95vh", overflow: "hidden", zIndex: "var(--z-modal)" }}>
 
                         {/* ── Modal Header ── */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.1rem 1.5rem", borderBottom: "1.5px solid var(--gray-100)", flexShrink: 0 }}>
@@ -1030,7 +1037,8 @@ export default function TeacherExams() {
                             <button className="btn btn-primary" onClick={() => saveEval(true)}>Save &amp; Send to Student</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ── CSV Column Picker Modal removed ── */}
