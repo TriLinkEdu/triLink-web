@@ -100,9 +100,9 @@ export default function ClassDetailPage() {
                         <button
                             className="btn btn-outline"
                             onClick={() => router.push("/admin/classes")}
-                            style={{ width: "100%" }}
+                            style={{ width: "100%", color: "var(--blue-600)" }}
                         >
-                            Edit Class
+                            Back to Classes
                         </button>
                     </div>
                 </div>
