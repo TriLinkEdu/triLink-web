@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { Announcement, useAnnouncementStore } from "@/store/announcementStore";
+import { Announcement, isAnnouncementVisibleToRole, useAnnouncementStore } from "@/store/announcementStore";
 
 export default function TeacherAnnouncements() {
     const { announcements, addAnnouncement } = useAnnouncementStore();
@@ -14,6 +14,13 @@ export default function TeacherAnnouncements() {
     const formRef = useRef<HTMLDivElement>(null);
 
     const targets = ["All My Classes", "Grade 11-A", "Grade 11-B", "Grade 12-A"];
+    const visibleAnnouncements = announcements.filter((a) => isAnnouncementVisibleToRole(a, "teacher"));
+
+    const resolveTeacherAudience = (value: string): { audience: "students" | "teachers"; grade?: string } => {
+        if (value.toLowerCase().includes("grade")) return { audience: "students", grade: value };
+        if (value.toLowerCase().includes("class")) return { audience: "students" };
+        return { audience: "students" };
+    };
 
     function showToast(msg: string) {
         setToast(msg);
@@ -36,6 +43,8 @@ export default function TeacherAnnouncements() {
             message: message.trim(),
             status: "sent",
             date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            ...resolveTeacherAudience(target),
+            authorRole: "teacher",
         });
         setTitle("");
         setMessage("");
@@ -63,7 +72,9 @@ export default function TeacherAnnouncements() {
             message: message.trim(),
             status: "scheduled",
             date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-            scheduledDate: formatted,
+            scheduledDate,
+            ...resolveTeacherAudience(target),
+            authorRole: "teacher",
         });
         setTitle("");
         setMessage("");
@@ -149,10 +160,10 @@ export default function TeacherAnnouncements() {
             </div>
             <div className="card">
                 <h3 className="card-title" style={{ marginBottom: "1rem" }}>Previous Announcements</h3>
-                {announcements.length === 0 && (
+                {visibleAnnouncements.length === 0 && (
                     <p style={{ fontSize: "0.875rem", color: "var(--gray-400)", textAlign: "center", padding: "1rem 0" }}>No announcements yet.</p>
                 )}
-                {announcements.map((a) => (
+                {visibleAnnouncements.map((a) => (
                     <button
                         key={a.id}
                         onClick={() => setSelectedAnnouncement(a)}

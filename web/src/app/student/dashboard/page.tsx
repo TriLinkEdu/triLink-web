@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAnnouncementStore } from "@/store/announcementStore";
+import { isAnnouncementVisibleToRole, useAnnouncementStore } from "@/store/announcementStore";
 import { useExamStore } from "@/store/examStore";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
@@ -39,8 +39,10 @@ export default function StudentDashboard() {
     const { announcements } = useAnnouncementStore();
     const publishedExams = useExamStore(s => s.publishedExams);
     const completedExams = useExamStore(s => s.completedExams);
-    const sentAnnouncements = announcements.filter(a => a.status === "sent");
     const studentClass = "Grade 11-A";
+    const sentAnnouncements = announcements.filter(
+        (a) => a.status === "sent" && isAnnouncementVisibleToRole(a, "student", { className: studentClass })
+    );
 
     const baseExams: Exam[] = [
         { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", date: "2026-02-20", time: "09:00", duration: 120, totalQuestions: 40, status: "available", room: "ICT Lab 1" },
