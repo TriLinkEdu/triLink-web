@@ -11,6 +11,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ role, rolePlural, dashboardPath, gradient, tagline }: LoginPageProps) {
+    const canUseForgotPassword = role.toLowerCase() !== "admin";
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPwd, setShowPwd] = useState(false);
@@ -91,7 +92,7 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                         <p>{tagline || "Learn smarter, grow faster"}</p>
                     </div>
 
-                    {!showForgotPassword ? (
+                    {!showForgotPassword || !canUseForgotPassword ? (
                         <>
                             <form className="login-form" onSubmit={handleLogin}>
                                 <div className="input-group">
@@ -145,15 +146,17 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                                     </div>
                                 </div>
 
-                                <div className="login-forgot">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowForgotPassword(true)}
-                                        style={{ background: "none", border: "none", color: "var(--blue-600)", cursor: "pointer", textDecoration: "underline" }}
-                                    >
-                                        Forgot password?
-                                    </button>
-                                </div>
+                                {canUseForgotPassword && (
+                                    <div className="login-forgot">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowForgotPassword(true)}
+                                            style={{ background: "none", border: "none", color: "var(--blue-600)", cursor: "pointer", textDecoration: "underline" }}
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    </div>
+                                )}
 
                                 <button type="submit" className="login-btn" disabled={loading}>
                                     {loading ? (
