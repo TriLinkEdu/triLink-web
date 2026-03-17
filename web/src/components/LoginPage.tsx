@@ -15,14 +15,63 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
     const [password, setPassword] = useState("");
     const [showPwd, setShowPwd] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState("");
+    const [resetMessage, setResetMessage] = useState("");
+    const [resetError, setResetError] = useState("");
+    const [resetting, setResetting] = useState(false);
     const router = useRouter();
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        
+        // Validate inputs
+        if (!email || !password) {
+            setLoading(false);
+            return;
+        }
+
+        // TODO: Replace with actual API authentication
+        const authPayload = {
+            email: email.toLowerCase(),
+            password,
+            role: role.toLowerCase(),
+        };
+
+        // Call backend API
         setTimeout(() => {
             router.push(dashboardPath);
         }, 800);
+    };
+
+    const handleForgotPassword = (e: React.FormEvent) => {
+        e.preventDefault();
+        setResetError("");
+        setResetMessage("");
+        
+        if (!forgotEmail) {
+            setResetError("Please enter your email address");
+            return;
+        }
+
+        setResetting(true);
+
+        // TODO: Call backend API to send reset password email
+        const resetPayload = {
+            email: forgotEmail.toLowerCase(),
+            role: role.toLowerCase(),
+        };
+
+        setTimeout(() => {
+            setResetMessage(`Password reset instructions have been sent to ${forgotEmail}`);
+            setForgotEmail("");
+            setResetting(false);
+            setTimeout(() => {
+                setShowForgotPassword(false);
+                setResetMessage("");
+            }, 3000);
+        }, 1200);
     };
 
     return (
@@ -42,84 +91,170 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                         <p>{tagline || "Learn smarter, grow faster"}</p>
                     </div>
 
-                    <form className="login-form" onSubmit={handleLogin}>
-                        <div className="input-group">
-                            <label htmlFor="login-email">Email</label>
-                            <div className="input-field">
-                                <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                </svg>
-                                <input
-                                    id="login-email"
-                                    type="email"
-                                    placeholder={`${role.toLowerCase()}@school.edu`}
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                        </div>
+                    {!showForgotPassword ? (
+                        <>
+                            <form className="login-form" onSubmit={handleLogin}>
+                                <div className="input-group">
+                                    <label htmlFor="login-email">Email</label>
+                                    <div className="input-field">
+                                        <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect width="20" height="16" x="2" y="4" rx="2" />
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                        </svg>
+                                        <input
+                                            id="login-email"
+                                            type="email"
+                                            placeholder={`${role.toLowerCase()}@school.edu`}
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="input-group">
-                            <label htmlFor="login-password">Password</label>
-                            <div className="input-field">
-                                <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                                <input
-                                    id="login-password"
-                                    type={showPwd ? "text" : "password"}
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                                <button type="button" onClick={() => setShowPwd(!showPwd)} style={{ color: "var(--gray-400)" }}>
-                                    {showPwd ? (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                            <circle cx="12" cy="12" r="3" />
+                                <div className="input-group">
+                                    <label htmlFor="login-password">Password</label>
+                                    <div className="input-field">
+                                        <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                         </svg>
-                                    ) : (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                                            <line x1="2" x2="22" y1="2" y2="22" />
-                                        </svg>
-                                    )}
+                                        <input
+                                            id="login-password"
+                                            type={showPwd ? "text" : "password"}
+                                            placeholder="Enter your password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            disabled={loading}
+                                        />
+                                        <button type="button" onClick={() => setShowPwd(!showPwd)} style={{ color: "var(--gray-400)" }} disabled={loading}>
+                                            {showPwd ? (
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                                    <circle cx="12" cy="12" r="3" />
+                                                </svg>
+                                            ) : (
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                                                    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                                                    <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                                                    <line x1="2" x2="22" y1="2" y2="22" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="login-forgot">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowForgotPassword(true)}
+                                        style={{ background: "none", border: "none", color: "var(--blue-600)", cursor: "pointer", textDecoration: "underline" }}
+                                    >
+                                        Forgot password?
+                                    </button>
+                                </div>
+
+                                <button type="submit" className="login-btn" disabled={loading}>
+                                    {loading ? (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite" }}>
+                                                <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" fill="none" />
+                                                <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
+                                            </svg>
+                                            Logging in...
+                                        </span>
+                                    ) : "LOG IN"}
                                 </button>
-                            </div>
-                        </div>
+                            </form>
 
-                        <div className="login-forgot">
-                            <a href="#">Forgot password?</a>
-                        </div>
-
-                        <button type="submit" className="login-btn" disabled={loading}>
-                            {loading ? (
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite" }}>
-                                        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" fill="none" />
-                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
+                            <div className="login-offline">
+                                <a href="#">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                                        <line x1="12" y1="20" x2="12.01" y2="20" />
                                     </svg>
-                                    Logging in...
-                                </span>
-                            ) : "LOG IN"}
-                        </button>
-                    </form>
+                                    Continue offline
+                                </a>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--blue-50)", borderRadius: "var(--radius-md)", borderLeft: "3px solid var(--blue-500)" }}>
+                                <p style={{ fontSize: "0.875rem", color: "var(--blue-700)" }}>
+                                    Enter your email and we'll send you a link to reset your password.
+                                </p>
+                            </div>
 
-                    <div className="login-offline">
-                        <a href="#">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                                <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                                <line x1="12" y1="20" x2="12.01" y2="20" />
-                            </svg>
-                            Continue offline
-                        </a>
-                    </div>
+                            <form className="login-form" onSubmit={handleForgotPassword}>
+                                <div className="input-group">
+                                    <label htmlFor="forgot-email">Email Address</label>
+                                    <div className="input-field">
+                                        <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect width="20" height="16" x="2" y="4" rx="2" />
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                        </svg>
+                                        <input
+                                            id="forgot-email"
+                                            type="email"
+                                            placeholder="your@email.com"
+                                            value={forgotEmail}
+                                            onChange={(e) => setForgotEmail(e.target.value)}
+                                            disabled={resetting}
+                                        />
+                                    </div>
+                                </div>
+
+                                {resetError && (
+                                    <div style={{ padding: "0.75rem", marginBottom: "1rem", background: "var(--red-50)", borderRadius: "var(--radius-md)", color: "var(--red-700)", fontSize: "0.875rem" }}>
+                                        {resetError}
+                                    </div>
+                                )}
+
+                                {resetMessage && (
+                                    <div style={{ padding: "0.75rem", marginBottom: "1rem", background: "var(--green-50)", borderRadius: "var(--radius-md)", color: "var(--green-700)", fontSize: "0.875rem" }}>
+                                        {resetMessage}
+                                    </div>
+                                )}
+
+                                <button type="submit" className="login-btn" disabled={resetting} style={{ marginBottom: "0.75rem" }}>
+                                    {resetting ? (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite" }}>
+                                                <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" fill="none" />
+                                                <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
+                                            </svg>
+                                            Sending...
+                                        </span>
+                                    ) : "SEND RESET LINK"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowForgotPassword(false);
+                                        setForgotEmail("");
+                                        setResetError("");
+                                        setResetMessage("");
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        padding: "0.75rem 1rem",
+                                        background: "var(--gray-100)",
+                                        border: "1px solid var(--gray-200)",
+                                        borderRadius: "var(--radius-md)",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                        color: "var(--gray-700)",
+                                    }}
+                                >
+                                    Back to Login
+                                </button>
+                            </form>
+                        </>
+                    )}
                 </div>
             </div>
 
