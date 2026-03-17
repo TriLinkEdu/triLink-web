@@ -1,20 +1,45 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Announcement, isAnnouncementVisibleToRole, useAnnouncementStore } from "@/store/announcementStore";
 
 export default function TeacherAnnouncements() {
     const { announcements, addAnnouncement } = useAnnouncementStore();
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const [title, setTitle] = useState("");
     const [target, setTarget] = useState("All My Classes");
     const [message, setMessage] = useState("");
     const [showSchedule, setShowSchedule] = useState(false);
     const [scheduledDate, setScheduledDate] = useState("");
+    const [viewFilter, setViewFilter] = useState<"all" | "sent" | "upcoming" | "today" | "overdue">("all");
     const [toast, setToast] = useState<string | null>(null);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-    const formRef = useRef<HTMLDivElement>(null);
 
     const targets = ["All My Classes", "Grade 11-A", "Grade 11-B", "Grade 12-A"];
     const visibleAnnouncements = announcements.filter((a) => isAnnouncementVisibleToRole(a, "teacher"));
+
+    const getScheduleState = (value?: string) => {
+        if (!value) return "scheduled" as const;
+        const today = new Date();
+        const scheduled = new Date(value);
+        if (Number.isNaN(scheduled.getTime())) return "scheduled" as const;
+        today.setHours(0, 0, 0, 0);
+        scheduled.setHours(0, 0, 0, 0);
+        if (scheduled.getTime() > today.getTime()) return "upcoming" as const;
+        if (scheduled.getTime() < today.getTime()) return "overdue" as const;
+        return "today" as const;
+    };
+
+    const sortedAnnouncements = [...visibleAnnouncements].sort((a, b) => b.id - a.id);
+    const sentAnnouncements = sortedAnnouncements.filter((a) => a.status === "sent");
+    const upcomingAnnouncements = sortedAnnouncements.filter((a) => a.status === "scheduled" && getScheduleState(a.scheduledDate) === "upcoming");
+    const todayAnnouncements = sortedAnnouncements.filter((a) => a.status === "scheduled" && getScheduleState(a.scheduledDate) === "today");
+    const overdueAnnouncements = sortedAnnouncements.filter((a) => a.status === "scheduled" && getScheduleState(a.scheduledDate) === "overdue");
+
+    const filteredAnnouncements = sortedAnnouncements.filter((a) => {
+        if (viewFilter === "all") return true;
+        if (viewFilter === "sent") return a.status === "sent";
+        return a.status === "scheduled" && getScheduleState(a.scheduledDate) === viewFilter;
+    });
 
     const resolveTeacherAudience = (value: string): { audience: "students" | "teachers"; grade?: string } => {
         if (value.toLowerCase().includes("grade")) return { audience: "students", grade: value };
@@ -25,11 +50,6 @@ export default function TeacherAnnouncements() {
     function showToast(msg: string) {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
-    }
-
-    function handleNewAnnouncement() {
-        formRef.current?.scrollIntoView({ behavior: "smooth" });
-        (formRef.current?.querySelector("input") as HTMLInputElement | null)?.focus();
     }
 
     function handlePublish() {
@@ -49,6 +69,8 @@ export default function TeacherAnnouncements() {
         setTitle("");
         setMessage("");
         setTarget("All My Classes");
+        setShowCreateModal(false);
+        setShowSchedule(false);
         showToast("Announcement published successfully!");
     }
 
@@ -80,6 +102,7 @@ export default function TeacherAnnouncements() {
         setMessage("");
         setTarget("All My Classes");
         setScheduledDate("");
+        setShowCreateModal(false);
         setShowSchedule(false);
         showToast(`Announcement scheduled for ${formatted}!`);
     }
@@ -101,69 +124,139 @@ export default function TeacherAnnouncements() {
                     <h1 className="page-title">Announcements</h1>
                     <p className="page-subtitle">Create and manage announcements for your classes</p>
                 </div>
-                <button className="btn btn-primary" onClick={handleNewAnnouncement}>+ New Announcement</button>
+                <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>+ New Announcement</button>
             </div>
-            <div className="card" style={{ marginBottom: "1rem" }} ref={formRef}>
-                <h3 className="card-title" style={{ marginBottom: "1rem" }}>Create Announcement</h3>
-                <div className="input-group" style={{ marginBottom: "1rem" }}>
-                    <label>Title</label>
-                    <div className="input-field">
-                        <input
-                            placeholder="Announcement title..."
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                        />
+
+            {showCreateModal && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 1000,
+                        background: "rgba(15, 23, 42, 0.45)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "1rem",
+                    }}
+                    onClick={() => {
+                        setShowCreateModal(false);
+                        setShowSchedule(false);
+                        setScheduledDate("");
+                    }}
+                >
+                    <div className="card" style={{ width: "100%", maxWidth: 760, margin: 0, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+                            <h3 className="card-title" style={{ marginBottom: 0 }}>{showSchedule ? "Schedule Announcement" : "Create Announcement"}</h3>
+                            <button className="btn btn-outline btn-sm" onClick={() => { setShowCreateModal(false); setShowSchedule(false); setScheduledDate(""); }}>Close</button>
+                        </div>
+
+                        <div className="input-group" style={{ marginBottom: "1rem" }}>
+                            <label>Title</label>
+                            <div className="input-field">
+                                <input placeholder="Announcement title..." value={title} onChange={(e) => setTitle(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="input-group" style={{ marginBottom: "1rem" }}>
+                            <label>Target</label>
+                            <select
+                                value={target}
+                                onChange={(e) => setTarget(e.target.value)}
+                                style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
+                            >
+                                {targets.map((t) => <option key={t}>{t}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="input-group" style={{ marginBottom: "1rem" }}>
+                            <label>Message</label>
+                            <textarea
+                                placeholder="Write your announcement..."
+                                rows={4}
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", resize: "vertical", width: "100%" }}
+                            />
+                        </div>
+
+                        {showSchedule && (
+                            <div className="input-group" style={{ marginBottom: "1rem" }}>
+                                <label>Schedule Date &amp; Time</label>
+                                <input
+                                    type="datetime-local"
+                                    value={scheduledDate}
+                                    onChange={(e) => setScheduledDate(e.target.value)}
+                                    style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                            <button className="btn btn-primary" onClick={handlePublish}>Publish Now</button>
+                            <button className="btn btn-outline" onClick={handleSchedule}>{showSchedule ? "Confirm Schedule" : "Schedule"}</button>
+                            {showSchedule && (
+                                <button className="btn btn-outline" onClick={() => { setShowSchedule(false); setScheduledDate(""); }}>Cancel Schedule</button>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <div className="input-group" style={{ marginBottom: "1rem" }}>
-                    <label>Target</label>
-                    <select
-                        value={target}
-                        onChange={(e) => setTarget(e.target.value)}
-                        style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
-                    >
-                        {targets.map((t) => <option key={t}>{t}</option>)}
-                    </select>
-                </div>
-                <div className="input-group" style={{ marginBottom: "1rem" }}>
-                    <label>Message</label>
-                    <textarea
-                        placeholder="Write your announcement..."
-                        rows={4}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", resize: "vertical", width: "100%" }}
-                    />
-                </div>
-                {showSchedule && (
-                    <div className="input-group" style={{ marginBottom: "1rem" }}>
-                        <label>Schedule Date &amp; Time</label>
-                        <input
-                            type="datetime-local"
-                            value={scheduledDate}
-                            onChange={(e) => setScheduledDate(e.target.value)}
-                            style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
-                        />
-                    </div>
-                )}
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                    <button className="btn btn-primary" onClick={handlePublish}>Publish Now</button>
-                    <button className="btn btn-outline" onClick={handleSchedule}>
-                        {showSchedule ? "Confirm Schedule" : "Schedule"}
-                    </button>
-                    {showSchedule && (
-                        <button className="btn btn-outline" onClick={() => { setShowSchedule(false); setScheduledDate(""); }}>
-                            Cancel
-                        </button>
-                    )}
-                </div>
-            </div>
+            )}
+
             <div className="card">
-                <h3 className="card-title" style={{ marginBottom: "1rem" }}>Previous Announcements</h3>
-                {visibleAnnouncements.length === 0 && (
+                <h3 className="card-title" style={{ marginBottom: "1rem" }}>Announcements At A Glance</h3>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
+                    <div style={{ border: "1px solid #bbf7d0", borderRadius: "var(--radius-md)", background: "#f0fdf4", padding: "0.9rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#166534", letterSpacing: "0.03em", textTransform: "uppercase" }}>Sent</span>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#166534" }}>{sentAnnouncements.length}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                            {sentAnnouncements.slice(0, 3).map((ann) => (
+                                <div key={`sent-${ann.id}`} style={{ fontSize: "0.85rem", color: "#14532d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.title}</div>
+                            ))}
+                            {sentAnnouncements.length === 0 && <div style={{ fontSize: "0.82rem", color: "#166534" }}>No sent announcements yet.</div>}
+                        </div>
+                    </div>
+
+                    <div style={{ border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", background: "#fff7ed", padding: "0.9rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#9a3412", letterSpacing: "0.03em", textTransform: "uppercase" }}>Upcoming</span>
+                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9a3412" }}>{upcomingAnnouncements.length}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                            {upcomingAnnouncements.slice(0, 3).map((ann) => (
+                                <div key={`upcoming-${ann.id}`} style={{ fontSize: "0.85rem", color: "#7c2d12", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.title}</div>
+                            ))}
+                            {upcomingAnnouncements.length === 0 && <div style={{ fontSize: "0.82rem", color: "#9a3412" }}>No upcoming announcements.</div>}
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+                    {[
+                        { key: "all", label: `All (${sortedAnnouncements.length})` },
+                        { key: "sent", label: `Sent (${sentAnnouncements.length})` },
+                        { key: "upcoming", label: `Upcoming (${upcomingAnnouncements.length})` },
+                        { key: "today", label: `Today (${todayAnnouncements.length})` },
+                        { key: "overdue", label: `Overdue (${overdueAnnouncements.length})` },
+                    ].map((item) => (
+                        <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setViewFilter(item.key as typeof viewFilter)}
+                            className={viewFilter === item.key ? "btn btn-primary btn-sm" : "btn btn-outline btn-sm"}
+                        >
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+
+                {filteredAnnouncements.length === 0 && (
                     <p style={{ fontSize: "0.875rem", color: "var(--gray-400)", textAlign: "center", padding: "1rem 0" }}>No announcements yet.</p>
                 )}
-                {visibleAnnouncements.map((a) => (
+                {filteredAnnouncements.map((a) => (
                     <button
                         key={a.id}
                         onClick={() => setSelectedAnnouncement(a)}
