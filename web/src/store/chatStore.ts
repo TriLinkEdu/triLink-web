@@ -37,6 +37,12 @@ interface ChatStore {
     readConversationIds: string[];
     sendMessage: (convId: string, msg: Omit<ChatMessage, "id" | "ts">) => void;
     createGroup: (section: string, participants: ChatParticipant[]) => void;
+    createPrivateConversation: (params: {
+        sender: ChatParticipant;
+        recipient: ChatParticipant;
+        initialText?: string;
+        parentVisible?: boolean;
+    }) => string;
     markConversationRead: (convId: string) => void;
 }
 
@@ -122,9 +128,9 @@ const SEED: Conversation[] = [
 
 export const useChatStore = create<ChatStore>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             conversations: SEED,
-            readConversationIds: [],
+            readConversationIds: [] as string[],
 
             markConversationRead(convId) {
                 set((s) => ({
@@ -175,6 +181,48 @@ export const useChatStore = create<ChatStore>()(
                     conversations: [conv, ...s.conversations],
                     readConversationIds: [...new Set([...s.readConversationIds, conv.id])],
                 }));
+            },
+
+            createPrivateConversation({ sender, recipient, initialText, parentVisible = false }): string {
+                const existing = get()
+                    .conversations
+                    .find(
+                        (c) =>
+                            c.type === "private" &&
+                            c.participants.some((p) => p.id === sender.id) &&
+                            c.participants.some((p) => p.id === recipient.id)
+                    );
+                if (existing) return existing.id;
+
+                const now = new Date().toISOString();
+                const convId = `conv-prv-${mkId()}`;
+                const conv: Conversation = {
+                    id: convId,
+                    type: "private",
+                    title: recipient.name,
+                    participants: [sender, recipient],
+                    messages: initialText
+                        ? [
+                              {
+                                  id: mkId(),
+                                  senderId: sender.id,
+                                  senderName: sender.name,
+                                  senderRole: sender.role,
+                                  text: initialText,
+                                  ts: now,
+                              },
+                          ]
+                        : [],
+                    parentVisible,
+                    lastTs: now,
+                };
+
+                set((s) => ({
+                    conversations: [conv, ...s.conversations],
+                    readConversationIds: [...new Set([...s.readConversationIds, convId])],
+                }));
+
+                return convId;
             },
         }),
         { name: "trilink-chat-v1" }

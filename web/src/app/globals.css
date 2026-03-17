@@ -1390,7 +1390,7 @@ table tbody tr:last-child td {
 
 .chat-list-item:hover,
 .chat-list-item.active {
-  background: var(--primary-50);
+  background: var(--gray-50);
 }
 
 .chat-main {
@@ -1427,8 +1427,9 @@ table tbody tr:last-child td {
 }
 
 .chat-input:focus {
-  border-color: var(--primary-300);
+  border-color: #2563eb;
   background: #fff;
+  outline: none;
 }
 
 /* Calendar */
