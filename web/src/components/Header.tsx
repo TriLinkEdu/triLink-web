@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useAcademicYearStore } from "@/store/academicYearStore";
 
 interface HeaderProps {
     userName: string;
@@ -15,6 +16,14 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     const pathname = usePathname();
     const [searchFocused, setSearchFocused] = useState(false);
     const [searchText, setSearchText] = useState("");
+    
+    // Academic Year
+    const { 
+        years, 
+        currentSystemYear, 
+        adminSelectedYear, 
+        setAdminSelectedYear 
+    } = useAcademicYearStore();
 
     const role = pathname.split("/").filter(Boolean)[0] ?? "";
 
@@ -121,6 +130,34 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
             </div>
 
             <div className="header-actions">
+                {/* Academic Year Control */}
+                {role === "admin" ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginRight: "1rem" }}>
+                        <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 600 }}>Year:</span>
+                        <select 
+                            value={adminSelectedYear}
+                            onChange={(e) => setAdminSelectedYear(e.target.value)}
+                            style={{
+                                padding: "0.3rem 0.6rem",
+                                borderRadius: "4px",
+                                border: "1px solid var(--gray-200)",
+                                fontSize: "0.85rem",
+                                background: "var(--gray-50)",
+                                cursor: "pointer",
+                                outline: "none",
+                                fontWeight: 600,
+                                color: "var(--gray-800)"
+                            }}
+                        >
+                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                ) : (
+                    <div style={{ marginRight: "1rem", padding: "0.3rem 0.8rem", background: "var(--primary-50)", color: "var(--primary-600)", borderRadius: "20px", fontSize: "0.75rem", fontWeight: 700 }}>
+                        {currentSystemYear}
+                    </div>
+                )}
+
                 {notificationsHref ? (
                     <Link href={notificationsHref} className="header-icon-btn" title="Notifications" aria-label="Open notifications">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -508,7 +508,7 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
     const snippetBtn = (item: Snippet & { html: string }, key: string) => (
         <button key={key} title={item.tip} onClick={() => insertSnippet(item)}
             dangerouslySetInnerHTML={{ __html: item.html }}
-            style={{ padding: "0.1rem 0.4rem", minWidth: 30, height: 26, borderRadius: 5, border: "1.5px solid var(--gray-200)", background: "#fff", cursor: "pointer" }}
+            style={{ padding: "0.1rem 0.4rem", minWidth: 30, height: 26, borderRadius: 4, border: "1.5px solid var(--gray-200)", background: "#fff", cursor: "pointer" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--primary-50)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary-300)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gray-200)"; }}
         />
@@ -519,7 +519,7 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.35rem" }}>
                 <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>{label}</label>
                 {!mini && (
-                    <button onClick={() => setShowTips(t => !t)} style={{ fontSize: "0.68rem", fontWeight: 600, color: showTips ? "#b45309" : "var(--primary-600)", background: showTips ? "#fef3c7" : "var(--primary-50)", border: `1px solid ${showTips ? "#fde68a" : "var(--primary-200)"}`, borderRadius: 5, padding: "0.1rem 0.45rem", cursor: "pointer" }}>
+                    <button onClick={() => setShowTips(t => !t)} style={{ fontSize: "0.68rem", fontWeight: 600, color: showTips ? "#b45309" : "var(--primary-600)", background: showTips ? "#fef3c7" : "var(--primary-50)", border: `1px solid ${showTips ? "#fde68a" : "var(--primary-200)"}`, borderRadius: 4, padding: "0.1rem 0.45rem", cursor: "pointer" }}>
                         {showTips ? "✕ Hide tips" : `? How to write ${subject ?? "math"}`}
                     </button>
                 )}
@@ -527,14 +527,14 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
 
             {/* Teacher-friendly tips panel — subject-specific */}
             {!mini && showTips && (
-                <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 10, padding: "0.75rem 0.875rem", marginBottom: "0.5rem" }}>
+                <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 4, padding: "0.75rem 0.875rem", marginBottom: "0.5rem" }}>
                     <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.82rem", marginBottom: "0.6rem" }}>{cfg.icon} Writing {subject} — quick guide</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
                         {cfg.tips.map(tip => {
                             let rendered = "";
                             if (tip.rendered) { try { rendered = katex.renderToString(tip.rendered, { throwOnError: false }); } catch {} }
                             return (
-                                <div key={tip.title} style={{ background: "#fff", borderRadius: 8, padding: "0.5rem 0.65rem" }}>
+                                <div key={tip.title} style={{ background: "#fff", borderRadius: 4, padding: "0.5rem 0.65rem" }}>
                                     <div style={{ fontWeight: 700, color: "#78350f", fontSize: "0.75rem", marginBottom: "0.25rem" }}>{tip.title}</div>
                                     <code style={{ fontSize: "0.72rem", color: "#b45309", display: "block", marginBottom: "0.15rem" }}>{tip.code}</code>
                                     {rendered && <div style={{ fontSize: "0.7rem", color: "#78350f" }}>→&nbsp;<span dangerouslySetInnerHTML={{ __html: rendered }} /></div>}
@@ -553,11 +553,11 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
                 </div>
             ) : (
                 /* Full subject-specific categorized toolbar for question text */
-                <div style={{ background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: 10, padding: "0.4rem 0.5rem", marginBottom: "0.4rem" }}>
+                <div style={{ background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: 4, padding: "0.4rem 0.5rem", marginBottom: "0.4rem" }}>
                     <div style={{ display: "flex", gap: "0.2rem", marginBottom: "0.4rem", flexWrap: "wrap" as const }}>
                         {cfg.cats.map((cat, i) => (
                             <button key={cat.name} onClick={() => setActiveCat(i)}
-                                style={{ padding: "0.1rem 0.5rem", borderRadius: 5, fontSize: "0.68rem", fontWeight: 600, border: "1.5px solid", cursor: "pointer",
+                                style={{ padding: "0.1rem 0.5rem", borderRadius: 4, fontSize: "0.68rem", fontWeight: 600, border: "1.5px solid", cursor: "pointer",
                                     borderColor: activeCat === i ? "var(--primary-500)" : "transparent",
                                     background: activeCat === i ? "var(--primary-50)" : "transparent",
                                     color: activeCat === i ? "var(--primary-600)" : "var(--gray-500)" }}>
@@ -572,13 +572,13 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
             )}
 
             <textarea ref={taRef} value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder={placeholder}
-                style={{ width: "100%", padding: "0.65rem 0.9rem", background: "#fff", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.875rem", fontFamily: "monospace", resize: "vertical" as const, lineHeight: 1.6, boxSizing: "border-box" as const }}
+                style={{ width: "100%", padding: "0.65rem 0.9rem", background: "#fff", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.875rem", fontFamily: "monospace", resize: "vertical" as const, lineHeight: 1.6, boxSizing: "border-box" as const }}
                 onFocus={e => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.boxShadow = "0 0 0 3px var(--primary-50)"; }}
                 onBlur={e => { e.target.style.borderColor = "var(--gray-200)"; e.target.style.boxShadow = "none"; }} />
 
             {/* Always-visible live preview when there is content */}
             {!mini && value.trim() && (
-                <div style={{ marginTop: "0.3rem", padding: "0.5rem 0.75rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: 8, fontSize: "0.9rem", lineHeight: 1.8 }}
+                <div style={{ marginTop: "0.3rem", padding: "0.5rem 0.75rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: 4, fontSize: "0.9rem", lineHeight: 1.8 }}
                     dangerouslySetInnerHTML={{ __html: renderLatex(value) }} />
             )}
             {!mini && <p style={{ fontSize: "0.63rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>{cfg.hintLine}</p>}
@@ -1000,8 +1000,8 @@ export default function TeacherExams() {
         <div className="page-wrapper">
             {/* Toast */}
             {toast && (
-                <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#fff", borderRadius: 14, padding: "1rem 1.5rem", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", border: `1.5px solid ${toast.ok ? "var(--success)" : "var(--danger)"}`, display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: toast.ok ? "var(--success-light)" : "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", color: toast.ok ? "var(--success)" : "var(--danger)" }}>
+                <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#fff", borderRadius: 4, padding: "1rem 1.5rem", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", border: `1.5px solid ${toast.ok ? "var(--success)" : "var(--danger)"}`, display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 4, background: toast.ok ? "var(--success-light)" : "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", color: toast.ok ? "var(--success)" : "var(--danger)" }}>
                         {toast.ok ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
                     </div>
                     <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{toast.msg}</span>
@@ -1011,7 +1011,7 @@ export default function TeacherExams() {
             {/* ── Evaluate Modal ── */}
             {isClient && evaluating && createPortal(
                 <div className="modal-overlay" style={{ padding: "1rem", overflowY: "auto", alignItems: "center" }}>
-                    <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 820, boxShadow: "0 28px 90px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", maxHeight: "95vh", overflow: "hidden", zIndex: "var(--z-modal)" }}>
+                    <div style={{ background: "#fff", borderRadius: 4, width: "100%", maxWidth: 820, boxShadow: "0 28px 90px rgba(0,0,0,0.28)", display: "flex", flexDirection: "column", maxHeight: "95vh", overflow: "hidden", zIndex: "var(--z-modal)" }}>
 
                         {/* ── Modal Header ── */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.1rem 1.5rem", borderBottom: "1.5px solid var(--gray-100)", flexShrink: 0 }}>
@@ -1019,7 +1019,7 @@ export default function TeacherExams() {
                                 <h3 style={{ fontWeight: 800, fontSize: "1.05rem", margin: 0 }}>Evaluate Student</h3>
                                 <div style={{ fontSize: "0.76rem", color: "var(--gray-400)", marginTop: "0.15rem" }}>Score is calculated automatically from assessments below</div>
                             </div>
-                            <button onClick={() => setEvaluating(null)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <button onClick={() => setEvaluating(null)} style={{ width: 32, height: 32, borderRadius: 4, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                             </button>
                         </div>
@@ -1042,7 +1042,7 @@ export default function TeacherExams() {
                         <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem 1.5rem" }}>
 
                             {/* Assessment Table */}
-                            <div style={{ overflowX: "auto", borderRadius: 12, border: "1.5px solid var(--gray-200)", marginBottom: "1rem" }}>
+                            <div style={{ overflowX: "auto", borderRadius: 4, border: "1.5px solid var(--gray-200)", marginBottom: "1rem" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                                     <thead>
                                         <tr style={{ background: "var(--gray-50)" }}>
@@ -1061,12 +1061,12 @@ export default function TeacherExams() {
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
                                                     <input value={a.name}
                                                         onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                                                        style={{ width: "100%", padding: "0.3rem 0.55rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", fontFamily: "inherit", boxSizing: "border-box" as const }} />
+                                                        style={{ width: "100%", padding: "0.3rem 0.55rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.83rem", fontFamily: "inherit", boxSizing: "border-box" as const }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
                                                     <select value={a.type}
                                                         onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
-                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", background: "#fff", fontFamily: "inherit" }}>
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.83rem", background: "#fff", fontFamily: "inherit" }}>
                                                         <option value="continuous">continuous</option>
                                                         <option value="midterm">midterm</option>
                                                         <option value="quiz">quiz</option>
@@ -1088,7 +1088,7 @@ export default function TeacherExams() {
                                                             }));
                                                         }}
                                                         onBlur={() => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, maxMark: Math.max(0, x.maxMark) } : x))}
-                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const }} />
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
                                                     <input type="number" min={0} max={a.maxMark} value={a.result === 0 ? "" : a.result}
@@ -1102,11 +1102,11 @@ export default function TeacherExams() {
                                                             }));
                                                         }}
                                                         onBlur={() => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, result: Math.max(0, Math.min(x.result, x.maxMark || 0)) } : x))}
-                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: `1.5px solid ${a.result > a.maxMark ? "var(--danger)" : "var(--gray-200)"}`, borderRadius: 7, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const, background: a.result > a.maxMark ? "var(--danger-light)" : "#fff" }} />
+                                                        style={{ width: "100%", padding: "0.3rem 0.5rem", border: `1.5px solid ${a.result > a.maxMark ? "var(--danger)" : "var(--gray-200)"}`, borderRadius: 4, fontSize: "0.83rem", textAlign: "center" as const, boxSizing: "border-box" as const, background: a.result > a.maxMark ? "var(--danger-light)" : "#fff" }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.4rem", textAlign: "center" as const }}>
                                                     <button onClick={() => setEvalAssessments(p => p.filter((_, j) => j !== i))}
-                                                        style={{ width: 24, height: 24, borderRadius: 5, border: "none", background: "var(--danger-light)", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                        style={{ width: 24, height: 24, borderRadius: 4, border: "none", background: "var(--danger-light)", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                                     </button>
                                                 </td>
@@ -1132,7 +1132,7 @@ export default function TeacherExams() {
                                                         Grade: <strong style={{ fontSize: "1.15rem", color: evalScore >= 90 ? "var(--success)" : evalScore >= 70 ? "var(--primary-600)" : "var(--warning)" }}>{evalGrade}</strong>
                                                     </span>
                                                     {evalTotalMax !== 100 && evalTotalMax > 0 && (
-                                                        <span style={{ fontSize: "0.72rem", color: "#b45309", background: "#fef3c7", padding: "0.15rem 0.5rem", borderRadius: 5 }}>⚠ Total max marks = {evalTotalMax} (not 100)</span>
+                                                        <span style={{ fontSize: "0.72rem", color: "#b45309", background: "#fef3c7", padding: "0.15rem 0.5rem", borderRadius: 4 }}>⚠ Total max marks = {evalTotalMax} (not 100)</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -1143,7 +1143,7 @@ export default function TeacherExams() {
 
                             {/* Add Row */}
                             <button onClick={() => setEvalAssessments(p => [...p, { id: Date.now(), name: "New Assessment", type: "continuous", maxMark: 10, result: 0 }])}
-                                style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.875rem", borderRadius: 8, border: "1.5px dashed var(--primary-300)", background: "var(--primary-50)", color: "var(--primary-600)", fontWeight: 600, fontSize: "0.8rem", cursor: "pointer", marginBottom: "1.25rem" }}>
+                                style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.875rem", borderRadius: 4, border: "1.5px dashed var(--primary-300)", background: "var(--primary-50)", color: "var(--primary-600)", fontWeight: 600, fontSize: "0.8rem", cursor: "pointer", marginBottom: "1.25rem" }}>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                                 Add Assessment Row
                             </button>
@@ -1152,7 +1152,7 @@ export default function TeacherExams() {
                             <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.4rem" }}>Feedback for Student (optional)</label>
                             <textarea value={evalComment} onChange={e => setEvalComment(e.target.value)} rows={3}
                                 placeholder="E.g. 'Great work on the mid-term. Focus on exam technique for the final.'"
-                                style={{ width: "100%", padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 10, fontSize: "0.875rem", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" as const }} />
+                                style={{ width: "100%", padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.875rem", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" as const }} />
                         </div>
 
                         {/* ── Footer ── */}
@@ -1205,7 +1205,7 @@ export default function TeacherExams() {
                                     type="datetime-local"
                                     value={scheduledOpenAt}
                                     onChange={(e) => setScheduledOpenAt(e.target.value)}
-                                    style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
+                                    style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}
                                 />
                             </div>
                         </div>
@@ -1269,12 +1269,12 @@ export default function TeacherExams() {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                                 <div className="input-group"><label>Quiz Title</label><div className="input-field"><input value={quizTitle} onChange={e => setQuizTitle(e.target.value)} placeholder={`e.g., ${subject} Chapter Quiz`} /></div></div>
                                 <div className="input-group"><label>Subject</label>
-                                    <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
+                                    <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
                                         <option>Mathematics</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>English</option>
                                     </select>
                                 </div>
                                 <div className="input-group"><label>Class</label>
-                                    <select value={classGroup} onChange={e => setClassGroup(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "var(--radius-md)", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
+                                    <select value={classGroup} onChange={e => setClassGroup(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
                                         <option>Grade 11-A</option><option>Grade 11-B</option><option>Grade 12-A</option><option>Grade 12-B</option>
                                     </select>
                                 </div>
@@ -1307,10 +1307,10 @@ export default function TeacherExams() {
                                             if (q.points > 20) updateQ({ points: 20 });
                                         }}
                                         onFocus={(e) => e.currentTarget.select()}
-                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 8, fontSize: "0.85rem", textAlign: "center" as const }}
+                                        style={{ width: 52, padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.85rem", textAlign: "center" as const }}
                                     />
                                     {questions.length > 1 && (
-                                        <button onClick={() => removeQuestion(activeQ)} style={{ padding: "0.3rem 0.65rem", borderRadius: 8, border: "1.5px solid var(--danger-light)", background: "var(--danger-light)", color: "var(--danger)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>Remove</button>
+                                        <button onClick={() => removeQuestion(activeQ)} style={{ padding: "0.3rem 0.65rem", borderRadius: 4, border: "1.5px solid var(--danger-light)", background: "var(--danger-light)", color: "var(--danger)", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>Remove</button>
                                     )}
                                 </div>
                             </div>
@@ -1377,7 +1377,7 @@ export default function TeacherExams() {
                             <h3 className="card-title" style={{ marginBottom: "0.875rem" }}>Questions</h3>
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 380, overflowY: "auto" as const }}>
                                 {questions.map((qq, i) => (
-                                    <button key={qq.id} onClick={() => setActiveQ(i)} style={{ padding: "0.6rem 0.75rem", borderRadius: 10, textAlign: "left" as const, border: `2px solid ${activeQ === i ? "var(--primary-400)" : "var(--gray-200)"}`, background: activeQ === i ? "var(--primary-50)" : "#fff", cursor: "pointer" }}>
+                                    <button key={qq.id} onClick={() => setActiveQ(i)} style={{ padding: "0.6rem 0.75rem", borderRadius: 4, textAlign: "left" as const, border: `2px solid ${activeQ === i ? "var(--primary-400)" : "var(--gray-200)"}`, background: activeQ === i ? "var(--primary-50)" : "#fff", cursor: "pointer" }}>
                                         <div style={{ fontSize: "0.76rem", fontWeight: 700, color: activeQ === i ? "var(--primary-600)" : "var(--gray-600)" }}>Q{i + 1}</div>
                                         <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{qq.text ? qq.text.replace(/\$[^$]*\$/g, "[math]").slice(0, 45) : <em>No text yet</em>}</div>
                                         <div style={{ marginTop: 3, display: "flex", gap: "0.25rem" }}>
@@ -1387,7 +1387,7 @@ export default function TeacherExams() {
                                     </button>
                                 ))}
                             </div>
-                            <div style={{ marginTop: "0.875rem", padding: "0.65rem", background: "var(--gray-50)", borderRadius: 10 }}>
+                            <div style={{ marginTop: "0.875rem", padding: "0.65rem", background: "var(--gray-50)", borderRadius: 4 }}>
                                 <div style={{ fontSize: "0.76rem", color: "var(--gray-500)" }}>{questions.length} question(s) · {questions.reduce((s, qq) => s + qq.points, 0)} pts · {duration} min</div>
                             </div>
                         </div>
@@ -1407,7 +1407,7 @@ export default function TeacherExams() {
                                     </div>
                                 );
                             })}
-                            <div style={{ marginTop: "0.6rem", padding: "0.5rem", background: "var(--primary-50)", borderRadius: 8, fontSize: "0.68rem", color: "var(--primary-700)" }}>
+                            <div style={{ marginTop: "0.6rem", padding: "0.5rem", background: "var(--primary-50)", borderRadius: 4, fontSize: "0.68rem", color: "var(--primary-700)" }}>
                                 Wrap formulas/symbols in <strong>$ dollar signs $</strong>
                             </div>
                         </div>
