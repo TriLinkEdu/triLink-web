@@ -49,6 +49,17 @@ export interface SubmittedRecord {
     correctedBy?: string;
 }
 
+const REGISTERED_TEACHERS = [
+    "Mr. Bekele",
+    "Ms. Tigist",
+    "Mr. Yonas",
+    "Ms. Helen",
+    "Mr. Solomon",
+    "Dr. Ahmed",
+    "Ms. Amara",
+    "Mr. Tadesse",
+] as const;
+
 const DEFAULT_CLASSES: ClassInfo[] = [
     { id: "cls-1", name: "Grade 9-A",  teacher: "Mr. Bekele",  room: "Room 101" },
     { id: "cls-2", name: "Grade 9-B",  teacher: "Ms. Tigist",  room: "Room 102" },
@@ -138,7 +149,9 @@ interface AttendanceStore {
     studentsByClass: Record<string, StudentRecord[]>;
     sessions: AttendanceSession[];
     records: SubmittedRecord[];
+    getRegisteredTeachers: () => typeof REGISTERED_TEACHERS;
     addClass: (c: Omit<ClassInfo, "id">) => void;
+    updateClass: (classId: string, updates: Partial<Pick<ClassInfo, "name" | "teacher" | "room">>) => void;
     submitSession: (params: { className: string; date: string; teacherName: string; entries: AttendanceEntry[] }) => void;
     unlockSession: (sessionId: string) => void;
     correctRecord: (recordId: string, status: AttendanceStatus, reason: string) => void;
@@ -157,6 +170,20 @@ export const useAttendanceStore = create<AttendanceStore>()(
                 set((state) => ({
                     classes: [...state.classes, { ...c, id: `cls-${Date.now()}` }],
                     studentsByClass: { ...state.studentsByClass, [c.name]: [] },
+                })),
+
+            updateClass: (classId, updates) =>
+                set((state) => ({
+                    classes: state.classes.map((c) =>
+                        c.id === classId
+                            ? {
+                                ...c,
+                                name: updates.name ?? c.name,
+                                teacher: updates.teacher ?? c.teacher,
+                                room: updates.room ?? c.room,
+                            }
+                            : c
+                    ),
                 })),
 
             submitSession: ({ className, date, teacherName, entries }) =>
@@ -215,6 +242,8 @@ export const useAttendanceStore = create<AttendanceStore>()(
                             : r
                     ),
                 })),
+
+            getRegisteredTeachers: () => [...REGISTERED_TEACHERS],
         }),
         { name: "trilink-attendance-v1" }
     )
