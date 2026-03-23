@@ -55,7 +55,6 @@ function getQuickProfile(participant: ChatParticipant, conversation?: Conversati
 export default function AdminChat() {
     const {
         conversations,
-        readConversationIds,
         sendMessage,
         markConversationRead,
         createPrivateConversation,
@@ -104,9 +103,27 @@ export default function AdminChat() {
     }, [activeId, active?.messages.length]);
 
     const unreadCount = useMemo(
-        () => filteredConvs.filter((c) => !readConversationIds.includes(c.id)).length,
-        [filteredConvs, readConversationIds]
+        () =>
+            filteredConvs.filter((c) => {
+                const last = c.messages[c.messages.length - 1];
+                if (!last) return false;
+                return last.senderId !== ME.id && c.id !== activeId;
+            }).length,
+        [filteredConvs, activeId]
     );
+
+    const unreadByFilter = useMemo(() => {
+        const base = myConvs.filter((c) => {
+            const last = c.messages[c.messages.length - 1];
+            if (!last) return false;
+            return last.senderId !== ME.id && c.id !== activeId;
+        });
+        return {
+            all: base.length,
+            private: base.filter((c) => c.type === "private").length,
+            group: base.filter((c) => c.type === "group").length,
+        };
+    }, [myConvs, activeId]);
     const selectedProfileData = selectedProfile
         ? getQuickProfile(selectedProfile.participant, selectedProfile.conversation)
         : null;
@@ -155,9 +172,9 @@ export default function AdminChat() {
                         </div>
                         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
                             {([
-                                { key: "all", label: `All (${myConvs.length})` },
-                                { key: "private", label: "Private" },
-                                { key: "group", label: "Group" },
+                                { key: "all", label: `All (${unreadByFilter.all})` },
+                                { key: "private", label: `Private (${unreadByFilter.private})` },
+                                { key: "group", label: `Group (${unreadByFilter.group})` },
                             ] as const).map((item) => (
                                 <button
                                     key={item.key}
@@ -191,7 +208,7 @@ export default function AdminChat() {
                             const accent = getConversationAccent(conv);
                             const lastMsg = conv.messages[conv.messages.length - 1];
                             const isActive = conv.id === activeId;
-                            const isUnread = !readConversationIds.includes(conv.id);
+                            const isUnread = !!lastMsg && lastMsg.senderId !== ME.id && !isActive;
                             return (
                                 <div
                                     key={conv.id}
