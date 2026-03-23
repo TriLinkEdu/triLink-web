@@ -1,13 +1,18 @@
 "use client";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useChatStore } from "@/store/chatStore";
+import { clearAuthSession, getAccessToken, getAuthUser } from "@/lib/auth";
 
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const { total, readIds } = useNotificationStore();
     const { conversations, readConversationIds } = useChatStore();
     const notifUnread = Math.max(0, total - readIds.length);
@@ -15,7 +20,27 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         const lastMessage = conversation.messages[conversation.messages.length - 1];
         return lastMessage && lastMessage.senderId !== "teacher-1" && !readConversationIds.includes(conversation.id);
     }).length;
+    useEffect(() => {
+        if (pathname === "/teacher/login") {
+            setIsAuthorized(true);
+            return;
+        }
+
+        const token = getAccessToken();
+        const user = getAuthUser();
+
+        if (!token || !user || user.role !== "teacher") {
+            clearAuthSession();
+            setIsAuthorized(false);
+            router.replace("/teacher/login");
+            return;
+        }
+
+        setIsAuthorized(true);
+    }, [pathname, router]);
+
     if (pathname === "/teacher/login") return <>{children}</>;
+    if (!isAuthorized) return null;
 
     const teacherNavItems = [
         {

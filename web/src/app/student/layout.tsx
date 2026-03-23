@@ -1,17 +1,46 @@
 "use client";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { clearAuthSession, getAccessToken, getAuthUser } from "@/lib/auth";
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const [isAuthorized, setIsAuthorized] = useState(false);
+
+    useEffect(() => {
+        if (pathname === "/student/login") {
+            setIsAuthorized(true);
+            return;
+        }
+
+        const token = getAccessToken();
+        const user = getAuthUser();
+
+        if (!token || !user || user.role !== "student") {
+            clearAuthSession();
+            setIsAuthorized(false);
+            router.replace("/student/login");
+            return;
+        }
+
+        setIsAuthorized(true);
+    }, [pathname, router]);
 
     // Exam session has its own full-screen layout (no sidebar/header)
     if (pathname.startsWith("/student/exam/")) {
+        if (!isAuthorized) return null;
         return <>{children}</>;
     }
 
     // Login page - no layout
     if (pathname === "/student/login") {
         return <>{children}</>;
+    }
+
+    if (!isAuthorized) {
+        return null;
     }
 
     // Dashboard (exam list) + result pages - minimal header
@@ -50,12 +79,21 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                             <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>Grade 11-A</div>
                         </div>
                     </div>
-                    <a href="/student/login" style={{
+                    <button
+                        type="button"
+                        onClick={() => {
+                            clearAuthSession();
+                            router.push("/student/login");
+                        }}
+                        style={{
                         padding: "0.4rem 0.75rem", borderRadius: "8px",
                         background: "var(--danger-light)", color: "#991b1b",
                         fontSize: "0.8rem", fontWeight: 600, textDecoration: "none",
-                        border: "1px solid rgba(239,68,68,0.2)"
-                    }}>Logout</a>
+                        border: "1px solid rgba(239,68,68,0.2)",
+                        cursor: "pointer"
+                    }}>
+                        Logout
+                    </button>
                 </div>
             </header>
             <main className="student-main">
