@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getStoredUser } from "@/lib/auth";
 
 const TEACHER_SECURITY_STORAGE_KEY = "trilink-teacher-security-v1";
 const DEFAULT_TEACHER_PASSWORD = "Teacher@123!";
@@ -168,20 +169,21 @@ export default function TeacherSettings() {
     const [toast, setToast] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Profile state
+    // Profile state — seed from the logged-in teacher stored in localStorage
+    const _stored = getStoredUser();
     const [profile, setProfile] = useState({
-        firstName: "Solomon",
-        lastName: "Tesfaye",
-        email: "solomon@school.edu",
-        phone: "+251 912 345 678",
-        subject: "Mathematics",
-        department: "Mathematics",
-        homeroomClass: "Grade 11-A",
-        experience: "8 Years Experience",
-        country: "Ethiopia",
-        cityState: "Addis Ababa",
-        postalCode: "1000",
-        officeRoom: "Block B, Room 12",
+        firstName: _stored?.firstName ?? "",
+        lastName: _stored?.lastName ?? "",
+        email: _stored?.email ?? "",
+        phone: "",
+        subject: _stored?.subject ?? "",
+        department: _stored?.department ?? "",
+        homeroomClass: "",
+        experience: "",
+        country: "",
+        cityState: "",
+        postalCode: "",
+        officeRoom: "",
     });
 
     // Security state
@@ -260,13 +262,9 @@ export default function TeacherSettings() {
         showToast("Profile updated successfully!");
     }
 
-    function handleChangePassword() {
+    async function handleChangePassword() {
         if (!passwords.current || !passwords.newPass || !passwords.confirm) {
             showToast("Please fill in all password fields.");
-            return;
-        }
-        if (passwords.current !== storedPassword) {
-            showToast("Current password is incorrect.");
             return;
         }
         if (passwordIssues.length > 0) {
@@ -277,10 +275,29 @@ export default function TeacherSettings() {
             showToast("New passwords do not match.");
             return;
         }
-        setStoredPassword(passwords.newPass);
-        setPasswords({ current: "", newPass: "", confirm: "" });
-        setShowPasswords({ current: false, newPass: false, confirm: false });
-        showToast("Password changed successfully!");
+
+        try {
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+            const { authFetch } = await import("@/lib/auth");
+            const res = await authFetch(`${apiBase}/api/auth/change-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword: passwords.current, newPassword: passwords.newPass }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                showToast(data.message || "Current password is incorrect.");
+                return;
+            }
+
+            setPasswords({ current: "", newPass: "", confirm: "" });
+            setShowPasswords({ current: false, newPass: false, confirm: false });
+            showToast("Password changed successfully!");
+        } catch {
+            showToast("Failed to connect to server. Please try again.");
+        }
     }
 
     function requestTwoFactorCode(action: TwoFactorAction) {

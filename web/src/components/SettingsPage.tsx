@@ -1,17 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { authFetch, getStoredUser } from "@/lib/auth";
 
-interface SettingsPageProps {
-    user: {
-        id: string;
-        name: string;
-        email: string;
-        role: string;
-    };
-}
-
-export default function SettingsPage({ user }: SettingsPageProps) {
+export default function SettingsPage() {
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,45 +16,42 @@ export default function SettingsPage({ user }: SettingsPageProps) {
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
     const [sessionTimeout, setSessionTimeout] = useState(30);
 
+    // Read the real logged-in user from localStorage
+    const storedUser = getStoredUser();
+    const user = {
+        id: storedUser?.id ?? "—",
+        name: storedUser ? `${storedUser.firstName} ${storedUser.lastName}`.trim() : "—",
+        email: storedUser?.email ?? "—",
+        role: storedUser?.role ?? "user",
+    };
+
     const handleChangePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setSuccessMessage("");
         setErrorMessage("");
 
-        // Validation
-        if (!currentPassword) {
-            setErrorMessage("Current password is required");
-            return;
-        }
-        if (!newPassword) {
-            setErrorMessage("New password is required");
-            return;
-        }
-        if (newPassword.length < 8) {
-            setErrorMessage("New password must be at least 8 characters");
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setErrorMessage("Passwords do not match");
-            return;
-        }
-        if (currentPassword === newPassword) {
-            setErrorMessage("New password must be different from current password");
-            return;
-        }
+        if (!currentPassword) { setErrorMessage("Current password is required"); return; }
+        if (!newPassword) { setErrorMessage("New password is required"); return; }
+        if (newPassword.length < 8) { setErrorMessage("New password must be at least 8 characters"); return; }
+        if (newPassword !== confirmPassword) { setErrorMessage("Passwords do not match"); return; }
+        if (currentPassword === newPassword) { setErrorMessage("New password must be different from current password"); return; }
 
         setLoading(true);
 
         try {
-            // TODO: Call backend API to change password
-            const payload = {
-                userId: user.id,
-                currentPassword,
-                newPassword,
-            };
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1200));
+            const response = await authFetch(`${apiBase}/api/auth/change-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword, newPassword }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || `Error ${response.status}`);
+            }
 
             setSuccessMessage("Password changed successfully!");
             setCurrentPassword("");
@@ -76,13 +65,13 @@ export default function SettingsPage({ user }: SettingsPageProps) {
     };
 
     const handleToggleTwoFactor = async () => {
-        // TODO: Call backend API to toggle 2FA
         setTwoFactorEnabled(!twoFactorEnabled);
         setSuccessMessage(
             twoFactorEnabled ? "Two-factor authentication disabled" : "Two-factor authentication enabled"
         );
         setTimeout(() => setSuccessMessage(""), 3000);
     };
+
 
     return (
         <div className="page-wrapper">
