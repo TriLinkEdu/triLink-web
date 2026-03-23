@@ -13,8 +13,10 @@ interface LoginPageProps {
 
 export default function LoginPage({ role, rolePlural, dashboardPath, gradient, tagline }: LoginPageProps) {
     const canUseForgotPassword = role.toLowerCase() !== "admin";
+    const normalizedRole = role.toLowerCase() as PortalRole;
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [loginError, setLoginError] = useState("");
     const [showPwd, setShowPwd] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -99,7 +101,7 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
         // TODO: Call backend API to send reset password email
         const resetPayload = {
             email: forgotEmail.toLowerCase(),
-            role: role.toLowerCase(),
+            role: normalizedRole,
         };
 
         setTimeout(() => {
@@ -133,6 +135,12 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                     {!showForgotPassword || !canUseForgotPassword ? (
                         <>
                             <form className="login-form" onSubmit={handleLogin}>
+                                {loginError && (
+                                    <div style={{ marginBottom: "0.1rem", color: "#dc2626", fontSize: "0.82rem", fontWeight: 600, lineHeight: 1.25 }}>
+                                        {loginError}
+                                    </div>
+                                )}
+
                                 <div className="input-group">
                                     <label htmlFor="login-email">Email</label>
                                     <div className="input-field">
@@ -145,7 +153,12 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                                             type="email"
                                             placeholder={`${role.toLowerCase()}@school.edu`}
                                             value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
+                                            onChange={(e) => {
+                                                setEmail(e.target.value);
+                                                if (loginError) {
+                                                    setLoginError("");
+                                                }
+                                            }}
                                             disabled={loading}
                                         />
                                     </div>
@@ -163,7 +176,12 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                                             type={showPwd ? "text" : "password"}
                                             placeholder="Enter your password"
                                             value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
+                                            onChange={(e) => {
+                                                setPassword(e.target.value);
+                                                if (loginError) {
+                                                    setLoginError("");
+                                                }
+                                            }}
                                             disabled={loading}
                                         />
                                         <button type="button" onClick={() => setShowPwd(!showPwd)} style={{ color: "var(--gray-400)" }} disabled={loading}>

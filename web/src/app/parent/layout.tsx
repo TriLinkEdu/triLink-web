@@ -9,6 +9,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     const user = useCurrentUser("parent");
 
     if (pathname === "/parent/login") return <>{children}</>;
+    if (!isAuthorized) return null;
 
     const subtitle = user.childName
         ? `${user.relationship ?? "Parent"} of ${user.childName}`

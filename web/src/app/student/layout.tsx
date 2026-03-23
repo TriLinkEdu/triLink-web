@@ -10,6 +10,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
     // Exam session has its own full-screen layout (no sidebar/header)
     if (pathname.startsWith("/student/exam/")) {
+        if (!isAuthorized) return null;
         return <>{children}</>;
     }
 
