@@ -4,10 +4,12 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useChatStore } from "@/store/chatStore";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const user = useCurrentUser("teacher");
     const { total, readIds } = useNotificationStore();
     const { conversations, readConversationIds } = useChatStore();
     const notifUnread = Math.max(0, total - readIds.length);
@@ -60,7 +62,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <div>
             <Sidebar role="Teacher" items={teacherNavItems} />
             <div className="main-content">
-                <Header userName="Mr. Solomon" userRole="Mathematics Teacher" userInitials="MS" userProfileHref="/teacher/profile" />
+                <Header
+                    userName={user.fullName || "Teacher"}
+                    userRole={user.subject ? `${user.subject} Teacher` : "Teacher"}
+                    userInitials={user.initials}
+                    userProfileHref="/teacher/profile"
+                />
                 {children}
             </div>
         </div>

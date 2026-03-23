@@ -1,8 +1,12 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCurrentUser } from "@/lib/useCurrentUser";
+import { clearAuth } from "@/lib/auth";
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const user = useCurrentUser("student");
 
     // Exam session has its own full-screen layout (no sidebar/header)
     if (pathname.startsWith("/student/exam/")) {
@@ -14,7 +18,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         return <>{children}</>;
     }
 
-    // Dashboard (exam list) + result pages - minimal header
+    const gradeLabel = [user.grade, user.section].filter(Boolean).join("-") || "Student";
+
+    function handleLogout() {
+        clearAuth();
+        router.push("/student/login");
+    }
+
     return (
         <div style={{ minHeight: "100vh", background: "var(--gray-50)" }}>
             <header className="student-header">
@@ -44,18 +54,22 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                             background: "var(--primary-50)", display: "flex",
                             alignItems: "center", justifyContent: "center",
                             fontSize: "0.75rem", fontWeight: 700, color: "var(--primary-600)"
-                        }}>AK</div>
+                        }}>{user.initials}</div>
                         <div className="student-header-user-details">
-                            <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>Abebe Kebede</div>
-                            <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>Grade 11-A</div>
+                            <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{user.fullName || "Student"}</div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>{gradeLabel}</div>
                         </div>
                     </div>
-                    <a href="/student/login" style={{
-                        padding: "0.4rem 0.75rem", borderRadius: "8px",
-                        background: "var(--danger-light)", color: "#991b1b",
-                        fontSize: "0.8rem", fontWeight: 600, textDecoration: "none",
-                        border: "1px solid rgba(239,68,68,0.2)"
-                    }}>Logout</a>
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            padding: "0.4rem 0.75rem", borderRadius: "8px",
+                            background: "var(--danger-light)", color: "#991b1b",
+                            fontSize: "0.8rem", fontWeight: 600,
+                            border: "1px solid rgba(239,68,68,0.2)",
+                            cursor: "pointer",
+                        }}
+                    >Logout</button>
                 </div>
             </header>
             <main className="student-main">
