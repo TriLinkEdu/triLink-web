@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { authFetch } from "@/lib/auth";
 
 type RegistrationType = "student" | "teacher" | "parent";
 
@@ -180,7 +181,7 @@ export default function AdminRegistration() {
             };
 
             // Call backend API
-            const response = await fetch("/api/register", {
+            const response = await authFetch("/api/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

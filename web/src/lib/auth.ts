@@ -9,7 +9,7 @@ export interface AuthUser {
     mustChangePassword: boolean;
 }
 
-export interface LoginResponse {
+export interface AuthSession {
     accessToken: string;
     refreshToken: string;
     expiresIn: number;
@@ -28,36 +28,28 @@ function getApiBaseUrl() {
     return process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
 }
 
-function getConfiguredLoginPath() {
-    const configuredPath = process.env.NEXT_PUBLIC_AUTH_LOGIN_PATH;
+function getEnvPath(name: "NEXT_PUBLIC_AUTH_LOGIN_PATH" | "NEXT_PUBLIC_AUTH_REFRESH_PATH", fallback: string) {
+    const value = process.env[name];
 
-    if (!configuredPath) {
-        return null;
+    if (!value) {
+        return fallback;
     }
 
-    return configuredPath.startsWith("/") ? configuredPath : `/${configuredPath}`;
+    return value.startsWith("/") ? value : `/${value}`;
 }
 
-function getLoginPaths() {
-    const configuredPath = getConfiguredLoginPath();
-    const paths = [configuredPath, "/auth/login", "/api/auth/login", "/api/v1/auth/login"].filter(
-        (path): path is string => Boolean(path)
-    );
+function getApiMessage(payload: ApiErrorPayload) {
+    if (Array.isArray(payload.message)) {
+        return payload.message.join(", ");
+    }
 
-    return Array.from(new Set(paths));
+    return typeof payload.message === "string" ? payload.message : "";
 }
 
-function getLoginErrorMessage(status: number, payload: ApiErrorPayload) {
+function getFriendlyAuthError(status: number, payload: ApiErrorPayload) {
     if (status === 400) {
-        if (Array.isArray(payload.message)) {
-            return payload.message.join(", ");
-        }
-
-        if (typeof payload.message === "string" && payload.message.length > 0) {
-            return payload.message;
-        }
-
-        return "Please check your email format and required fields.";
+        const apiMessage = getApiMessage(payload);
+        return apiMessage || "Please check your email format and required fields.";
     }
 
     if (status === 401) {
@@ -68,62 +60,69 @@ function getLoginErrorMessage(status: number, payload: ApiErrorPayload) {
         return "Login service is temporarily unavailable. Please try again.";
     }
 
-    return "Unable to sign in with the current server settings. Check NEXT_PUBLIC_API_BASE_URL and NEXT_PUBLIC_AUTH_LOGIN_PATH.";
+    return "Unable to log in right now. Please try again.";
 }
 
-export async function login(email: string, password: string, role: PortalRole): Promise<LoginResponse> {
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = password.trim();
-    const normalizedRole = role.toLowerCase() as PortalRole;
-    const baseUrl = getApiBaseUrl();
-    const loginPaths = getLoginPaths();
-    let lastErrorMessage = "Unable to sign in right now. Please try again.";
-
-    for (const path of loginPaths) {
-        let response: Response;
-
-        try {
-            response = await fetch(`${baseUrl}${path}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email: normalizedEmail,
-                    password: normalizedPassword,
-                    role: normalizedRole,
-                }),
-            });
-        } catch {
-            throw new Error("Cannot reach authentication server. Check NEXT_PUBLIC_API_BASE_URL and ensure backend is running.");
-        }
-
-        if (response.ok) {
-            return (await response.json()) as LoginResponse;
-        }
-
-        let payload: ApiErrorPayload = {};
-
-        try {
-            payload = (await response.json()) as ApiErrorPayload;
-        } catch {
-            // Ignore response parsing failures and use status-based fallback.
-        }
-
-        lastErrorMessage = getLoginErrorMessage(response.status, payload);
-
-        // Try the next path when the endpoint is missing.
-        if (response.status === 404) {
-            continue;
-        }
-
-        throw new Error(lastErrorMessage);
+function getFriendlyRefreshError(status: number, payload: ApiErrorPayload) {
+    if (status === 401) {
+        return "Your session has expired. Please log in again.";
     }
 
-    throw new Error(lastErrorMessage);
+    if (status >= 500) {
+        return "Token refresh is temporarily unavailable. Please try again.";
+    }
+
+    const apiMessage = getApiMessage(payload);
+    return apiMessage || "Unable to refresh session. Please log in again.";
 }
 
-export function persistAuthSession(session: LoginResponse) {
+async function parseErrorPayload(response: Response) {
+    try {
+        return (await response.json()) as ApiErrorPayload;
+    } catch {
+        return {};
+    }
+}
+
+export async function login(email: string, password: string, role: PortalRole): Promise<AuthSession> {
+    const response = await fetch(`${getApiBaseUrl()}${getEnvPath("NEXT_PUBLIC_AUTH_LOGIN_PATH", "/api/auth/login")}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password: password.trim(),
+            role: role.toLowerCase(),
+        }),
+    });
+
+    if (!response.ok) {
+        const payload = await parseErrorPayload(response);
+        throw new Error(getFriendlyAuthError(response.status, payload));
+    }
+
+    return (await response.json()) as AuthSession;
+}
+
+export async function refreshTokens(refreshToken: string): Promise<AuthSession> {
+    const response = await fetch(`${getApiBaseUrl()}${getEnvPath("NEXT_PUBLIC_AUTH_REFRESH_PATH", "/api/auth/refresh")}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+        const payload = await parseErrorPayload(response);
+        throw new Error(getFriendlyRefreshError(response.status, payload));
+    }
+
+    return (await response.json()) as AuthSession;
+}
+
+export function persistAuthSession(session: AuthSession) {
     if (typeof window === "undefined") {
         return;
     }
@@ -141,6 +140,81 @@ export function getAccessToken() {
     return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+export function getAuthUser() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw) as AuthUser;
+    } catch {
+        return null;
+    }
+}
+
+export function getRefreshToken() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export async function refreshAccessTokenFromStorage() {
+    const token = getRefreshToken();
+
+    if (!token) {
+        throw new Error("No refresh token found. Please log in again.");
+    }
+
+    const session = await refreshTokens(token);
+    persistAuthSession(session);
+    return session;
+}
+
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+    const send = (token: string | null) => {
+        const headers = new Headers(init.headers ?? {});
+
+        if (token) {
+            headers.set("Authorization", `Bearer ${token}`);
+        }
+
+        return fetch(input, {
+            ...init,
+            headers,
+        });
+    };
+
+    const currentAccessToken = getAccessToken();
+    const firstResponse = await send(currentAccessToken);
+
+    if (firstResponse.status !== 401) {
+        return firstResponse;
+    }
+
+    const currentRefreshToken = getRefreshToken();
+
+    if (!currentRefreshToken) {
+        return firstResponse;
+    }
+
+    try {
+        const refreshed = await refreshTokens(currentRefreshToken);
+        persistAuthSession(refreshed);
+        return send(refreshed.accessToken);
+    } catch {
+        clearAuthSession();
+        throw new Error("Your session has expired. Please log in again.");
+    }
+}
+
 export function clearAuthSession() {
     if (typeof window === "undefined") {
         return;
@@ -149,4 +223,14 @@ export function clearAuthSession() {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
+}
+
+export function logoutToRoleLogin(role: PortalRole) {
+    clearAuthSession();
+
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    window.location.href = `/${role}/login`;
 }

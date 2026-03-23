@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
+import { clearAuthSession } from "@/lib/auth";
 
 export interface NavItem {
     label: string;
@@ -19,6 +20,7 @@ interface SidebarProps {
 
 export default function Sidebar({ role, items, roleColor }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [mobileOpen, setMobileOpen] = useState(false);
     let currentSection = "";
 
@@ -98,7 +100,15 @@ export default function Sidebar({ role, items, roleColor }: SidebarProps) {
                 </nav>
 
                 <div className="sidebar-footer">
-                    <Link href={`/${role.toLowerCase()}/login`} className="nav-item" style={{ color: "var(--danger)" }}>
+                    <button
+                        type="button"
+                        className="nav-item"
+                        style={{ color: "var(--danger)", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer" }}
+                        onClick={() => {
+                            clearAuthSession();
+                            router.push(`/${role.toLowerCase()}/login`);
+                        }}
+                    >
                         <span className="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -107,7 +117,7 @@ export default function Sidebar({ role, items, roleColor }: SidebarProps) {
                             </svg>
                         </span>
                         <span>Logout</span>
-                    </Link>
+                    </button>
                 </div>
             </aside>
         </>
