@@ -85,7 +85,7 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
         }
     };
 
-    const handleForgotPassword = (e: React.FormEvent) => {
+    const handleForgotPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setResetError("");
         setResetMessage("");
@@ -97,21 +97,37 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
 
         setResetting(true);
 
-        // TODO: Call backend API to send reset password email
-        const resetPayload = {
-            email: forgotEmail.toLowerCase(),
-            role: normalizedRole,
-        };
+        try {
+            const resetPayload = {
+                emailType: "reset-password",
+                to: forgotEmail.toLowerCase(),
+                role: normalizedRole,
+                resetLink: `${window.location.origin}/reset-password?email=${encodeURIComponent(forgotEmail.toLowerCase())}&role=${normalizedRole}`,
+            };
 
-        setTimeout(() => {
+            const res = await fetch("/api/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(resetPayload),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Failed to send reset email");
+            }
+
             setResetMessage(`Password reset instructions have been sent to ${forgotEmail}`);
             setForgotEmail("");
-            setResetting(false);
+            
             setTimeout(() => {
                 setShowForgotPassword(false);
                 setResetMessage("");
             }, 3000);
-        }, 1200);
+        } catch (err) {
+            setResetError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setResetting(false);
+        }
     };
 
     return (

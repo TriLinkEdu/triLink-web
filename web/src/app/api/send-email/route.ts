@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
 export interface RegistrationEmailPayload {
+    emailType?: "registration" | "reset-password";
     to: string;
-    firstName: string;
-    lastName: string;
-    role: "student" | "teacher" | "parent";
-    tempPassword: string;
+    firstName?: string;
+    lastName?: string;
+    role: "student" | "teacher" | "parent" | "admin";
+    tempPassword?: string;
+    resetLink?: string;
     // role-specific extras
     grade?: string;
     section?: string;
@@ -52,6 +54,68 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
     const roleLabel = payload.role.charAt(0).toUpperCase() + payload.role.slice(1);
     const roleDetails = buildRoleDetails(payload);
 
+    if (payload.emailType === "reset-password") {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Reset Your Password</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,${primary},${primary}dd);padding:40px 40px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div style="display:inline-flex;align-items:center;gap:10px;">
+                      <span style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">TriLink</span>
+                    </div>
+                  </td>
+                  <td align="right" style="font-size:48px;">🔒</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:${light};padding:32px 40px;border-bottom:1px solid #e2e8f0;">
+              <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:#0f172a;">Reset Your Password</h1>
+              <p style="margin:0;font-size:15px;color:#475569;line-height:1.6;">
+                We received a request to reset the password for the TriLink ${roleLabel} account associated with <strong>${payload.to}</strong>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 40px;text-align:center;">
+              <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+                Click the button below to reset your password. This link will expire in 30 minutes.
+              </p>
+              <a href="${payload.resetLink || '#'}"
+                 style="display:inline-block;background:${primary};color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:10px;letter-spacing:0.3px;">
+                Reset Password
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 40px 32px;">
+              <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+                If you didn't request a password reset, you can safely ignore this email. Your password will not change until you create a new one.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    }
+
+    // Default: Registration Email
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -200,8 +264,12 @@ export async function POST(req: NextRequest) {
     try {
         const payload: RegistrationEmailPayload = await req.json();
 
-        if (!payload.to || !payload.firstName || !payload.tempPassword) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        if (payload.emailType === "reset-password") {
+            if (!payload.to) return NextResponse.json({ error: "Missing email" }, { status: 400 });
+        } else {
+            if (!payload.to || !payload.firstName || !payload.tempPassword) {
+                return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+            }
         }
 
         const transporter = nodemailer.createTransport({
@@ -214,10 +282,14 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        const title = payload.emailType === "reset-password"
+            ? `🔒 Reset Your Password - TriLink Security`
+            : `🎉 Welcome to TriLink – Your ${payload.role.charAt(0).toUpperCase() + payload.role.slice(1)} Account is Ready`;
+
         await transporter.sendMail({
             from: process.env.SMTP_FROM ?? `"TriLink School System" <${process.env.SMTP_USER}>`,
             to: payload.to,
-            subject: `🎉 Welcome to TriLink – Your ${payload.role.charAt(0).toUpperCase() + payload.role.slice(1)} Account is Ready`,
+            subject: title,
             html: buildEmailHtml(payload),
         });
 
