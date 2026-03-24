@@ -7,10 +7,12 @@ import Header from "@/components/Header";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useChatStore } from "@/store/chatStore";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-
+import { getAccessToken, getStoredUser, clearAuth } from "@/lib/auth";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const user = useCurrentUser("teacher");
     const { total, readIds } = useNotificationStore();
     const { conversations, readConversationIds } = useChatStore();
@@ -26,10 +28,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         }
 
         const token = getAccessToken();
-        const user = getAuthUser();
+        const user = getStoredUser();
 
         if (!token || !user || user.role !== "teacher") {
-            clearAuthSession();
+            clearAuth();
             setIsAuthorized(false);
             router.replace("/teacher/login");
             return;

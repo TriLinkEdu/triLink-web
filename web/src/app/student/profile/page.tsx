@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { getAuthUser } from "../../../lib/auth";
+import { getStoredUser } from "../../../lib/auth";
 
 type StudentProfile = {
     firstName: string;
@@ -90,7 +90,7 @@ export default function StudentProfilePage() {
 
     // Hydrate from auth user on mount
     useEffect(() => {
-        const user = getAuthUser && getAuthUser();
+        const user = getStoredUser && getStoredUser();
         if (user && user.role === "student") {
             setProfile((prev) => ({
                 ...prev,

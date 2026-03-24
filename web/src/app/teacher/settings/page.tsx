@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getStoredUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const TEACHER_SECURITY_STORAGE_KEY = "trilink-teacher-security-v1";
 const DEFAULT_TEACHER_PASSWORD = "Teacher@123!";
@@ -170,14 +170,15 @@ export default function TeacherSettings() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Profile state — seed from the logged-in teacher stored in localStorage
-    const _stored = getStoredUser();
+    const user = useCurrentUser("teacher");
+    
     const [profile, setProfile] = useState({
-        firstName: _stored?.firstName ?? "",
-        lastName: _stored?.lastName ?? "",
-        email: _stored?.email ?? "",
+        firstName: "",
+        lastName: "",
+        email: "",
         phone: "",
-        subject: _stored?.subject ?? "",
-        department: _stored?.department ?? "",
+        subject: "",
+        department: "",
         homeroomClass: "",
         experience: "",
         country: "",
@@ -185,6 +186,20 @@ export default function TeacherSettings() {
         postalCode: "",
         officeRoom: "",
     });
+
+    // Hydrate profile correctly avoiding SSR mismatch
+    useEffect(() => {
+        if (user && user.email) {
+            setProfile((prev) => ({
+                ...prev,
+                firstName: user.firstName || prev.firstName,
+                lastName: user.lastName || prev.lastName,
+                email: user.email || prev.email,
+                subject: user.subject || prev.subject,
+                department: user.department || prev.department,
+            }));
+        }
+    }, [user]);
 
     // Security state
     const [passwords, setPasswords] = useState({ current: "", newPass: "", confirm: "" });
