@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
-import { clearAuthSession } from "@/lib/auth";
+import { clearAuth } from "@/lib/auth";
 
 export interface NavItem {
     label: string;
@@ -105,7 +105,7 @@ export default function Sidebar({ role, items, roleColor }: SidebarProps) {
                         className="nav-item"
                         style={{ color: "var(--danger)", width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer" }}
                         onClick={() => {
-                            clearAuthSession();
+                            clearAuth();
                             router.push(`/${role.toLowerCase()}/login`);
                         }}
                     >

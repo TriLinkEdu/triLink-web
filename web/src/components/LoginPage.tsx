@@ -26,7 +26,6 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
     const [resetting, setResetting] = useState(false);
     const router = useRouter();
 
-    const [loginError, setLoginError] = useState("");
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 type TeacherProfile = {
     firstName: string;
@@ -75,8 +76,27 @@ function EditableField({
 export default function TeacherProfilePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isEditing, setIsEditing] = useState(false);
+    const user = useCurrentUser("teacher");
     const [profile, setProfile] = useState<TeacherProfile>(initialProfile);
     const [draft, setDraft] = useState<TeacherProfile>(initialProfile);
+
+    // Hydrate profile correctly avoiding SSR mismatch
+    useEffect(() => {
+        if (user && user.email) {
+            const nextProfile = {
+                ...profile,
+                firstName: user.firstName || profile.firstName,
+                lastName: user.lastName || profile.lastName,
+                email: user.email || profile.email,
+                subject: user.subject || profile.subject,
+                department: user.department || profile.department,
+            };
+            setProfile(nextProfile);
+            if (!isEditing) {
+                setDraft(nextProfile);
+            }
+        }
+    }, [user, isEditing]);
 
     const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
     const fullName = `${profile.firstName} ${profile.lastName}`;
