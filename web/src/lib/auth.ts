@@ -1,236 +1,164 @@
-export type PortalRole = "admin" | "teacher" | "student" | "parent";
+/**
+ * auth.ts — Token storage, automatic refresh, and authenticated fetch.
+ *
+ * Keys stored in localStorage:
+ *   trilink.accessToken   — short-lived JWT
+ *   trilink.refreshToken  — long-lived refresh token
+ *   trilink.user          — JSON: { id, firstName, lastName, email, role, ... }
+ */
 
-export interface AuthUser {
-    id: string;
-    email: string;
-    role: PortalRole;
-    firstName: string;
-    lastName: string;
-    mustChangePassword: boolean;
+const ACCESS_KEY = "trilink.accessToken";
+const REFRESH_KEY = "trilink.refreshToken";
+const USER_KEY = "trilink.user";
+
+// ─── Token helpers ───────────────────────────────────────────────────────────
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ACCESS_KEY);
 }
 
-export interface AuthSession {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    user: AuthUser;
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(REFRESH_KEY);
 }
 
-interface ApiErrorPayload {
-    message?: string | string[];
+export function setTokens(accessToken: string, refreshToken?: string) {
+  localStorage.setItem(ACCESS_KEY, accessToken);
+  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
 }
 
-const ACCESS_TOKEN_KEY = "trilink.accessToken";
-const REFRESH_TOKEN_KEY = "trilink.refreshToken";
-const AUTH_USER_KEY = "trilink.user";
-
-function getApiBaseUrl() {
-    return process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+export function clearAuth() {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(USER_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("trilink-auth"));
+  }
 }
 
-function getEnvPath(name: "NEXT_PUBLIC_AUTH_LOGIN_PATH" | "NEXT_PUBLIC_AUTH_REFRESH_PATH", fallback: string) {
-    const value = process.env[name];
+// ─── User profile helpers ─────────────────────────────────────────────────────
 
-    if (!value) {
-        return fallback;
-    }
-
-    return value.startsWith("/") ? value : `/${value}`;
+export interface StoredUser {
+  id?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  // role-specific
+  grade?: string;
+  section?: string;
+  subject?: string;
+  department?: string;
+  childName?: string;
+  relationship?: string;
 }
 
-function getApiMessage(payload: ApiErrorPayload) {
-    if (Array.isArray(payload.message)) {
-        return payload.message.join(", ");
-    }
-
-    return typeof payload.message === "string" ? payload.message : "";
+export function getStoredUser(): StoredUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as StoredUser) : null;
+  } catch {
+    return null;
+  }
 }
 
-function getFriendlyAuthError(status: number, payload: ApiErrorPayload) {
-    if (status === 400) {
-        const apiMessage = getApiMessage(payload);
-        return apiMessage || "Please check your email format and required fields.";
-    }
-
-    if (status === 401) {
-        return "Invalid email or password";
-    }
-
-    if (status >= 500) {
-        return "Login service is temporarily unavailable. Please try again.";
-    }
-
-    return "Unable to log in right now. Please try again.";
+export function setStoredUser(user: StoredUser) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("trilink-auth"));
+  }
 }
 
-function getFriendlyRefreshError(status: number, payload: ApiErrorPayload) {
-    if (status === 401) {
-        return "Your session has expired. Please log in again.";
-    }
-
-    if (status >= 500) {
-        return "Token refresh is temporarily unavailable. Please try again.";
-    }
-
-    const apiMessage = getApiMessage(payload);
-    return apiMessage || "Unable to refresh session. Please log in again.";
+/** Derive initials from a stored user */
+export function getUserInitials(user: StoredUser | null): string {
+  if (!user) return "??";
+  return (
+    (user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")
+  ).toUpperCase();
 }
 
-async function parseErrorPayload(response: Response) {
+// ─── Token refresh ────────────────────────────────────────────────────────────
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  // Deduplicate concurrent refresh attempts
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
+
     try {
-        return (await response.json()) as ApiErrorPayload;
-    } catch {
-        return {};
-    }
-}
+      const apiBase =
+        (typeof process !== "undefined" &&
+          process.env?.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")) ||
+        "http://localhost:4000";
+      const refreshPath =
+        (typeof process !== "undefined" &&
+          process.env?.NEXT_PUBLIC_AUTH_REFRESH_PATH) ||
+        "/api/auth/refresh";
 
-export async function login(email: string, password: string, role: PortalRole): Promise<AuthSession> {
-    const response = await fetch(`${getApiBaseUrl()}${getEnvPath("NEXT_PUBLIC_AUTH_LOGIN_PATH", "/api/auth/login")}`, {
+      const res = await fetch(`${apiBase}${refreshPath}`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            password: password.trim(),
-            role: role.toLowerCase(),
-        }),
-    });
-
-    if (!response.ok) {
-        const payload = await parseErrorPayload(response);
-        throw new Error(getFriendlyAuthError(response.status, payload));
-    }
-
-    return (await response.json()) as AuthSession;
-}
-
-export async function refreshTokens(refreshToken: string): Promise<AuthSession> {
-    const response = await fetch(`${getApiBaseUrl()}${getEnvPath("NEXT_PUBLIC_AUTH_REFRESH_PATH", "/api/auth/refresh")}`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
-    });
+      });
 
-    if (!response.ok) {
-        const payload = await parseErrorPayload(response);
-        throw new Error(getFriendlyRefreshError(response.status, payload));
-    }
-
-    return (await response.json()) as AuthSession;
-}
-
-export function persistAuthSession(session: AuthSession) {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(session.user));
-}
-
-export function getAccessToken() {
-    if (typeof window === "undefined") {
+      if (!res.ok) {
+        clearAuth();
         return null;
-    }
+      }
 
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-export function getAuthUser() {
-    if (typeof window === "undefined") {
-        return null;
-    }
-
-    const raw = localStorage.getItem(AUTH_USER_KEY);
-
-    if (!raw) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(raw) as AuthUser;
+      const data = await res.json();
+      if (data.accessToken) {
+        setTokens(data.accessToken, data.refreshToken);
+        return data.accessToken as string;
+      }
+      clearAuth();
+      return null;
     } catch {
-        return null;
+      return null;
+    } finally {
+      refreshPromise = null;
     }
+  })();
+
+  return refreshPromise;
 }
 
-export function getRefreshToken() {
-    if (typeof window === "undefined") {
-        return null;
-    }
+// ─── Authenticated fetch with auto-refresh ────────────────────────────────────
 
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
+export async function authFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+): Promise<Response> {
+  const token = getAccessToken();
+  const headers = new Headers(init.headers ?? {});
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
-export async function refreshAccessTokenFromStorage() {
-    const token = getRefreshToken();
+  let response = await fetch(input, { ...init, headers });
 
-    if (!token) {
-        throw new Error("No refresh token found. Please log in again.");
-    }
-
-    const session = await refreshTokens(token);
-    persistAuthSession(session);
-    return session;
-}
-
-export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-    const send = (token: string | null) => {
-        const headers = new Headers(init.headers ?? {});
-
-        if (token) {
-            headers.set("Authorization", `Bearer ${token}`);
+  // If 401, try to refresh and retry once
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers.set("Authorization", `Bearer ${newToken}`);
+      response = await fetch(input, { ...init, headers });
+    } else {
+      // Refresh failed — redirect to appropriate login page
+      if (typeof window !== "undefined") {
+        const path = window.location.pathname;
+        const role = path.split("/").filter(Boolean)[0] ?? "admin";
+        const loginPath = `/${role}/login`;
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = loginPath;
         }
-
-        return fetch(input, {
-            ...init,
-            headers,
-        });
-    };
-
-    const currentAccessToken = getAccessToken();
-    const firstResponse = await send(currentAccessToken);
-
-    if (firstResponse.status !== 401) {
-        return firstResponse;
+      }
     }
+  }
 
-    const currentRefreshToken = getRefreshToken();
-
-    if (!currentRefreshToken) {
-        return firstResponse;
-    }
-
-    try {
-        const refreshed = await refreshTokens(currentRefreshToken);
-        persistAuthSession(refreshed);
-        return send(refreshed.accessToken);
-    } catch {
-        clearAuthSession();
-        throw new Error("Your session has expired. Please log in again.");
-    }
-}
-
-export function clearAuthSession() {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
-}
-
-export function logoutToRoleLogin(role: PortalRole) {
-    clearAuthSession();
-
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    window.location.href = `/${role}/login`;
+  return response;
 }

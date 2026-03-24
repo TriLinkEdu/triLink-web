@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, persistAuthSession, type PortalRole } from "@/lib/auth";
+import { setTokens, setStoredUser } from "@/lib/auth";
 
 interface LoginPageProps {
     role: string;
@@ -26,30 +26,62 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
     const [resetting, setResetting] = useState(false);
     const router = useRouter();
 
+    const [loginError, setLoginError] = useState("");
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoginError("");
-        setLoading(true);
-        
-        // Validate inputs
+
         if (!email || !password) {
-            setLoginError("Email and password are required.");
-            setLoading(false);
+            setLoginError("Please enter your email and password.");
             return;
         }
 
-        if (!/^\S+@\S+\.\S+$/.test(email)) {
-            setLoginError("Please enter a valid email address.");
-            setLoading(false);
-            return;
-        }
+        setLoading(true);
 
         try {
-            const session = await login(email, password, normalizedRole);
-            persistAuthSession(session);
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+            const loginPath = process.env.NEXT_PUBLIC_AUTH_LOGIN_PATH ?? "/api/auth/login";
+
+            const res = await fetch(`${apiBase}${loginPath}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.toLowerCase(), password, role: role.toLowerCase() }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                throw new Error(data.message || "Invalid email or password.");
+            }
+
+            // Store JWT so authFetch can attach it to subsequent requests
+            setTokens(data.accessToken ?? "", data.refreshToken);
+
+            // Store user profile so layouts can show real name/initials
+            if (data.user ?? data.id ?? data.firstName) {
+                const u = data.user ?? data;
+                setStoredUser({
+                    id: u.id,
+                    firstName: u.firstName ?? "",
+                    lastName: u.lastName ?? "",
+                    email: u.email ?? email.toLowerCase(),
+                    role: (u.role ?? role).toLowerCase(),
+                    grade: u.grade,
+                    section: u.section,
+                    subject: u.subject,
+                    department: u.department,
+                    childName: u.childName,
+                    relationship: u.relationship,
+                });
+            } else {
+                // Fallback: at minimum store email + role
+                setStoredUser({ firstName: "", lastName: "", email: email.toLowerCase(), role: role.toLowerCase() });
+            }
+
             router.push(dashboardPath);
-        } catch (error) {
-            setLoginError(error instanceof Error ? error.message : "Unable to log in right now. Please try again.");
+        } catch (err) {
+            setLoginError(err instanceof Error ? err.message : "Login failed. Please try again.");
             setLoading(false);
         }
     };
@@ -179,6 +211,21 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                                         >
                                             Forgot password?
                                         </button>
+                                    </div>
+                                )}
+
+                                {loginError && (
+                                    <div style={{
+                                        padding: "0.75rem 1rem",
+                                        marginBottom: "0.75rem",
+                                        background: "var(--red-50, #fff5f5)",
+                                        border: "1px solid var(--red-300, #fc8181)",
+                                        borderRadius: "var(--radius-md, 8px)",
+                                        color: "var(--red-700, #c53030)",
+                                        fontSize: "0.875rem",
+                                        fontWeight: 500,
+                                    }}>
+                                        {loginError}
                                     </div>
                                 )}
 

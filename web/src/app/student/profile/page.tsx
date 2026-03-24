@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import { getAuthUser } from "../../../lib/auth";
 
 type StudentProfile = {
     firstName: string;
@@ -17,19 +18,19 @@ type StudentProfile = {
     postalCode: string;
 };
 
-const initialProfile: StudentProfile = {
-    firstName: "Ahmed",
-    lastName: "Hassan",
-    email: "ahmed.hassan@school.edu",
-    phone: "+251 912 345 678",
-    grade: "Grade 11",
-    section: "A",
-    dateOfBirth: "2008-05-15",
-    studentId: "STU-2024-001",
-    guardian: "Hassan Ahmed",
-    country: "Ethiopia",
-    cityState: "Addis Ababa",
-    postalCode: "1000",
+const defaultProfile: StudentProfile = {
+    firstName: "Student",
+    lastName: "",
+    email: "",
+    phone: "",
+    grade: "",
+    section: "",
+    dateOfBirth: "",
+    studentId: "",
+    guardian: "",
+    country: "",
+    cityState: "",
+    postalCode: "",
 };
 
 function StaticField({ label, value }: { label: string; value: string }) {
@@ -84,8 +85,27 @@ function EditableField({
 export default function StudentProfilePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [profile, setProfile] = useState<StudentProfile>(initialProfile);
-    const [draft, setDraft] = useState<StudentProfile>(initialProfile);
+    const [profile, setProfile] = useState<StudentProfile>(defaultProfile);
+    const [draft, setDraft] = useState<StudentProfile>(defaultProfile);
+
+    // Hydrate from auth user on mount
+    useEffect(() => {
+        const user = getAuthUser && getAuthUser();
+        if (user && user.role === "student") {
+            setProfile((prev) => ({
+                ...prev,
+                firstName: user.firstName || "Student",
+                lastName: user.lastName || "",
+                email: user.email || "",
+            }));
+            setDraft((prev) => ({
+                ...prev,
+                firstName: user.firstName || "Student",
+                lastName: user.lastName || "",
+                email: user.email || "",
+            }));
+        }
+    }, []);
 
     const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
     const fullName = `${profile.firstName} ${profile.lastName}`;

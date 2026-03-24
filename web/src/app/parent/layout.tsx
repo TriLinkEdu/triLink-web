@@ -1,35 +1,24 @@
 "use client";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { clearAuthSession, getAccessToken, getAuthUser } from "@/lib/auth";
+import { usePathname, useRouter } from "next/navigation";
+import { useCurrentUser } from "@/lib/useCurrentUser";
+import { clearAuth } from "@/lib/auth";
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const [isAuthorized, setIsAuthorized] = useState(false);
-
-    useEffect(() => {
-        if (pathname === "/parent/login") {
-            setIsAuthorized(true);
-            return;
-        }
-
-        const token = getAccessToken();
-        const user = getAuthUser();
-
-        if (!token || !user || user.role !== "parent") {
-            clearAuthSession();
-            setIsAuthorized(false);
-            router.replace("/parent/login");
-            return;
-        }
-
-        setIsAuthorized(true);
-    }, [pathname, router]);
+    const user = useCurrentUser("parent");
 
     if (pathname === "/parent/login") return <>{children}</>;
     if (!isAuthorized) return null;
+
+    const subtitle = user.childName
+        ? `${user.relationship ?? "Parent"} of ${user.childName}`
+        : "Parent Portal";
+
+    function handleLogout() {
+        clearAuth();
+        router.push("/parent/login");
+    }
 
     return (
         <div style={{ minHeight: "100vh", background: "var(--gray-50)" }}>
@@ -80,27 +69,22 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                             background: "#ede9fe", display: "flex",
                             alignItems: "center", justifyContent: "center",
                             fontSize: "0.75rem", fontWeight: 700, color: "#7c3aed",
-                        }}>MK</div>
+                        }}>{user.initials}</div>
                         <div>
-                            <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>Mr. Kebede</div>
-                            <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>Parent of Abebe Kebede</div>
+                            <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{user.fullName || "Parent"}</div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>{subtitle}</div>
                         </div>
                     </div>
                     <button
-                        type="button"
-                        onClick={() => {
-                            clearAuthSession();
-                            router.push("/parent/login");
-                        }}
+                        onClick={handleLogout}
                         style={{
-                        padding: "0.4rem 0.75rem", borderRadius: "8px",
-                        background: "var(--danger-light)", color: "#991b1b",
-                        fontSize: "0.8rem", fontWeight: 600, textDecoration: "none",
-                        border: "1px solid rgba(239,68,68,0.2)",
-                        cursor: "pointer"
-                    }}>
-                        Logout
-                    </button>
+                            padding: "0.4rem 0.75rem", borderRadius: "8px",
+                            background: "var(--danger-light)", color: "#991b1b",
+                            fontSize: "0.8rem", fontWeight: 600,
+                            border: "1px solid rgba(239,68,68,0.2)",
+                            cursor: "pointer",
+                        }}
+                    >Logout</button>
                 </div>
             </header>
             <main style={{ padding: 0 }}>

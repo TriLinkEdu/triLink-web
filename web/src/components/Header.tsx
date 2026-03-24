@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAcademicYearStore } from "@/store/academicYearStore";
+import { clearAuth } from "@/lib/auth";
 
 interface HeaderProps {
     userName: string;
@@ -16,6 +17,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     const pathname = usePathname();
     const [searchFocused, setSearchFocused] = useState(false);
     const [searchText, setSearchText] = useState("");
+    const [showUserMenu, setShowUserMenu] = useState(false);
     
     // Academic Year
     const { 
@@ -94,15 +96,78 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
         router.push(target);
     }
 
+    function handleLogout() {
+        clearAuth();
+        const role = pathname.split("/").filter(Boolean)[0] ?? "admin";
+        router.push(`/${role}/login`);
+    }
+
     const userBlock = (
-        <div className="header-user">
-            <div className="header-user-info">
-                <div className="header-user-name">{userName}</div>
-                <div className="header-user-role">{userRole}</div>
-            </div>
-            <div className="avatar avatar-initials" style={{ width: 36, height: 36, fontSize: "0.8rem" }}>
-                {userInitials}
-            </div>
+        <div style={{ position: "relative" }}>
+            <button
+                onClick={() => setShowUserMenu((v) => !v)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+            >
+                <div className="header-user">
+                    <div className="header-user-info">
+                        <div className="header-user-name">{userName}</div>
+                        <div className="header-user-role">{userRole}</div>
+                    </div>
+                    <div className="avatar avatar-initials" style={{ width: 36, height: 36, fontSize: "0.8rem" }}>
+                        {userInitials}
+                    </div>
+                </div>
+            </button>
+            {showUserMenu && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        onClick={() => setShowUserMenu(false)}
+                        style={{ position: "fixed", inset: 0, zIndex: 999 }}
+                    />
+                    {/* Dropdown */}
+                    <div style={{
+                        position: "absolute", right: 0, top: "calc(100% + 8px)",
+                        background: "#fff", borderRadius: 12, zIndex: 1000,
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+                        border: "1px solid var(--gray-100)",
+                        minWidth: 180, overflow: "hidden",
+                    }}>
+                        {userProfileHref && (
+                            <Link
+                                href={userProfileHref}
+                                onClick={() => setShowUserMenu(false)}
+                                style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "12px 16px", textDecoration: "none",
+                                    color: "var(--gray-700)", fontSize: 14, fontWeight: 500,
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                                </svg>
+                                View Profile
+                            </Link>
+                        )}
+                        <div style={{ borderTop: "1px solid var(--gray-100)" }} />
+                        <button
+                            onClick={handleLogout}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                width: "100%", padding: "12px 16px",
+                                background: "none", border: "none", cursor: "pointer",
+                                color: "#dc2626", fontSize: 14, fontWeight: 500,
+                                textAlign: "left",
+                            }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
+                            </svg>
+                            Logout
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 
@@ -190,7 +255,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                     </button>
                 )}
 
-                {userProfileHref ? <Link href={userProfileHref}>{userBlock}</Link> : userBlock}
+                {userBlock}
             </div>
         </header>
     );
