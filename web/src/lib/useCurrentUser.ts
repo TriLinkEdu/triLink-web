@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { getStoredUser, getUserInitials, StoredUser } from "./auth";
 
 export interface CurrentUser {
+  id?: string;
   firstName: string;
   lastName: string;
   fullName: string;
@@ -15,6 +16,7 @@ export interface CurrentUser {
   department?: string;
   childName?: string;
   relationship?: string;
+  profileImageFileId?: string;
 }
 
 const FALLBACKS: Record<string, CurrentUser> = {
@@ -38,6 +40,7 @@ const FALLBACKS: Record<string, CurrentUser> = {
 
 function fromStored(u: StoredUser): CurrentUser {
   return {
+    id: u.id,
     firstName: u.firstName,
     lastName: u.lastName,
     fullName: `${u.firstName} ${u.lastName}`.trim(),
@@ -50,6 +53,7 @@ function fromStored(u: StoredUser): CurrentUser {
     department: u.department,
     childName: u.childName,
     relationship: u.relationship,
+    profileImageFileId: u.profileImageFileId,
   };
 }
 

@@ -1,3 +1,5 @@
+import { apiPath, getApiBase } from "./api";
+
 /**
  * auth.ts — Token storage, automatic refresh, and authenticated fetch.
  *
@@ -52,6 +54,7 @@ export interface StoredUser {
   department?: string;
   childName?: string;
   relationship?: string;
+  profileImageFileId?: string;
 }
 
 export function getStoredUser(): StoredUser | null {
@@ -68,6 +71,33 @@ export function setStoredUser(user: StoredUser) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("trilink-auth"));
+  }
+}
+
+/** Load full profile from GET /api/auth/me (grade, section, subject, etc.). No-op if not logged in. */
+export async function refreshStoredProfile(): Promise<void> {
+  if (typeof window === "undefined" || !getAccessToken()) return;
+  try {
+    const res = await authFetch(`${getApiBase()}${apiPath.me}`, { method: "GET" });
+    if (!res.ok) return;
+    const u = (await res.json()) as Record<string, unknown>;
+    const prev = getStoredUser();
+    setStoredUser({
+      id: typeof u.id === "string" ? u.id : prev?.id,
+      firstName: typeof u.firstName === "string" ? u.firstName : prev?.firstName ?? "",
+      lastName: typeof u.lastName === "string" ? u.lastName : prev?.lastName ?? "",
+      email: typeof u.email === "string" ? u.email : prev?.email ?? "",
+      role: String(u.role ?? prev?.role ?? "student").toLowerCase(),
+      grade: typeof u.grade === "string" ? u.grade : undefined,
+      section: typeof u.section === "string" ? u.section : undefined,
+      subject: typeof u.subject === "string" ? u.subject : undefined,
+      department: typeof u.department === "string" ? u.department : undefined,
+      childName: typeof u.childName === "string" ? u.childName : undefined,
+      relationship: typeof u.relationship === "string" ? u.relationship : undefined,
+      profileImageFileId: typeof u.profileImageFileId === "string" ? u.profileImageFileId : undefined,
+    });
+  } catch {
+    /* ignore */
   }
 }
 
@@ -92,14 +122,11 @@ async function refreshAccessToken(): Promise<string | null> {
     if (!refreshToken) return null;
 
     try {
-      const apiBase =
-        (typeof process !== "undefined" &&
-          process.env?.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")) ||
-        "http://localhost:4000";
+      const apiBase = getApiBase();
       const refreshPath =
         (typeof process !== "undefined" &&
           process.env?.NEXT_PUBLIC_AUTH_REFRESH_PATH) ||
-        "/api/auth/refresh";
+        apiPath.refresh;
 
       const res = await fetch(`${apiBase}${refreshPath}`, {
         method: "POST",
