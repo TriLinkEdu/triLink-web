@@ -1,6 +1,18 @@
 "use client";
-import { useState } from "react";
-import { authFetch, getAccessToken } from "../../../lib/auth";
+import { useEffect, useState } from "react";
+import {
+    BookOpen,
+    CheckCircle2,
+    GraduationCap,
+    MailCheck,
+    ShieldCheck,
+    Sparkles,
+    Users,
+    type LucideIcon,
+} from "lucide-react";
+import { apiPath, getApiBase } from "@/lib/api";
+import { authFetch, getAccessToken } from "@/lib/auth";
+import { listUsers, type PublicUser } from "@/lib/admin-api";
 
 type RegistrationType = "student" | "teacher" | "parent";
 
@@ -25,8 +37,11 @@ interface TeacherFormData extends BaseFormData {
 
 interface ParentFormData extends BaseFormData {
     type: "parent";
-    childName: string;
+    /** Required — backend links parent to this student user id */
+    linkedStudentId: string;
     relationship: string;
+    /** Optional display label for emails */
+    childName?: string;
 }
 
 type FormData = StudentFormData | TeacherFormData | ParentFormData;
@@ -41,6 +56,7 @@ interface FormErrors {
     subject?: string;
     department?: string;
     childName?: string;
+    linkedStudentId?: string;
     relationship?: string;
 }
 
@@ -50,13 +66,14 @@ interface SuccessInfo {
     email: string;
     role: RegistrationType;
     tempPassword: string;
-    emailSent: boolean;
+    /** From API: true when the server sent the welcome email via SMTP */
+    registrationEmailSent: boolean;
 }
 
 const ROLE_META = {
-    student: { icon: "🎓", color: "#4f46e5", light: "#eef2ff", label: "Student" },
-    teacher: { icon: "📚", color: "#0891b2", light: "#ecfeff", label: "Teacher" },
-    parent:  { icon: "👨‍👩‍👧", color: "#7c3aed", light: "#f5f3ff", label: "Parent" },
+    student: { icon: GraduationCap as LucideIcon, color: "#4f46e5", light: "#eef2ff", label: "Student" },
+    teacher: { icon: BookOpen as LucideIcon, color: "#0891b2", light: "#ecfeff", label: "Teacher" },
+    parent:  { icon: Users as LucideIcon, color: "#7c3aed", light: "#f5f3ff", label: "Parent" },
 };
 
 export default function AdminRegistration() {
@@ -65,7 +82,8 @@ export default function AdminRegistration() {
     const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [errors, setErrors] = useState<FormErrors>({});
-    const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+    const [emailStatus, setEmailStatus] = useState<"idle" | "sent" | "failed" | "skipped">("idle");
+    const [studentOptions, setStudentOptions] = useState<PublicUser[]>([]);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -77,14 +95,42 @@ export default function AdminRegistration() {
         subject: "",
         department: "",
         childName: "",
+        linkedStudentId: "",
         relationship: "Father",
     });
+
+    useEffect(() => {
+        if (regType !== "parent") return;
+        let c = false;
+        (async () => {
+            try {
+                const studs = await listUsers("student");
+                if (!c) {
+                    setStudentOptions(studs);
+                    setFormData((fd) => ({
+                        ...fd,
+                        linkedStudentId: fd.linkedStudentId || studs[0]?.id || "",
+                    }));
+                }
+            } catch {
+                if (!c) setStudentOptions([]);
+            }
+        })();
+        return () => {
+            c = true;
+        };
+    }, [regType]);
 
     const validateEmail = (email: string): boolean =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    const validatePhone = (phone: string): boolean =>
-        /^[+]?[\d\s\-()]*$/.test(phone) && phone.replace(/\D/g, "").length >= 10;
+    /** Match API: strip spaces/dashes/parens, then 9–15 digits, optional leading + */
+    const normalizePhone = (phone: string): string => phone.trim().replace(/[\s\-().]/g, "");
+
+    const validatePhone = (phone: string): boolean => {
+        const n = normalizePhone(phone);
+        return /^\+?[1-9]\d{8,14}$/.test(n);
+    };
 
     const validateForm = (): boolean => {
         const newErrors: FormErrors = {};
@@ -93,7 +139,9 @@ export default function AdminRegistration() {
         if (!formData.email.trim()) newErrors.email = "Email is required";
         else if (!validateEmail(formData.email)) newErrors.email = "Invalid email format";
         if (!formData.phone.trim()) newErrors.phone = "Phone is required";
-        else if (!validatePhone(formData.phone)) newErrors.phone = "Invalid phone format";
+        else if (!validatePhone(formData.phone)) {
+            newErrors.phone = "Invalid phone (use 9–15 digits, optional + country code)";
+        }
 
         if (regType === "student") {
             if (!formData.grade) newErrors.grade = "Grade is required";
@@ -102,7 +150,7 @@ export default function AdminRegistration() {
             if (!formData.subject.trim()) newErrors.subject = "Subject is required";
             if (!formData.department.trim()) newErrors.department = "Department is required";
         } else if (regType === "parent") {
-            if (!formData.childName.trim()) newErrors.childName = "Child's name is required";
+            if (!formData.linkedStudentId) newErrors.linkedStudentId = "Select a student to link";
             if (!formData.relationship) newErrors.relationship = "Relationship is required";
         }
 
@@ -115,7 +163,7 @@ export default function AdminRegistration() {
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim(),
             email: formData.email.trim(),
-            phone: formData.phone.trim(),
+            phone: normalizePhone(formData.phone),
         };
 
         if (regType === "student") {
@@ -123,45 +171,17 @@ export default function AdminRegistration() {
         } else if (regType === "teacher") {
             return { type: "teacher", ...baseData, subject: formData.subject.trim(), department: formData.department.trim() } as TeacherFormData;
         } else if (regType === "parent") {
-            return { type: "parent", ...baseData, childName: formData.childName.trim(), relationship: formData.relationship } as ParentFormData;
+            const sel = studentOptions.find((s) => s.id === formData.linkedStudentId);
+            const childName = sel ? `${sel.firstName} ${sel.lastName}`.trim() : undefined;
+            return {
+                type: "parent",
+                ...baseData,
+                linkedStudentId: formData.linkedStudentId,
+                relationship: formData.relationship,
+                childName,
+            } as ParentFormData;
         }
         return null;
-    };
-
-    const sendRegistrationEmail = async (info: SuccessInfo) => {
-        setEmailStatus("sending");
-        try {
-            const emailPayload: Record<string, string> = {
-                to: info.email,
-                firstName: info.firstName,
-                lastName: info.lastName,
-                role: info.role,
-                tempPassword: info.tempPassword,
-            };
-
-            // Add role-specific fields
-            if (info.role === "student") {
-                emailPayload.grade = formData.grade;
-                emailPayload.section = formData.section;
-            } else if (info.role === "teacher") {
-                emailPayload.subject = formData.subject;
-                emailPayload.department = formData.department;
-            } else if (info.role === "parent") {
-                emailPayload.childName = formData.childName;
-                emailPayload.relationship = formData.relationship;
-            }
-
-            const res = await fetch("/api/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(emailPayload),
-            });
-
-            if (!res.ok) throw new Error("Email send failed");
-            setEmailStatus("sent");
-        } catch {
-            setEmailStatus("failed");
-        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -186,17 +206,11 @@ export default function AdminRegistration() {
             const accessToken = getAccessToken();
             if (!accessToken) throw new Error("Admin session expired. Please log in again.");
 
-            const response = await authFetch(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000"}/api/auth/register`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${accessToken}`,
-                    },
-                    body: JSON.stringify(registrationPayload),
-                }
-            );
+            const response = await authFetch(`${getApiBase()}${apiPath.register}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(registrationPayload),
+            });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -205,6 +219,7 @@ export default function AdminRegistration() {
 
             const result = await response.json();
             const tempPwd: string = result.tempPassword ?? "—";
+            const registrationEmailSent = Boolean(result.registrationEmailSent);
 
             const info: SuccessInfo = {
                 firstName: formData.firstName.trim(),
@@ -212,22 +227,20 @@ export default function AdminRegistration() {
                 email: formData.email.trim(),
                 role: regType,
                 tempPassword: tempPwd,
-                emailSent: false,
+                registrationEmailSent,
             };
 
             setSuccessInfo(info);
+            setEmailStatus(registrationEmailSent ? "sent" : "skipped");
 
             // Reset form
             setFormData({
                 firstName: "", lastName: "", email: "", phone: "",
                 grade: "Grade 9", section: "A",
                 subject: "", department: "",
-                childName: "", relationship: "Father",
+                childName: "", linkedStudentId: studentOptions[0]?.id ?? "", relationship: "Father",
             });
             setErrors({});
-
-            // Fire email
-            await sendRegistrationEmail(info);
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred");
         } finally {
@@ -251,26 +264,39 @@ export default function AdminRegistration() {
     };
 
     const meta = ROLE_META[regType];
+    const RoleIcon = meta.icon;
 
     return (
         <div className="page-wrapper">
-            <div className="page-header">
+            <div className="registration-hero">
                 <div>
-                    <h1 className="page-title">Registration</h1>
-                    <p className="page-subtitle">Register students, teachers, and parents</p>
+                    <p className="registration-kicker">
+                        <Sparkles size={14} />
+                        Onboarding Studio
+                    </p>
+                    <h1 className="registration-title">Registration</h1>
+                    <p className="registration-subtitle">Register students, teachers, and parents with role-specific data</p>
+                </div>
+                <div className="admin-dash-pill">
+                    <ShieldCheck size={15} />
+                    Admin-only flow
                 </div>
             </div>
 
             {/* Role tabs */}
-            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+            <div className="registration-role-tabs">
                 {(["student", "teacher", "parent"] as const).map(t => (
                     <button
                         key={t}
-                        className={`btn ${regType === t ? "btn-primary" : "btn-secondary"}`}
+                        className={`registration-role-tab ${regType === t ? "active" : ""}`}
                         onClick={() => handleTypeChange(t)}
                         disabled={loading}
                     >
-                        {ROLE_META[t].icon} {ROLE_META[t].label}
+                        {(() => {
+                            const Icon = ROLE_META[t].icon;
+                            return <Icon size={16} />;
+                        })()}
+                        {ROLE_META[t].label}
                     </button>
                 ))}
             </div>
@@ -297,9 +323,9 @@ export default function AdminRegistration() {
                             width: 48, height: 48, borderRadius: "50%",
                             background: "rgba(255,255,255,0.2)",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 24,
+                            color: "#fff",
                         }}>
-                            ✓
+                            <CheckCircle2 size={24} />
                         </div>
                         <div>
                             <p style={{ margin: 0, color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
@@ -310,7 +336,10 @@ export default function AdminRegistration() {
                             </p>
                         </div>
                         <div style={{ marginLeft: "auto", fontSize: 40 }}>
-                            {ROLE_META[successInfo.role].icon}
+                            {(() => {
+                                const SuccessIcon = ROLE_META[successInfo.role].icon;
+                                return <SuccessIcon size={36} color="#fff" />;
+                            })()}
                         </div>
                     </div>
 
@@ -365,7 +394,10 @@ export default function AdminRegistration() {
                                         cursor: "pointer", fontWeight: 600, fontSize: 13,
                                     }}
                                 >
-                                    📋 Copy
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                        <MailCheck size={14} />
+                                        Copy
+                                    </span>
                                 </button>
                             </div>
                             <p style={{ margin: "10px 0 0", fontSize: 12, color: "#92400e", background: "#fffbeb", padding: "8px 12px", borderRadius: 6, border: "1px solid #fde68a" }}>
@@ -377,18 +409,24 @@ export default function AdminRegistration() {
                         <div style={{
                             display: "flex", alignItems: "center", gap: 10,
                             padding: "12px 16px", borderRadius: 10,
-                            background: emailStatus === "sent" ? "#f0fdf4" : emailStatus === "failed" ? "#fff5f5" : "#f8fafc",
-                            border: `1px solid ${emailStatus === "sent" ? "#86efac" : emailStatus === "failed" ? "#fca5a5" : "#e2e8f0"}`,
+                            background:
+                                emailStatus === "sent"
+                                    ? "#f0fdf4"
+                                    : emailStatus === "failed"
+                                      ? "#fff5f5"
+                                      : emailStatus === "skipped"
+                                        ? "#fffbeb"
+                                        : "#f8fafc",
+                            border: `1px solid ${
+                                emailStatus === "sent"
+                                    ? "#86efac"
+                                    : emailStatus === "failed"
+                                      ? "#fca5a5"
+                                      : emailStatus === "skipped"
+                                        ? "#fcd34d"
+                                        : "#e2e8f0"
+                            }`,
                         }}>
-                            {emailStatus === "sending" && (
-                                <>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite", color: "#64748b" }}>
-                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" fill="none" />
-                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
-                                    </svg>
-                                    <span style={{ fontSize: 14, color: "#475569" }}>Sending confirmation email to <strong>{successInfo.email}</strong>…</span>
-                                </>
-                            )}
                             {emailStatus === "sent" && (
                                 <>
                                     <span style={{ fontSize: 18 }}>✅</span>
@@ -399,6 +437,14 @@ export default function AdminRegistration() {
                                 <>
                                     <span style={{ fontSize: 18 }}>⚠️</span>
                                     <span style={{ fontSize: 14, color: "#991b1b" }}>Email delivery failed — check SMTP settings in <code>.env.local</code></span>
+                                </>
+                            )}
+                            {emailStatus === "skipped" && (
+                                <>
+                                    <span style={{ fontSize: 18 }}>ℹ️</span>
+                                    <span style={{ fontSize: 14, color: "#92400e" }}>
+                                        No email was sent — configure <code>SMTP_HOST</code> (and related vars) on the <strong>API server</strong> so new users receive their temporary password by email.
+                                    </span>
                                 </>
                             )}
                         </div>
@@ -418,9 +464,9 @@ export default function AdminRegistration() {
             )}
 
             {/* ── Form ── */}
-            <div className="card">
-                <h3 className="card-title" style={{ marginBottom: "1.25rem" }}>
-                    {meta.icon} Register New {meta.label}
+            <div className="card registration-form-card">
+                <h3 className="card-title registration-form-title" style={{ marginBottom: "1.25rem" }}>
+                    <RoleIcon size={18} /> Register New {meta.label}
                 </h3>
 
                 <form onSubmit={handleSubmit}>
@@ -572,18 +618,35 @@ export default function AdminRegistration() {
                         {regType === "parent" && (
                             <>
                                 <div className="input-group">
-                                    <label htmlFor="childName">Child&apos;s Name <span style={{ color: "var(--red-500)" }}>*</span></label>
-                                    <div className="input-field">
-                                        <input
-                                            id="childName"
-                                            placeholder="Student full name"
-                                            value={formData.childName}
-                                            onChange={(e) => handleInputChange("childName", e.target.value)}
-                                            disabled={loading}
-                                            style={errors.childName ? { borderColor: "var(--red-500)" } : {}}
-                                        />
-                                    </div>
-                                    {errors.childName && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.childName}</p>}
+                                    <label htmlFor="linkedStudentId">Link to student <span style={{ color: "var(--red-500)" }}>*</span></label>
+                                    <select
+                                        id="linkedStudentId"
+                                        value={formData.linkedStudentId}
+                                        onChange={(e) => handleInputChange("linkedStudentId", e.target.value)}
+                                        disabled={loading || studentOptions.length === 0}
+                                        style={{
+                                            padding: "0.75rem",
+                                            width: "100%",
+                                            background: "var(--gray-50)",
+                                            border: `1.5px solid ${errors.linkedStudentId ? "var(--red-500)" : "var(--gray-200)"}`,
+                                            borderRadius: "var(--radius-md)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    >
+                                        {studentOptions.length === 0 ? (
+                                            <option value="">No students — register a student first</option>
+                                        ) : (
+                                            studentOptions.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.firstName} {s.lastName} · {s.email}
+                                                </option>
+                                            ))
+                                        )}
+                                    </select>
+                                    {errors.linkedStudentId && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.linkedStudentId}</p>}
+                                    <p style={{ fontSize: "0.75rem", color: "var(--gray-500)", marginTop: "0.35rem" }}>
+                                        Backend requires a student UUID (<code>linkedStudentId</code>), not name-only matching.
+                                    </p>
                                 </div>
 
                                 <div className="input-group">
@@ -620,7 +683,12 @@ export default function AdminRegistration() {
                                 </svg>
                                 Registering…
                             </span>
-                        ) : `${meta.icon} Register ${meta.label}`}
+                        ) : (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                <RoleIcon size={16} />
+                                Register {meta.label}
+                            </span>
+                        )}
                     </button>
                 </form>
             </div>

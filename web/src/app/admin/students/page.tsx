@@ -1,2 +1,160 @@
 "use client";
-export default function AdminStudents() { return <div className="page-wrapper"><div className="page-header"><div><h1 className="page-title">Students</h1><p className="page-subtitle">Manage all registered students</p></div><button className="btn btn-primary">+ Add Student</button></div><div className="card"><div className="table-wrapper"><table><thead><tr><th>Name</th><th>ID</th><th>Grade</th><th>Attendance</th><th>Avg Score</th><th>Status</th></tr></thead><tbody>{[{ name: "Abebe Kebede", id: "STU-042", grade: "11-A", att: 94, avg: 87, status: "active" }, { name: "Kalkidan Assefa", id: "STU-015", grade: "11-A", att: 97, avg: 91, status: "active" }, { name: "Meron Girma", id: "STU-033", grade: "11-A", att: 85, avg: 79, status: "warning" }, { name: "Samuel Dereje", id: "STU-019", grade: "11-B", att: 92, avg: 85, status: "active" }].map((s, i) => (<tr key={i}><td style={{ fontWeight: 600 }}>{s.name}</td><td style={{ color: "var(--gray-500)" }}>{s.id}</td><td>{s.grade}</td><td>{s.att}%</td><td><span className={`badge ${s.avg >= 90 ? "badge-success" : s.avg >= 80 ? "badge-primary" : "badge-warning"}`}>{s.avg}%</span></td><td><span className={`badge ${s.status === "active" ? "badge-success" : "badge-warning"}`}>{s.status}</span></td></tr>))}</tbody></table></div></div></div>; }
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { GraduationCap, Layers3, Search, Sparkles, Users } from "lucide-react";
+import { type PublicUser, listUsers } from "@/lib/admin-api";
+
+function StudentsSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="students-hero admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 500 }}>
+          <div className="admin-skeleton shimmer" style={{ width: 140, height: 12, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "80%", height: 34, marginBottom: 10 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "64%", height: 14 }} />
+        </div>
+      </div>
+      <div className="students-summary-grid">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div className="card students-summary-card admin-dash-skeleton-block" key={i}>
+            <div className="admin-skeleton shimmer" style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 10 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12, marginBottom: 8 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "35%", height: 22 }} />
+          </div>
+        ))}
+      </div>
+      <div className="card admin-dash-skeleton-block">
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 240, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
+}
+
+export default function AdminStudents() {
+  const [rows, setRows] = useState<PublicUser[]>([]);
+  const [q, setQ] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const data = await listUsers("student", q.trim() || undefined);
+      setRows(data);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- search on demand
+  }, []);
+
+  const withGrade = rows.filter((s) => !!s.grade).length;
+  const withSection = rows.filter((s) => !!s.section).length;
+
+  if (loading && rows.length === 0) {
+    return <StudentsSkeleton />;
+  }
+
+  return (
+    <div className="page-wrapper">
+      <div className="students-hero">
+        <div>
+          <p className="students-kicker">
+            <Sparkles size={14} />
+            Learner Directory
+          </p>
+          <h1 className="students-title">Students</h1>
+          <p className="students-subtitle">Directory of enrolled students</p>
+        </div>
+        <Link href="/admin/registration" className="btn btn-primary">
+          + Register
+        </Link>
+      </div>
+
+      <div className="students-summary-grid">
+        <div className="card students-summary-card">
+          <div className="students-summary-icon blue">
+            <Users size={18} />
+          </div>
+          <div className="students-summary-label">Total students</div>
+          <div className="students-summary-value">{rows.length}</div>
+        </div>
+        <div className="card students-summary-card">
+          <div className="students-summary-icon teal">
+            <GraduationCap size={18} />
+          </div>
+          <div className="students-summary-label">With grade</div>
+          <div className="students-summary-value">{withGrade}</div>
+        </div>
+        <div className="card students-summary-card">
+          <div className="students-summary-icon orange">
+            <Layers3 size={18} />
+          </div>
+          <div className="students-summary-label">With section</div>
+          <div className="students-summary-value">{withSection}</div>
+        </div>
+      </div>
+
+      <div className="card students-panel" style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name or email"
+          style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)", minWidth: 220 }}
+        />
+        <button type="button" className="btn btn-secondary" onClick={load}>
+          <Search size={14} />
+          Search
+        </button>
+      </div>
+      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
+      <div className="card students-panel">
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Grade</th>
+                <th>Section</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} style={{ color: "var(--gray-500)" }}>
+                    Loading…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ color: "var(--gray-500)" }}>
+                    No students.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((s) => (
+                  <tr key={s.id}>
+                    <td style={{ fontWeight: 600 }}>
+                      {s.firstName} {s.lastName}
+                    </td>
+                    <td>{s.email}</td>
+                    <td>{s.grade ?? "—"}</td>
+                    <td>{s.section ?? "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

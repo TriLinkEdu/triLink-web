@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { getApiBase, getFileUrl } from "@/lib/api";
 
 const TEACHER_SECURITY_STORAGE_KEY = "trilink-teacher-security-v1";
 const DEFAULT_TEACHER_PASSWORD = "Teacher@123!";
@@ -169,7 +170,7 @@ export default function TeacherSettings() {
     const [toast, setToast] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Profile state — seed from the logged-in teacher stored in localStorage
+    // Profile state - seed from the logged-in teacher stored in localStorage
     const user = useCurrentUser("teacher");
     
     const [profile, setProfile] = useState({
@@ -277,6 +278,24 @@ export default function TeacherSettings() {
         showToast("Profile updated successfully!");
     }
 
+    async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        showToast("Uploading new photo...");
+        try {
+            const { uploadProfileImage, patchMe } = await import("@/lib/admin-api");
+            const { refreshStoredProfile } = await import("@/lib/auth");
+            const res = await uploadProfileImage(file);
+            await patchMe({ profileImageFileId: res.id });
+            await refreshStoredProfile();
+            
+            showToast("Profile photo updated successfully!");
+            setTimeout(() => window.location.reload(), 1500);
+        } catch {
+            showToast("Failed to upload photo.");
+        }
+    }
+
     async function handleChangePassword() {
         if (!passwords.current || !passwords.newPass || !passwords.confirm) {
             showToast("Please fill in all password fields.");
@@ -292,9 +311,10 @@ export default function TeacherSettings() {
         }
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+            const { getApiBase, apiPath } = await import("@/lib/api");
             const { authFetch } = await import("@/lib/auth");
-            const res = await authFetch(`${apiBase}/api/auth/change-password`, {
+            const apiBase = getApiBase();
+            const res = await authFetch(`${apiBase}${apiPath.changePassword}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ currentPassword: passwords.current, newPassword: passwords.newPass }),
@@ -442,12 +462,21 @@ export default function TeacherSettings() {
                             <div className="card">
                                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.9fr)", gap: "1rem", alignItems: "center" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-                                        <div
-                                            className="avatar avatar-xl avatar-initials"
-                                            style={{ fontSize: "1.5rem", flexShrink: 0, background: "linear-gradient(135deg, #ea580c, #dc2626)" }}
-                                        >
-                                            {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
-                                        </div>
+                                        {user.profileImageFileId ? (
+                                            <img
+                                                src={getFileUrl(user.profileImageFileId)}
+                                                alt={profile.firstName}
+                                                className="avatar avatar-xl"
+                                                style={{ flexShrink: 0, objectFit: "cover" }}
+                                            />
+                                        ) : (
+                                            <div
+                                                className="avatar avatar-xl avatar-initials"
+                                                style={{ fontSize: "1.5rem", flexShrink: 0, background: "linear-gradient(135deg, #ea580c, #dc2626)" }}
+                                            >
+                                                {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
+                                            </div>
+                                        )}
                                         <div>
                                             <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--gray-900)" }}>
                                                 {profile.firstName} {profile.lastName}
@@ -475,7 +504,7 @@ export default function TeacherSettings() {
                                             <button className="btn btn-outline btn-sm" onClick={() => fileInputRef.current?.click()}>
                                                 Upload Photo
                                             </button>
-                                            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} />
+                                            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarUpload} />
                                         </div>
                                     </div>
                                 </div>

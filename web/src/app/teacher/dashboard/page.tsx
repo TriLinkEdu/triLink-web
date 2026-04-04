@@ -1,109 +1,213 @@
 "use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { 
+  Activity, 
+  BookOpen, 
+  Calendar, 
+  CheckCircle2, 
+  GraduationCap, 
+  Layout, 
+  Megaphone, 
+  Sparkles, 
+  Star, 
+  Users 
+} from "lucide-react";
+import { getActiveAcademicYear, listAllClassOfferings as listOfferings, teacherDashboard, type ClassOffering } from "@/lib/admin-api";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
-const StatIcons = {
-    students: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
-    classes: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>,
-    attendance: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
-    grades: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>,
-};
+function DashboardSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="admin-dash-hero admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 420 }}>
+          <div className="admin-skeleton shimmer" style={{ height: 12, width: 140, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ height: 32, width: "90%", marginBottom: 10 }} />
+          <div className="admin-skeleton shimmer" style={{ height: 14, width: "70%" }} />
+        </div>
+        <div className="admin-skeleton shimmer" style={{ height: 32, width: 100, borderRadius: 999 }} />
+      </div>
+
+      <div className="stats-grid admin-dash-stats-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div className="stat-card admin-dash-stat-card admin-dash-skeleton-block" key={i}>
+            <div className="admin-skeleton shimmer" style={{ width: 48, height: 48, borderRadius: 14 }} />
+            <div style={{ flex: 1 }}>
+              <div className="admin-skeleton shimmer" style={{ width: "60%", height: 12, marginBottom: 10 }} />
+              <div className="admin-skeleton shimmer" style={{ width: "35%", height: 24, marginBottom: 10 }} />
+              <div className="admin-skeleton shimmer" style={{ width: "55%", height: 10 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function offeringLabel(o: ClassOffering) {
+  return o.displayName || o.name?.trim() || "Untitled Class";
+}
 
 export default function TeacherDashboard() {
-    const user = useCurrentUser("teacher");
-    const stats = [
-        { label: "Total Students", value: "156", iconKey: "students" as const, color: "blue", change: "+8 new", positive: true },
-        { label: "Classes Today", value: "4", iconKey: "classes" as const, color: "green", change: "2 remaining", positive: true },
-        { label: "Avg. Attendance", value: "91%", iconKey: "attendance" as const, color: "purple", change: "+1.5%", positive: true },
-        { label: "Pending Grades", value: "12", iconKey: "grades" as const, color: "orange", change: "3 urgent", positive: false },
-    ];
+  const user = useCurrentUser("teacher");
+  const [dash, setDash] = useState<Awaited<ReturnType<typeof teacherDashboard>> | null>(null);
+  const [offerings, setOfferings] = useState<ClassOffering[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-    const classes = [
-        { name: "Grade 11-A Mathematics", students: 42, time: "8:00 - 8:45", status: "completed" },
-        { name: "Grade 11-B Mathematics", students: 38, time: "9:00 - 9:45", status: "completed" },
-        { name: "Grade 12-A Calculus", students: 35, time: "10:00 - 10:45", status: "ongoing" },
-        { name: "Grade 12-B Calculus", students: 41, time: "11:00 - 11:45", status: "upcoming" },
-    ];
+  const load = useCallback(async () => {
+    setLoadErr(null);
+    setLoading(true);
+    try {
+      const [d, year] = await Promise.all([teacherDashboard(), getActiveAcademicYear()]);
+      setDash(d);
+      if (year?.id) {
+        const mine = await listOfferings(year.id);
+        // Only show teacher's own offerings in the dashboard list for relevance
+        setOfferings(mine.filter(o => o.teacherId === user.id));
+      } else {
+        setOfferings([]);
+      }
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Could not load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  }, [user.id]);
 
-    const recentActivity = [
-        { action: "Graded Quiz - Grade 11-A", time: "30 min ago", type: "grade" },
-        { action: "Marked attendance - Grade 12-A", time: "1 hour ago", type: "attendance" },
-        { action: "Created new quiz for Chapter 7", time: "2 hours ago", type: "exam" },
-        { action: "Received feedback from admin", time: "3 hours ago", type: "notification" },
-    ];
+  useEffect(() => {
+    load();
+  }, [load]);
 
-    return (
-        <div className="page-wrapper">
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Good morning, {user.firstName || "Teacher"}! ☀️</h1>
-                    <p className="page-subtitle">Here&apos;s your teaching overview for today.</p>
-                </div>
-            </div>
+  if (loading || !dash) return <DashboardSkeleton />;
 
-            <div className="stats-grid">
-                {stats.map((stat) => (
-                    <div className="stat-card" key={stat.label}>
-                        <div className={`stat-icon ${stat.color}`}>{StatIcons[stat.iconKey]}</div>
-                        <div className="stat-info">
-                            <div className="stat-label">{stat.label}</div>
-                            <div className="stat-value">{stat.value}</div>
-                            <div className={`stat-change ${stat.positive ? "positive" : "negative"}`}>{stat.positive ? "↑" : "⚠"} {stat.change}</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+  const stats = [
+    {
+      label: "My classes",
+      value: String(dash.myClasses),
+      icon: Layout,
+      tone: "green",
+      note: "Assigned this year",
+    },
+    {
+      label: "Total Students",
+      value: String(dash.totalStudents),
+      icon: GraduationCap,
+      tone: "blue",
+      note: "Across all classes",
+    },
+    {
+      label: "Attendance Rate",
+      value: dash.attendanceRate != null ? `${Math.round(dash.attendanceRate * 100)}%` : "—",
+      icon: CheckCircle2,
+      tone: "teal",
+      note: "Presence (last 30d)",
+    },
+    {
+      label: "Pending Grading",
+      value: String(dash.pendingGradingApprox),
+      icon: Star,
+      tone: "orange",
+      note: "Submitted attempts",
+    },
+  ];
 
-            <div className="content-grid">
-                <div className="card">
-                    <div className="card-header">
-                        <h3 className="card-title">Today&apos;s Classes</h3>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {classes.map((c, i) => (
-                            <div key={i} style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "0.875rem", background: "var(--gray-50)", borderRadius: "var(--radius-md)",
-                                borderLeft: `3px solid ${c.status === "completed" ? "var(--success)" : c.status === "ongoing" ? "var(--primary-500)" : "var(--gray-300)"}`,
-                            }}>
-                                <div>
-                                    <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{c.name}</div>
-                                    <div style={{ fontSize: "0.75rem", color: "var(--gray-500)" }}>{c.students} students · {c.time}</div>
-                                </div>
-                                <span className={`badge ${c.status === "completed" ? "badge-success" : c.status === "ongoing" ? "badge-primary" : "badge-warning"}`}>
-                                    {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="card">
-                    <div className="card-header">
-                        <h3 className="card-title">Recent Activity</h3>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                        {recentActivity.map((a, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                                <div style={{
-                                    width: 36, height: 36, borderRadius: "var(--radius-full)",
-                                    background: a.type === "grade" ? "var(--primary-100)" : a.type === "attendance" ? "var(--success-light)" : a.type === "exam" ? "var(--purple-light)" : "var(--warning-light)",
-                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                    color: a.type === "grade" ? "var(--primary-600)" : a.type === "attendance" ? "var(--success)" : a.type === "exam" ? "var(--purple)" : "var(--warning)",
-                                }}>
-                                    {a.type === "grade" && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>}
-                                    {a.type === "attendance" && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-                                    {a.type === "exam" && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
-                                    {a.type === "notification" && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>{a.action}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--gray-400)" }}>{a.time}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="page-wrapper">
+      <div className="admin-dash-hero">
+        <div>
+          <p className="admin-dash-kicker">
+            <Sparkles size={14} />
+            Academic Pulse
+          </p>
+          <h1 className="admin-dash-title">Good morning, {user.firstName || "Teacher"}! ☀️</h1>
+          <p className="admin-dash-subtitle">Real-time overview of your classes and performance.</p>
         </div>
-    );
+        <div className="admin-dash-pill">
+          <Calendar size={16} />
+          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+        </div>
+      </div>
+
+      {loadErr && (
+        <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)" }}>
+          {loadErr}
+        </div>
+      )}
+
+      <div className="stats-grid admin-dash-stats-grid">
+        {stats.map((s) => (
+          <div className="stat-card admin-dash-stat-card" key={s.label}>
+            <div className={`stat-icon admin-dash-stat-icon ${s.tone}`}>
+              <s.icon size={20} />
+            </div>
+            <div className="stat-info">
+              <div className="stat-label admin-dash-stat-label">{s.label}</div>
+              <div className="stat-value">{s.value}</div>
+              <div className="admin-dash-stat-note">{s.note}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="content-grid admin-dash-bottom-grid" style={{ marginTop: "1.5rem" }}>
+        <div className="card admin-dash-bottom-card">
+          <div className="admin-dash-bottom-head">
+            <h3 className="card-title admin-dash-bottom-title">Performance & Engagement</h3>
+            <div className="admin-dash-chip">
+              <Activity size={14} />
+              Current Status
+            </div>
+          </div>
+          <div className="admin-dash-metric-list">
+            <div className="admin-dash-metric-item">
+              <span>Published Exams</span>
+              <strong>{dash.publishedExams}</strong>
+            </div>
+            <div className="admin-dash-metric-item">
+              <span>Announcements Sent</span>
+              <strong>{dash.recentAnnouncements}</strong>
+            </div>
+            <div className="admin-dash-metric-item">
+              <span>Unread Notifications</span>
+              <strong style={{ color: dash.unreadNotifications > 0 ? "var(--primary-600)" : "inherit" }}>
+                {dash.unreadNotifications}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="card admin-dash-bottom-card">
+          <div className="card-header">
+            <h3 className="card-title">Your class offerings</h3>
+            <Megaphone size={16} color="var(--gray-400)" />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {offerings.length === 0 ? (
+              <p style={{ fontSize: "0.875rem", color: "var(--gray-500)" }}>
+                No active offerings.
+              </p>
+            ) : (
+              offerings.map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.875rem",
+                    background: "var(--gray-50)",
+                    borderRadius: "var(--radius-md)",
+                    borderLeft: "3px solid var(--primary-500)",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{offeringLabel(c)}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

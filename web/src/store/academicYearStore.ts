@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+/** Legacy seed list; admin header year dropdown uses GET /api/academic-years instead. */
 export const ACADEMIC_YEARS = [
     "2021/2022",
     "2022/2023",

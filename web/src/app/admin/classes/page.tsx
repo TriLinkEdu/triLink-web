@@ -1,240 +1,478 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAttendanceStore } from "@/store/attendanceStore";
 
-export default function AdminClasses() {
-    const router = useRouter();
-    const { classes, addClass, updateClass, getRegisteredTeachers, studentsByClass } = useAttendanceStore();
-    const registeredTeachers = getRegisteredTeachers();
-    const [showModal, setShowModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showAssignModal, setShowAssignModal] = useState(false);
-    const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-    const [form, setForm] = useState({ name: "", teacher: "", room: "" });
-    const [editForm, setEditForm] = useState({ name: "", teacher: "", room: "" });
-    const [selectedTeacher, setSelectedTeacher] = useState("");
-    const [toast, setToast] = useState<string | null>(null);
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { BookOpen, CalendarDays, GraduationCap, RefreshCcw, Sparkles, UserRoundCheck } from "lucide-react";
+import {
+  type AcademicYear,
+  type ClassOffering,
+  type Grade,
+  type PublicUser,
+  type Section,
+  type Subject,
+  activateAcademicYear,
+  createClassOffering,
+  deleteClassOffering,
+  listAcademicYears,
+  listClassOfferings,
+  listGrades,
+  listSections,
+  listSubjects,
+  listUsers,
+  patchClassOffering,
+} from "@/lib/admin-api";
 
-    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
-    const handleCreate = () => {
-        if (!form.name.trim() || !form.teacher.trim() || !form.room.trim()) {
-            showToast("Please fill in all fields.");
-            return;
-        }
-        if (classes.find(c => c.name.toLowerCase() === form.name.trim().toLowerCase())) {
-            showToast("A class with that name already exists.");
-            return;
-        }
-        addClass({ name: form.name.trim(), teacher: form.teacher.trim(), room: form.room.trim() });
-        setForm({ name: "", teacher: "", room: "" });
-        setShowModal(false);
-        showToast(`Class "${form.name.trim()}" created successfully!`);
-    };
-
-    const openEditModal = (classId: string) => {
-        const cls = classes.find((c) => c.id === classId);
-        if (!cls) return;
-        setSelectedClassId(classId);
-        setEditForm({ name: cls.name, teacher: cls.teacher, room: cls.room });
-        setShowEditModal(true);
-    };
-
-    const openAssignModal = (classId: string) => {
-        const cls = classes.find((c) => c.id === classId);
-        if (!cls) return;
-        setSelectedClassId(classId);
-        setSelectedTeacher(cls.teacher);
-        setShowAssignModal(true);
-    };
-
-    const handleEditSave = () => {
-        if (!selectedClassId) return;
-        if (!editForm.teacher.trim() || !editForm.room.trim()) {
-            showToast("Teacher and room are required.");
-            return;
-        }
-        updateClass(selectedClassId, {
-            teacher: editForm.teacher.trim(),
-            room: editForm.room.trim(),
-        });
-        setShowEditModal(false);
-        setSelectedClassId(null);
-        setEditForm({ name: "", teacher: "", room: "" });
-        showToast(`Class updated successfully!`);
-    };
-
-    const handleAssignTeacher = () => {
-        if (!selectedClassId || !selectedTeacher) {
-            showToast("Please select a teacher.");
-            return;
-        }
-        const cls = classes.find((c) => c.id === selectedClassId);
-        updateClass(selectedClassId, { teacher: selectedTeacher });
-        setShowAssignModal(false);
-        setSelectedClassId(null);
-        setSelectedTeacher("");
-        showToast(`Teacher assigned to ${cls?.name ?? "class"}.`);
-    };
-
-    return (
-        <div className="page-wrapper">
-            {/* Toast */}
-            {toast && (
-                <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#fff", borderRadius: 14, padding: "1rem 1.5rem", boxShadow: "0 8px 30px rgba(0,0,0,0.12)", border: "1.5px solid var(--success)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--success-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--success)" }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                    </div>
-                    <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{toast}</span>
-                </div>
-            )}
-
-            {/* Create Class Modal */}
-            {showModal && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-                    <div style={{ background: "#fff", borderRadius: 20, padding: "2rem", width: "100%", maxWidth: 460, boxShadow: "0 25px 60px rgba(0,0,0,0.22)" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-                            <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Create New Class</h2>
-                            <button onClick={() => setShowModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--gray-500)" }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Class Name</label>
-                            <div className="input-field">
-                                <input placeholder="e.g. Grade 10-C" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                            </div>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Homeroom Teacher</label>
-                            <div className="input-field">
-                                <input placeholder="e.g. Mr. Solomon" value={form.teacher} onChange={e => setForm(f => ({ ...f, teacher: e.target.value }))} />
-                            </div>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1.5rem" }}>
-                            <label>Room</label>
-                            <div className="input-field">
-                                <input placeholder="e.g. Room 303" value={form.room} onChange={e => setForm(f => ({ ...f, room: e.target.value }))} />
-                            </div>
-                        </div>
-                        <div style={{ display: "flex", gap: "0.75rem" }}>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCreate}>Create Class</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Class Modal */}
-            {showEditModal && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-                    <div style={{ background: "#fff", borderRadius: 20, padding: "2rem", width: "100%", maxWidth: 460, boxShadow: "0 25px 60px rgba(0,0,0,0.22)" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-                            <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Edit Class</h2>
-                            <button onClick={() => setShowEditModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--gray-500)" }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Class Name</label>
-                            <div className="input-field">
-                                <input value={editForm.name} disabled />
-                            </div>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Homeroom Teacher</label>
-                            <div className="input-field">
-                                <input value={editForm.teacher} onChange={e => setEditForm(f => ({ ...f, teacher: e.target.value }))} />
-                            </div>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1.5rem" }}>
-                            <label>Room</label>
-                            <div className="input-field">
-                                <input value={editForm.room} onChange={e => setEditForm(f => ({ ...f, room: e.target.value }))} />
-                            </div>
-                        </div>
-                        <div style={{ display: "flex", gap: "0.75rem" }}>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowEditModal(false)}>Cancel</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleEditSave}>Save Changes</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Assign Teacher Modal */}
-            {showAssignModal && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-                    <div style={{ background: "#fff", borderRadius: 20, padding: "2rem", width: "100%", maxWidth: 460, boxShadow: "0 25px 60px rgba(0,0,0,0.22)" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-                            <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Assign Teacher</h2>
-                            <button onClick={() => setShowAssignModal(false)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--gray-500)" }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <div className="input-group" style={{ marginBottom: "1.5rem" }}>
-                            <label htmlFor="teacher-select">Select Registered Teacher</label>
-                            <select
-                                id="teacher-select"
-                                value={selectedTeacher}
-                                onChange={(e) => setSelectedTeacher(e.target.value)}
-                                style={{
-                                    padding: "0.75rem",
-                                    background: "var(--gray-50)",
-                                    border: "1.5px solid var(--gray-200)",
-                                    borderRadius: "var(--radius-md)",
-                                    fontFamily: "inherit",
-                                    width: "100%",
-                                    fontSize: "0.95rem",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <option value="">-- Select Teacher --</option>
-                                {registeredTeachers.map((teacher) => (
-                                    <option key={teacher} value={teacher}>
-                                        {teacher}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div style={{ display: "flex", gap: "0.75rem" }}>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowAssignModal(false)}>Cancel</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAssignTeacher}>Assign</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="page-header">
-                <div><h1 className="page-title">Class Management</h1><p className="page-subtitle">Create classes and assign teachers</p></div>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Create Class</button>
-            </div>
-            <div className="card">
-                <div className="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr><th>Class</th><th>Homeroom Teacher</th><th>Students</th><th>Room</th><th>Actions</th></tr>
-                        </thead>
-                        <tbody>
-                            {classes.map(c => (
-                                <tr key={c.id} onClick={() => router.push(`/admin/classes/${c.id}`)} style={{ cursor: "pointer", transition: "background-color 0.2s ease" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--gray-50)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ""}>
-                                    <td style={{ fontWeight: 600 }}>{c.name}</td>
-                                    <td>{c.teacher}</td>
-                                    <td>{studentsByClass[c.name]?.length ?? 0}</td>
-                                    <td>{c.room}</td>
-                                    <td onClick={(e) => e.stopPropagation()}>
-                                        <div style={{ display: "flex", gap: "0.375rem" }}>
-                                            <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openEditModal(c.id); }}>Edit</button>
-                                            <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openAssignModal(c.id); }}>Assign Teacher</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
+function labelOffering(
+  o: ClassOffering,
+  g: Map<string, Grade>,
+  sec: Map<string, Section>,
+  sub: Map<string, Subject>,
+): string {
+  if (o.name?.trim()) return o.name.trim();
+  const gn = g.get(o.gradeId)?.name ?? o.gradeId.slice(0, 8);
+  const sn = sec.get(o.sectionId)?.name ?? o.sectionId.slice(0, 8);
+  const sb = sub.get(o.subjectId)?.name ?? o.subjectId.slice(0, 8);
+  return `${gn} · ${sn} · ${sb}`;
 }
 
+function ClassesSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="classes-hero admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 500 }}>
+          <div className="admin-skeleton shimmer" style={{ width: 160, height: 12, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "85%", height: 34, marginBottom: 10 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "70%", height: 14 }} />
+        </div>
+        <div className="admin-skeleton shimmer" style={{ width: 132, height: 38, borderRadius: 999 }} />
+      </div>
+      <div className="classes-summary-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div className="card classes-summary-card admin-dash-skeleton-block" key={i}>
+            <div className="admin-skeleton shimmer" style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 10 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12, marginBottom: 8 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "35%", height: 22 }} />
+          </div>
+        ))}
+      </div>
+      <div className="card admin-dash-skeleton-block" style={{ marginBottom: "1rem" }}>
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 86, borderRadius: 12 }} />
+      </div>
+      <div className="card admin-dash-skeleton-block">
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 260, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
+}
+
+export default function AdminClasses() {
+  const [years, setYears] = useState<AcademicYear[]>([]);
+  const [yearId, setYearId] = useState<string>("");
+  const [offerings, setOfferings] = useState<ClassOffering[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [teachers, setTeachers] = useState<PublicUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    gradeId: "",
+    sectionId: "",
+    subjectId: "",
+    teacherId: "",
+    name: "",
+  });
+  const [editTeacherId, setEditTeacherId] = useState("");
+
+  const showT = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const gMap = useMemo(() => new Map(grades.map((x) => [x.id, x])), [grades]);
+  const sMap = useMemo(() => new Map(sections.map((x) => [x.id, x])), [sections]);
+  const subMap = useMemo(() => new Map(subjects.map((x) => [x.id, x])), [subjects]);
+  const tMap = useMemo(() => new Map(teachers.map((x) => [x.id, x])), [teachers]);
+
+  const loadCore = useCallback(async () => {
+    const [y, g, sec, subj, t] = await Promise.all([
+      listAcademicYears(),
+      listGrades(),
+      listSections(),
+      listSubjects(),
+      listUsers("teacher"),
+    ]);
+    setYears(y);
+    setGrades(g);
+    setSections(sec);
+    setSubjects(subj);
+    setTeachers(t);
+    const active = y.find((a) => a.isActive && !a.isArchived);
+    setYearId((prev) => prev || active?.id || y[0]?.id || "");
+  }, []);
+
+  const loadOfferings = useCallback(async (y: string) => {
+    if (!y) {
+      setOfferings([]);
+      return;
+    }
+    const list = await listClassOfferings(y);
+    setOfferings(list);
+  }, []);
+
+  useEffect(() => {
+    let c = false;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        await loadCore();
+      } catch (e) {
+        if (!c) setErr(e instanceof Error ? e.message : "Load failed");
+      } finally {
+        if (!c) setLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, [loadCore]);
+
+  useEffect(() => {
+    if (!yearId) return;
+    let c = false;
+    (async () => {
+      try {
+        await loadOfferings(yearId);
+      } catch (e) {
+        if (!c) setErr(e instanceof Error ? e.message : "Failed to load classes");
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, [yearId, loadOfferings]);
+
+  const openCreate = () => {
+    setForm({
+      gradeId: grades[0]?.id ?? "",
+      sectionId: sections[0]?.id ?? "",
+      subjectId: subjects[0]?.id ?? "",
+      teacherId: teachers[0]?.id ?? "",
+      name: "",
+    });
+    setShowModal(true);
+  };
+
+  const handleCreate = async () => {
+    if (!yearId) {
+      showT("Select an academic year first.");
+      return;
+    }
+    if (!form.gradeId || !form.sectionId || !form.subjectId || !form.teacherId) {
+      showT("Fill grade, section, subject, and teacher.");
+      return;
+    }
+    try {
+      await createClassOffering({
+        academicYearId: yearId,
+        gradeId: form.gradeId,
+        sectionId: form.sectionId,
+        subjectId: form.subjectId,
+        teacherId: form.teacherId,
+        name: form.name.trim() || undefined,
+      });
+      setShowModal(false);
+      await loadOfferings(yearId);
+      showT("Class offering created.");
+    } catch (e) {
+      showT(e instanceof Error ? e.message : "Create failed");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this class offering? Enrollments may block deletion on the server.")) return;
+    try {
+      await deleteClassOffering(id);
+      await loadOfferings(yearId);
+      showT("Deleted.");
+    } catch (e) {
+      showT(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
+
+  const openEditTeacher = (o: ClassOffering) => {
+    setEditId(o.id);
+    setEditTeacherId(o.teacherId);
+  };
+
+  const saveEditTeacher = async () => {
+    if (!editId || !editTeacherId) return;
+    try {
+      await patchClassOffering(editId, { teacherId: editTeacherId });
+      setEditId(null);
+      await loadOfferings(yearId);
+      showT("Teacher updated.");
+    } catch (e) {
+      showT(e instanceof Error ? e.message : "Update failed");
+    }
+  };
+
+  const setYearActive = async (id: string) => {
+    try {
+      await activateAcademicYear(id);
+      await loadCore();
+      setYearId(id);
+      showT("Academic year activated.");
+    } catch (e) {
+      showT(e instanceof Error ? e.message : "Activate failed");
+    }
+  };
+
+  if (loading && !years.length) {
+    return <ClassesSkeleton />;
+  }
+
+  const activeYear = years.find((y) => y.isActive && !y.isArchived);
+  const assignedTeacherCount = new Set(offerings.map((o) => o.teacherId).filter(Boolean)).size;
+
+  return (
+    <div className="page-wrapper">
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            background: "#fff",
+            borderRadius: 14,
+            padding: "1rem 1.5rem",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+            border: "1.5px solid var(--success)",
+            fontWeight: 600,
+          }}
+        >
+          {toast}
+        </div>
+      )}
+
+      <div className="classes-hero">
+        <div>
+          <p className="classes-kicker">
+            <Sparkles size={14} />
+            Scheduling Hub
+          </p>
+          <h1 className="classes-title">Class offerings</h1>
+          <p className="classes-subtitle">Classes offered this year, with section, subject, and teacher assignment</p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={openCreate} disabled={!yearId}>
+          + New offering
+        </button>
+      </div>
+
+      <div className="classes-summary-grid">
+        <div className="card classes-summary-card">
+          <div className="classes-summary-icon blue">
+            <BookOpen size={18} />
+          </div>
+          <div className="classes-summary-label">Offerings</div>
+          <div className="classes-summary-value">{offerings.length}</div>
+          <div className="classes-summary-note">Current year classes</div>
+        </div>
+        <div className="card classes-summary-card">
+          <div className="classes-summary-icon teal">
+            <UserRoundCheck size={18} />
+          </div>
+          <div className="classes-summary-label">Assigned teachers</div>
+          <div className="classes-summary-value">{assignedTeacherCount}</div>
+          <div className="classes-summary-note">Unique faculty assigned</div>
+        </div>
+        <div className="card classes-summary-card">
+          <div className="classes-summary-icon orange">
+            <GraduationCap size={18} />
+          </div>
+          <div className="classes-summary-label">Students scope</div>
+          <div className="classes-summary-value">{years.length ? "Open" : "Pending"}</div>
+          <div className="classes-summary-note">Based on class enrollments</div>
+        </div>
+        <div className="card classes-summary-card">
+          <div className="classes-summary-icon purple">
+            <CalendarDays size={18} />
+          </div>
+          <div className="classes-summary-label">Active year</div>
+          <div className="classes-summary-value classes-summary-small">{activeYear?.label ?? "None"}</div>
+          <div className="classes-summary-note">Switch or activate below</div>
+        </div>
+      </div>
+
+      {err && (
+        <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)", padding: "1rem" }}>
+          {err}
+        </div>
+      )}
+
+      <div className="card classes-panel" style={{ marginBottom: "1rem" }}>
+        <label style={{ fontWeight: 600, display: "block", marginBottom: "0.5rem" }}>Academic year</label>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+          <select
+            value={yearId}
+            onChange={(e) => setYearId(e.target.value)}
+            style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)", minWidth: 220 }}
+          >
+            {years.length === 0 && <option value="">No years — create one under School setup</option>}
+            {years.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.label}
+                {y.isActive ? " (active)" : ""}
+              </option>
+            ))}
+          </select>
+          {yearId && (
+            <button type="button" className="btn btn-secondary" onClick={() => setYearActive(yearId)}>
+              <RefreshCcw size={14} />
+              Set as active year
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="card classes-panel">
+        <div className="classes-table-head">
+          <h3 className="card-title classes-section-title">Class list</h3>
+          <span className="admin-dash-chip">{offerings.length} total</span>
+        </div>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Teacher</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {offerings.length === 0 ? (
+                <tr>
+                  <td colSpan={3} style={{ color: "var(--gray-500)", padding: "1.5rem" }}>
+                    No offerings for this year.
+                  </td>
+                </tr>
+              ) : (
+                offerings.map((o) => {
+                  const tn = tMap.get(o.teacherId);
+                  const tname = tn ? `${tn.firstName} ${tn.lastName}` : "—";
+                  return (
+                    <tr key={o.id}>
+                      <td style={{ fontWeight: 600 }}>{labelOffering(o, gMap, sMap, subMap)}</td>
+                      <td>{tname}</td>
+                      <td style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <Link href={`/admin/classes/${o.id}`} className="btn btn-secondary" style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}>
+                          Enrollments
+                        </Link>
+                        <button type="button" className="btn btn-secondary" style={{ fontSize: "0.8rem" }} onClick={() => openEditTeacher(o)}>
+                          Change teacher
+                        </button>
+                        <button type="button" className="btn btn-danger" style={{ fontSize: "0.8rem" }} onClick={() => handleDelete(o.id)}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="modal-overlay" style={{ zIndex: 9998, padding: "1rem" }}>
+          <div className="modal" style={{ maxWidth: 520, width: "100%", padding: "2rem" }}>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }}>New class offering</h2>
+            <div style={{ display: "grid", gap: "0.75rem" }}>
+              <label>
+                Grade
+                <select value={form.gradeId} onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Section
+                <select value={form.sectionId} onChange={(e) => setForm((f) => ({ ...f, sectionId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                  {sections.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Subject
+                <select value={form.subjectId} onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Teacher
+                <select value={form.teacherId} onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.firstName} {t.lastName} ({t.email})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Optional label
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }} placeholder="e.g. Advanced Math" />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleCreate}>
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editId && (
+        <div className="modal-overlay" style={{ zIndex: 9998, padding: "1rem" }}>
+          <div className="modal" style={{ maxWidth: 420, width: "100%", padding: "2rem" }}>
+            <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "1rem" }}>Assign teacher</h2>
+            <select value={editTeacherId} onChange={(e) => setEditTeacherId(e.target.value)} style={{ width: "100%", padding: "0.5rem" }}>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.firstName} {t.lastName}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setEditId(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={saveEditTeacher}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

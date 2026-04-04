@@ -1,468 +1,229 @@
 "use client";
-import { useState } from "react";
-import { useAnnouncementStore } from "@/store/announcementStore";
 
-const GRADES = ["Grade 9-A", "Grade 9-B", "Grade 10-A", "Grade 10-B", "Grade 11-A", "Grade 11-B", "Grade 12-A", "Grade 12-B"];
+import { useCallback, useEffect, useState } from "react";
+import { BellRing, CalendarDays, Megaphone, RefreshCcw, Sparkles, Users } from "lucide-react";
+import { type AcademicYear, type Announcement, createAnnouncement, deleteAnnouncement, getActiveAcademicYear, listAnnouncements } from "@/lib/admin-api";
+
+const AUDIENCES = ["all", "students", "teachers", "parents"];
+
+function AnnouncementsSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="announcements-hero admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 500 }}>
+          <div className="admin-skeleton shimmer" style={{ width: 160, height: 12, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "80%", height: 34, marginBottom: 10 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "64%", height: 14 }} />
+        </div>
+      </div>
+      <div className="announcements-summary-grid">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div className="card announcements-summary-card admin-dash-skeleton-block" key={i}>
+            <div className="admin-skeleton shimmer" style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 10 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12, marginBottom: 8 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "35%", height: 22 }} />
+          </div>
+        ))}
+      </div>
+      <div className="card admin-dash-skeleton-block" style={{ marginBottom: "1rem" }}>
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 220, borderRadius: 12 }} />
+      </div>
+      <div className="card admin-dash-skeleton-block">
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 230, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminAnnouncements() {
-    const { announcements, addAnnouncement } = useAnnouncementStore();
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [title, setTitle] = useState("");
-    const [targetAudience, setTargetAudience] = useState("Everyone");
-    const [selectedGrade, setSelectedGrade] = useState(GRADES[0]);
-    const [message, setMessage] = useState("");
-    const [scheduledDate, setScheduledDate] = useState("");
-    const [showScheduleForm, setShowScheduleForm] = useState(false);
-    const [toast, setToast] = useState("");
-    const [viewFilter, setViewFilter] = useState<"all" | "sent" | "upcoming" | "today" | "overdue">("all");
+  const [year, setYear] = useState<AcademicYear | null>(null);
+  const [rows, setRows] = useState<Announcement[]>([]);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [audience, setAudience] = useState("all");
+  const [err, setErr] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    const showToast = (message: string) => {
-        setToast(message);
-        setTimeout(() => setToast(""), 3000);
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const active = await getActiveAcademicYear();
+      setYear(active);
+      if (active) setRows(await listAnnouncements(active.id));
+      else setRows(await listAnnouncements());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    const getAudience = (): "everyone" | "students" | "teachers" | "parents" => {
-        if (targetAudience === "All Students" || targetAudience === "Specific Grade") return "students";
-        if (targetAudience === "All Teachers") return "teachers";
-        if (targetAudience === "All Parents") return "parents";
-        return "everyone";
-    };
+  useEffect(() => {
+    load();
+  }, [load]);
 
-    const formatDate = (value?: string) => {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return value;
-        return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-    };
+  const publish = async () => {
+    if (!year) {
+      setToast("No active academic year — set one under Settings or Classes.");
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    if (!title.trim() || !body.trim()) {
+      setToast("Title and body required");
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    try {
+      await createAnnouncement({
+        academicYearId: year.id,
+        title: title.trim(),
+        body: body.trim(),
+        audience,
+      });
+      setTitle("");
+      setBody("");
+      await load();
+      setToast("Published");
+      setTimeout(() => setToast(null), 2500);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Create failed");
+    }
+  };
 
-    const getScheduleState = (value?: string) => {
-        if (!value) return "scheduled" as const;
-        const today = new Date();
-        const scheduled = new Date(value);
-        if (Number.isNaN(scheduled.getTime())) return "scheduled" as const;
-        today.setHours(0, 0, 0, 0);
-        scheduled.setHours(0, 0, 0, 0);
-        if (scheduled.getTime() > today.getTime()) return "upcoming" as const;
-        if (scheduled.getTime() < today.getTime()) return "overdue" as const;
-        return "today" as const;
-    };
+  const del = async (id: string) => {
+    if (!confirm("Delete announcement?")) return;
+    try {
+      await deleteAnnouncement(id);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
 
-    const scheduleBucket = (ann: (typeof announcements)[number]) => {
-        if (ann.status !== "scheduled") return null;
-        return getScheduleState(ann.scheduledDate);
-    };
+  const audienceStats = {
+    all: rows.filter((r) => r.audience === "all").length,
+    scoped: rows.filter((r) => r.audience !== "all").length,
+  };
 
-    const sortedAnnouncements = [...announcements].sort((a, b) => b.id - a.id);
-    const sentAnnouncements = sortedAnnouncements.filter((a) => a.status === "sent");
-    const upcomingAnnouncements = sortedAnnouncements.filter((a) => scheduleBucket(a) === "upcoming");
-    const todayAnnouncements = sortedAnnouncements.filter((a) => scheduleBucket(a) === "today");
-    const overdueAnnouncements = sortedAnnouncements.filter((a) => scheduleBucket(a) === "overdue");
+  if (loading && rows.length === 0) {
+    return <AnnouncementsSkeleton />;
+  }
 
-    const visibleAnnouncements = sortedAnnouncements.filter((ann) => {
-        if (viewFilter === "all") return true;
-        if (viewFilter === "sent") return ann.status === "sent";
-        return scheduleBucket(ann) === viewFilter;
-    });
-
-    const handleSendNow = () => {
-        if (!title.trim() || !message.trim()) {
-            showToast("Please fill in all fields");
-            return;
-        }
-
-        const today = new Date();
-        const dateStr = today.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-
-        addAnnouncement({
-            title: title.trim(),
-            target: targetAudience === "Specific Grade" ? selectedGrade : targetAudience,
-            message: message.trim(),
-            status: "sent",
-            date: dateStr,
-            audience: getAudience(),
-            grade: targetAudience === "Specific Grade" ? selectedGrade : undefined,
-            authorRole: "admin",
-        });
-
-        setTitle("");
-        setMessage("");
-        setTargetAudience("Everyone");
-        setSelectedGrade(GRADES[0]);
-        setShowCreateModal(false);
-        setShowScheduleForm(false);
-        showToast("Announcement sent successfully!");
-    };
-
-    const handleSchedule = () => {
-        if (!title.trim() || !message.trim() || !scheduledDate) {
-            showToast("Please fill in all fields including schedule date");
-            return;
-        }
-
-        addAnnouncement({
-            title: title.trim(),
-            target: targetAudience === "Specific Grade" ? selectedGrade : targetAudience,
-            message: message.trim(),
-            status: "scheduled",
-            date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }),
-            scheduledDate,
-            audience: getAudience(),
-            grade: targetAudience === "Specific Grade" ? selectedGrade : undefined,
-            authorRole: "admin",
-        });
-
-        setTitle("");
-        setMessage("");
-        setTargetAudience("Everyone");
-        setSelectedGrade(GRADES[0]);
-        setScheduledDate("");
-        setShowCreateModal(false);
-        setShowScheduleForm(false);
-        showToast("Announcement scheduled successfully!");
-    };
-
-    return (
-        <div className="page-wrapper">
-            {/* Toast Notification */}
-            {toast && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: "1rem",
-                        right: "1rem",
-                        background: "var(--green-600)",
-                        color: "white",
-                        padding: "0.75rem 1rem",
-                        borderRadius: "var(--radius-md)",
-                        zIndex: 1000,
-                        boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-                    }}
-                >
-                    {toast}
-                </div>
-            )}
-
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Announcements</h1>
-                    <p className="page-subtitle">Send and manage school announcements</p>
-                </div>
-                <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                    + Create Announcement
-                </button>
-            </div>
-
-            {showCreateModal && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        zIndex: 1000,
-                        background: "rgba(15, 23, 42, 0.45)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "1rem",
-                    }}
-                    onClick={() => {
-                        setShowCreateModal(false);
-                        setShowScheduleForm(false);
-                        setScheduledDate("");
-                    }}
-                >
-                    <div
-                        className="card"
-                        style={{ width: "100%", maxWidth: 760, margin: 0, maxHeight: "90vh", overflowY: "auto" }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                            <h3 className="card-title" style={{ marginBottom: 0 }}>
-                                {showScheduleForm ? "Schedule Announcement" : "Create Announcement"}
-                            </h3>
-                            <button
-                                className="btn btn-outline btn-sm"
-                                onClick={() => {
-                                    setShowCreateModal(false);
-                                    setShowScheduleForm(false);
-                                    setScheduledDate("");
-                                }}
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Title</label>
-                            <div className="input-field">
-                                <input
-                                    placeholder="Announcement title"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Target Audience</label>
-                            <select
-                                value={targetAudience}
-                                onChange={(e) => setTargetAudience(e.target.value)}
-                                style={{
-                                    padding: "0.75rem",
-                                    background: "var(--gray-50)",
-                                    border: "1.5px solid var(--gray-200)",
-                                    borderRadius: "var(--radius-md)",
-                                    fontFamily: "inherit",
-                                    width: "100%",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <option>Everyone</option>
-                                <option>All Students</option>
-                                <option>All Teachers</option>
-                                <option>All Parents</option>
-                                <option>Specific Grade</option>
-                            </select>
-                        </div>
-
-                        {targetAudience === "Specific Grade" && (
-                            <div className="input-group" style={{ marginBottom: "1rem" }}>
-                                <label>Select Grade</label>
-                                <select
-                                    value={selectedGrade}
-                                    onChange={(e) => setSelectedGrade(e.target.value)}
-                                    style={{
-                                        padding: "0.75rem",
-                                        background: "var(--gray-50)",
-                                        border: "1.5px solid var(--gray-200)",
-                                        borderRadius: "var(--radius-md)",
-                                        fontFamily: "inherit",
-                                        width: "100%",
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    {GRADES.map((grade) => (
-                                        <option key={grade} value={grade}>
-                                            {grade}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div className="input-group" style={{ marginBottom: "1rem" }}>
-                            <label>Message</label>
-                            <textarea
-                                rows={4}
-                                placeholder="Write announcement..."
-                                value={message}
-                                onChange={(e) => setMessage(e.target.value)}
-                                style={{
-                                    padding: "0.75rem",
-                                    background: "var(--gray-50)",
-                                    border: "1.5px solid var(--gray-200)",
-                                    borderRadius: "var(--radius-md)",
-                                    fontFamily: "inherit",
-                                    resize: "vertical",
-                                    width: "100%",
-                                }}
-                            />
-                        </div>
-
-                        {showScheduleForm && (
-                            <div className="input-group" style={{ marginBottom: "1rem" }}>
-                                <label>Schedule Date</label>
-                                <input
-                                    type="date"
-                                    value={scheduledDate}
-                                    onChange={(e) => setScheduledDate(e.target.value)}
-                                    style={{
-                                        padding: "0.75rem",
-                                        background: "var(--gray-50)",
-                                        border: "1.5px solid var(--gray-200)",
-                                        borderRadius: "var(--radius-md)",
-                                        fontFamily: "inherit",
-                                        width: "100%",
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                            {!showScheduleForm && (
-                                <>
-                                    <button className="btn btn-primary" onClick={handleSendNow}>
-                                        Send Now
-                                    </button>
-                                    <button className="btn btn-outline" onClick={() => setShowScheduleForm(true)}>
-                                        Schedule
-                                    </button>
-                                </>
-                            )}
-                            {showScheduleForm && (
-                                <>
-                                    <button className="btn btn-primary" onClick={handleSchedule}>
-                                        Schedule Announcement
-                                    </button>
-                                    <button
-                                        className="btn btn-outline"
-                                        onClick={() => {
-                                            setShowScheduleForm(false);
-                                            setScheduledDate("");
-                                        }}
-                                    >
-                                        Cancel Schedule
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Announcements List */}
-            <div className="card">
-                <h3 className="card-title" style={{ marginBottom: "1rem" }}>
-                    Announcements At A Glance
-                </h3>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
-                    <div style={{ border: "1px solid #bbf7d0", borderRadius: "var(--radius-md)", background: "#f0fdf4", padding: "0.9rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
-                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#166534", letterSpacing: "0.03em", textTransform: "uppercase" }}>Sent</span>
-                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#166534" }}>{sentAnnouncements.length}</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                            {sentAnnouncements.slice(0, 3).map((ann) => (
-                                <div key={`sent-${ann.id}`} style={{ fontSize: "0.85rem", color: "#14532d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {ann.title}
-                                </div>
-                            ))}
-                            {sentAnnouncements.length === 0 && (
-                                <div style={{ fontSize: "0.82rem", color: "#166534" }}>No sent announcements yet.</div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div style={{ border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", background: "#fff7ed", padding: "0.9rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
-                            <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "#9a3412", letterSpacing: "0.03em", textTransform: "uppercase" }}>Upcoming</span>
-                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#9a3412" }}>{upcomingAnnouncements.length}</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                            {upcomingAnnouncements.slice(0, 3).map((ann) => (
-                                <div key={`upcoming-${ann.id}`} style={{ fontSize: "0.85rem", color: "#7c2d12", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {ann.title}
-                                </div>
-                            ))}
-                            {upcomingAnnouncements.length === 0 && (
-                                <div style={{ fontSize: "0.82rem", color: "#9a3412" }}>No upcoming announcements.</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-                    {[
-                        { key: "all", label: `All (${sortedAnnouncements.length})` },
-                        { key: "sent", label: `Sent (${sentAnnouncements.length})` },
-                        { key: "upcoming", label: `Upcoming (${upcomingAnnouncements.length})` },
-                        { key: "today", label: `Today (${todayAnnouncements.length})` },
-                        { key: "overdue", label: `Overdue (${overdueAnnouncements.length})` },
-                    ].map((item) => (
-                        <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => setViewFilter(item.key as typeof viewFilter)}
-                            className={viewFilter === item.key ? "btn btn-primary btn-sm" : "btn btn-outline btn-sm"}
-                        >
-                            {item.label}
-                        </button>
-                    ))}
-                </div>
-
-                {visibleAnnouncements.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        {visibleAnnouncements.map((ann) => (
-                            (() => {
-                                const scheduleState = ann.status === "scheduled" ? getScheduleState(ann.scheduledDate) : null;
-                                const statusText = ann.status === "sent"
-                                    ? "SENT"
-                                    : scheduleState === "upcoming"
-                                    ? "UPCOMING"
-                                    : scheduleState === "today"
-                                    ? "SCHEDULED TODAY"
-                                    : scheduleState === "overdue"
-                                    ? "OVERDUE"
-                                    : "SCHEDULED";
-                                const statusStyle = ann.status === "sent"
-                                                                        ? { background: "#dcfce7", color: "#166534" }
-                                    : scheduleState === "upcoming"
-                                    ? { background: "#fff7ed", color: "#c2410c" }
-                                    : scheduleState === "today"
-                                    ? { background: "#ecfeff", color: "#0e7490" }
-                                    : scheduleState === "overdue"
-                                    ? { background: "#fef2f2", color: "#b91c1c" }
-                                                                        : { background: "#dbeafe", color: "#1d4ed8" };
-                                                                const cardStyle = ann.status === "sent"
-                                                                        ? {
-                                                                                background: "#f0fdf4",
-                                                                                border: "1px solid #bbf7d0",
-                                                                                borderLeft: "4px solid #22c55e",
-                                                                            }
-                                                                        : {
-                                                                                background: "#fffbeb",
-                                                                                border: "1px solid #fde68a",
-                                                                                borderLeft: "4px solid #f59e0b",
-                                                                            };
-
-                                return (
-                            <div
-                                key={ann.id}
-                                style={{
-                                    padding: "1rem",
-                                    borderRadius: "var(--radius-md)",
-                                    ...cardStyle,
-                                }}
-                            >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "0.5rem" }}>
-                                    <div>
-                                        <h4 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--gray-900)", marginBottom: "0.25rem" }}>
-                                            {ann.title}
-                                        </h4>
-                                        <p style={{ fontSize: "0.875rem", color: "#4b5563" }}>
-                                            Target: <strong>{ann.target}</strong>
-                                        </p>
-                                    </div>
-                                    <div
-                                        style={{
-                                            padding: "0.35rem 0.75rem",
-                                            borderRadius: "var(--radius-sm)",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 700,
-                                            ...statusStyle,
-                                        }}
-                                    >
-                                        {statusText}
-                                    </div>
-                                </div>
-                                <p style={{ fontSize: "0.9rem", color: "#1f2937", marginBottom: "0.5rem", lineHeight: 1.5 }}>
-                                    {ann.message}
-                                </p>
-                                <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                                    {ann.status === "sent" ? `Sent on ${ann.date}` : `Scheduled for ${formatDate(ann.scheduledDate)}`}
-                                </p>
-                            </div>
-                                );
-                            })()
-                        ))}
-                    </div>
-                ) : (
-                    <div style={{ textAlign: "center", padding: "2rem", color: "var(--gray-400)" }}>
-                        No announcements in this view.
-                    </div>
-                )}
-            </div>
+  return (
+    <div className="page-wrapper">
+      {toast && (
+        <div style={{ position: "fixed", top: 80, right: 20, zIndex: 9999, background: "#fff", padding: "0.75rem 1rem", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", fontWeight: 600 }}>
+          {toast}
         </div>
-    );
+      )}
+      <div className="announcements-hero">
+        <div>
+          <p className="announcements-kicker">
+            <Sparkles size={14} />
+            Broadcast Center
+          </p>
+          <h1 className="announcements-title">Announcements</h1>
+          <p className="announcements-subtitle">Broadcast messages to students, teachers, or parents</p>
+        </div>
+        <button type="button" className="btn btn-secondary" onClick={load}>
+          <RefreshCcw size={14} />
+          Refresh
+        </button>
+      </div>
+
+      <div className="announcements-summary-grid">
+        <div className="card announcements-summary-card">
+          <div className="announcements-summary-icon blue">
+            <Megaphone size={18} />
+          </div>
+          <div className="announcements-summary-label">Total posts</div>
+          <div className="announcements-summary-value">{rows.length}</div>
+        </div>
+        <div className="card announcements-summary-card">
+          <div className="announcements-summary-icon teal">
+            <Users size={18} />
+          </div>
+          <div className="announcements-summary-label">Audience-wide</div>
+          <div className="announcements-summary-value">{audienceStats.all}</div>
+        </div>
+        <div className="card announcements-summary-card">
+          <div className="announcements-summary-icon orange">
+            <CalendarDays size={18} />
+          </div>
+          <div className="announcements-summary-label">Scoped messages</div>
+          <div className="announcements-summary-value">{audienceStats.scoped}</div>
+        </div>
+      </div>
+
+      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
+      <div className="card announcements-panel" style={{ marginBottom: "1.5rem" }}>
+        <h3 className="card-title announcements-section-title" style={{ marginBottom: "1rem" }}>
+          <BellRing size={16} />
+          New announcement
+        </h3>
+        <p style={{ fontSize: "0.85rem", color: "var(--gray-500)", marginBottom: "1rem" }}>
+          Posting into: {year ? <strong>{year.label}</strong> : "no active year — choose one under Settings first"}
+        </p>
+        <div style={{ display: "grid", gap: "0.75rem", maxWidth: 560 }}>
+          <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
+          <textarea placeholder="Body" value={body} onChange={(e) => setBody(e.target.value)} rows={5} style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
+          <select value={audience} onChange={(e) => setAudience(e.target.value)} style={{ padding: "0.5rem", maxWidth: 200 }}>
+            {AUDIENCES.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn-primary" onClick={publish} disabled={loading}>
+            Publish
+          </button>
+        </div>
+      </div>
+      <div className="card announcements-panel">
+        <h3 className="card-title announcements-section-title" style={{ marginBottom: "1rem" }}>
+          All (filtered by year when active)
+        </h3>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Audience</th>
+                <th>Created</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4}>Loading…</td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ color: "var(--gray-500)" }}>
+                    No announcements.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((a) => (
+                  <tr key={a.id}>
+                    <td style={{ fontWeight: 600 }}>{a.title}</td>
+                    <td>{a.audience}</td>
+                    <td style={{ fontSize: "0.8rem" }}>{new Date(a.createdAt).toLocaleString()}</td>
+                    <td>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => del(a.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }

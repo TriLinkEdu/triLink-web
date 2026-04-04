@@ -1,102 +1,69 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useExamStore } from "@/store/examStore";
+import {
+    getExamQuestions,
+    startExamAttempt,
+    saveAttemptAnswers,
+    submitAttempt as apiSubmitAttempt,
+    recordViolation,
+    listExams,
+    getActiveAcademicYear,
+    type ExamQuestionForStudent,
+    type Exam,
+} from "@/lib/admin-api";
+import { chatRealtime } from "@/lib/chat-realtime";
+import { getStoredUser } from "@/lib/auth";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
 
 interface Question {
-    id: number;
+    id: string;
     type: QuestionType;
     text: string;
     options?: string[];
     order: number;
-    correctAnswer?: string;
 }
 
 interface ExamData {
-    id: number;
-    course: string;
-    type: string;
+    id: string;
     title: string;
     duration: number;
     totalQuestions: number;
     questions: Question[];
 }
 
-function getMockExam(): ExamData {
-    const questions: Question[] = [
-        { id: 1, order: 1, type: "mcq", text: "What is the derivative of f(x) = 3x² + 2x - 5?", options: ["6x + 2", "3x + 2", "6x² + 2", "6x - 5"] },
-        { id: 2, order: 2, type: "mcq", text: "Which of the following is NOT a property of limits?", options: ["Sum rule", "Product rule", "Division by zero rule", "Quotient rule"] },
-        { id: 3, order: 3, type: "truefalse", text: "The integral of 1/x is ln|x| + C." },
-        { id: 4, order: 4, type: "fillin", text: "The derivative of sin(x) is ______." },
-        { id: 5, order: 5, type: "mcq", text: "What is the value of lim(x→0) sin(x)/x?", options: ["0", "1", "∞", "Does not exist"] },
-        { id: 6, order: 6, type: "truefalse", text: "A continuous function on a closed interval always attains its maximum and minimum values." },
-        { id: 7, order: 7, type: "mcq", text: "The chain rule states that d/dx[f(g(x))] equals:", options: ["f'(g(x)) · g'(x)", "f'(x) · g'(x)", "f(g'(x))", "f'(g(x))"] },
-        { id: 8, order: 8, type: "fillin", text: "The formula for integration by parts is ∫u dv = uv - ∫______." },
-        { id: 9, order: 9, type: "mcq", text: "Which test is used to determine if an infinite series converges?", options: ["Ratio test", "Mean test", "Mode test", "Range test"] },
-        { id: 10, order: 10, type: "truefalse", text: "The second derivative test can determine concavity of a function." },
-    ];
-    return { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", duration: 120, totalQuestions: questions.length, questions };
-}
-
-const STUDENT_EXAM_META: Record<number, { course: string; type: string; title: string; duration: number }> = {
-    1: { course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", duration: 120 },
-    2: { course: "Physics", type: "Quiz", title: "Ch.6 Mechanics Quiz", duration: 30 },
-    3: { course: "Chemistry", type: "Test", title: "Organic Chemistry Test", duration: 60 },
-    4: { course: "English", type: "Quiz", title: "Grammar & Vocabulary Quiz", duration: 20 },
-    5: { course: "Biology", type: "Test", title: "Cell Biology Test", duration: 45 },
-    6: { course: "Mathematics", type: "Quiz", title: "Integration Quick Quiz", duration: 15 },
-    7: { course: "Physics", type: "Final", title: "Semester Final Exam", duration: 180 },
-};
-
-function buildExamById(examId: number): ExamData {
-    const base = getMockExam();
-    const meta = STUDENT_EXAM_META[examId] ?? STUDENT_EXAM_META[1];
-    return {
-        ...base,
-        id: examId,
-        course: meta.course,
-        type: meta.type,
-        title: meta.title,
-        duration: meta.duration,
-    };
-}
-
-function buildPublishedExamById(examId: number, publishedExams: ReturnType<typeof useExamStore.getState>["publishedExams"]): ExamData | null {
-    const published = publishedExams.find((e) => e.id === examId);
-    if (!published) return null;
-
-    return {
-        id: published.id,
-        course: published.course,
-        type: published.type,
-        title: published.title,
-        duration: published.duration,
-        totalQuestions: published.totalQuestions,
-        questions: published.questions.map((q) => ({
-            id: q.id,
-            order: q.order,
-            type: "mcq",
-            text: q.text,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-        })),
-    };
+function mapApiQuestions(raw: ExamQuestionForStudent[]): Question[] {
+    return raw
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((q, i) => {
+            let options: string[] | undefined;
+            if (q.optionsJson) {
+                try { options = JSON.parse(q.optionsJson); } catch { options = undefined; }
+            }
+            let type: QuestionType = "fillin";
+            if (q.type === "mcq" && options && options.length > 0) type = "mcq";
+            else if (q.type === "truefalse") type = "truefalse";
+            return { id: q.id, type, text: q.stem, options, order: i + 1 };
+        });
 }
 
 export default function ExamSession() {
     const router = useRouter();
     const params = useParams<{ examId: string }>();
-    const examId = Number(params?.examId ?? 1);
-    const publishedExams = useExamStore(s => s.publishedExams);
-    const safeExamId = Number.isNaN(examId) ? 1 : examId;
-    const exam = buildPublishedExamById(safeExamId, publishedExams) ?? buildExamById(safeExamId);
+    const examId = params?.examId ?? "";
 
+    // ── Loading state ──
+    const [loading, setLoading] = useState(true);
+    const [loadErr, setLoadErr] = useState<string | null>(null);
+    const [exam, setExam] = useState<ExamData | null>(null);
+    const [attemptId, setAttemptId] = useState<string | null>(null);
+
+    // ── Exam session state ──
     const [currentQ, setCurrentQ] = useState(0);
-    const [answers, setAnswers] = useState<Record<number, string>>({});
-    const [flagged, setFlagged] = useState<Set<number>>(new Set());
-    const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [flagged, setFlagged] = useState<Set<string>>(new Set());
+    const [timeLeft, setTimeLeft] = useState(0);
     const [timeSpent, setTimeSpent] = useState(0);
     const [showConfirm, setShowConfirm] = useState(false);
     const [showEarlyWarning, setShowEarlyWarning] = useState(false);
@@ -104,39 +71,125 @@ export default function ExamSession() {
     const [tabViolations, setTabViolations] = useState(0);
     const [submitted, setSubmitted] = useState(false);
     const [showReport, setShowReport] = useState(false);
+    const [showTeacherWarning, setShowTeacherWarning] = useState(false);
+    const [teacherWarningMsg, setTeacherWarningMsg] = useState("");
     const tabViolationsRef = useRef(0);
     const submittedRef = useRef(false);
-    const { setResult, markExamCompleted } = useExamStore();
+    const attemptIdRef = useRef<string | null>(null);
 
-    const question = exam.questions[currentQ];
+    // ── Load exam from backend ──
+    useEffect(() => {
+        if (!examId) return;
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            setLoadErr(null);
+            try {
+                // Get exam metadata
+                const year = await getActiveAcademicYear();
+                if (!year) throw new Error("No active academic year");
+                const exams = await listExams(year.id);
+                const examMeta = exams.find(e => e.id === examId);
+                if (!examMeta) throw new Error("Exam not found");
+
+                // Get questions
+                const rawQuestions = await getExamQuestions(examId);
+                const questions = mapApiQuestions(rawQuestions);
+
+                // Start attempt
+                const attempt = await startExamAttempt(examId);
+                if (cancelled) return;
+
+                attemptIdRef.current = attempt.id;
+                setAttemptId(attempt.id);
+
+                // Store attemptId globally for violation reporting
+                (window as unknown as Record<string, string>).__currentAttemptId = attempt.id;
+
+                // Restore previous answers if any
+                if (attempt.answersJson) {
+                    try {
+                        const prev = JSON.parse(attempt.answersJson);
+                        if (typeof prev === "object" && prev !== null) setAnswers(prev);
+                    } catch { /* ignore */ }
+                }
+
+        setExam({
+                    id: examMeta.id,
+                    title: examMeta.title,
+                    duration: examMeta.durationMinutes,
+                    totalQuestions: questions.length,
+                    questions,
+                });
+                setTimeLeft(examMeta.durationMinutes * 60);
+
+                // Setup realtime listener for teacher control
+                const me = getStoredUser();
+                if (me && me.id) {
+                    chatRealtime.connect({ id: me.id, name: `${me.firstName} ${me.lastName}` });
+                }
+                const unsubControl = chatRealtime.on("attempt:control", (payload) => {
+                    if (payload.attemptId !== attempt.id) return;
+                    if (payload.action === "force_submit") {
+                        setSubmitted(true);
+                    } else if (payload.action === "warn") {
+                        setTeacherWarningMsg(payload.message || "A teacher has sent you a warning.");
+                        setShowTeacherWarning(true);
+                    }
+                });
+                return () => {
+                    cancelled = true;
+                    unsubControl();
+                };
+            } catch (e) {
+                if (!cancelled) setLoadErr(e instanceof Error ? e.message : "Failed to load exam");
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [examId, router]);
+
+    const question = exam?.questions[currentQ];
     const answeredCount = Object.keys(answers).length;
-    const minimumTimeSeconds = Math.floor((exam.duration * 60) / 2);
+    const minimumTimeSeconds = exam ? Math.floor((exam.duration * 60) / 2) : 0;
 
+    // ── Timer ──
     useEffect(() => {
-        setTimeLeft(exam.duration * 60);
-        setTimeSpent(0);
-        setCurrentQ(0);
-        setAnswers({});
-        setFlagged(new Set());
-        setSubmitted(false);
-        setShowConfirm(false);
-        setShowEarlyWarning(false);
-        setShowReport(false);
-        submittedRef.current = false;
-    }, [exam.id, exam.duration]);
-
-    useEffect(() => {
-        if (submitted) return;
+        if (submitted || !exam) return;
         const interval = setInterval(() => {
-            setTimeLeft(prev => { if (prev <= 1) { clearInterval(interval); setSubmitted(true); return 0; } return prev - 1; });
+            setTimeLeft(prev => {
+                if (prev <= 1) { clearInterval(interval); setSubmitted(true); return 0; }
+                return prev - 1;
+            });
             setTimeSpent(prev => prev + 1);
         }, 1000);
         return () => clearInterval(interval);
-    }, [submitted]);
+    }, [submitted, exam]);
 
+    // ── Auto-save answers every 15 seconds ──
+    useEffect(() => {
+        if (!attemptId || submitted) return;
+        const interval = setInterval(() => {
+            saveAttemptAnswers(attemptId, JSON.stringify(answers)).catch(() => {});
+        }, 15000);
+        return () => clearInterval(interval);
+    }, [attemptId, answers, submitted]);
+
+    // ── Tab switch / cheating prevention ──
     useEffect(() => {
         if (submitted) return;
-        const handleVisibilityChange = () => { if (document.hidden) { tabViolationsRef.current += 1; setTabViolations(tabViolationsRef.current); setShowTabWarning(true); } };
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                tabViolationsRef.current += 1;
+                setTabViolations(tabViolationsRef.current);
+                setShowTabWarning(true);
+                const aid = attemptIdRef.current;
+                if (aid) {
+                    recordViolation(aid, JSON.stringify({ type: "tab_switch", reason: "Document visibility changed to hidden", timestamp: new Date().toISOString() })).catch(() => {});
+                }
+            }
+        };
         const handleBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = "You are in an active exam session."; };
         const handleContextMenu = (e: MouseEvent) => { e.preventDefault(); };
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -155,7 +208,7 @@ export default function ExamSession() {
         };
     }, [submitted]);
 
-    // Fullscreen enforcement — entering is attempted on mount; exiting counts as a violation
+    // ── Fullscreen enforcement ──
     useEffect(() => {
         const enterFullscreen = () => {
             if (document.documentElement.requestFullscreen) {
@@ -168,6 +221,10 @@ export default function ExamSession() {
                 tabViolationsRef.current += 1;
                 setTabViolations(tabViolationsRef.current);
                 setShowTabWarning(true);
+                const aid = attemptIdRef.current;
+                if (aid) {
+                    recordViolation(aid, JSON.stringify({ type: "fullscreen_exit", reason: "Student exited fullscreen mode", timestamp: new Date().toISOString() })).catch(() => {});
+                }
                 setTimeout(enterFullscreen, 500);
             }
         };
@@ -180,70 +237,71 @@ export default function ExamSession() {
         };
     }, []);
 
-    // Save results to store and navigate to result page when exam is submitted
+    // ── Submit ──
     useEffect(() => {
-        if (!submitted) return;
+        if (!submitted || !attemptId) return;
         submittedRef.current = true;
-        const fallbackCorrectAnswers: Record<number, string> = {
-            1: "6x + 2", 2: "Division by zero rule", 3: "True", 4: "cos(x)",
-            5: "1", 6: "True", 7: "f'(g(x)) \u00b7 g'(x)", 8: "v du",
-            9: "Ratio test", 10: "True",
-        };
-        const score = Math.round((exam.questions.reduce((sum, q) => {
-            const expected = (q.correctAnswer ?? fallbackCorrectAnswers[q.id] ?? "").trim();
-            const actual = (answers[q.id] ?? "").trim();
-            return sum + (expected && expected.toLowerCase() === actual.toLowerCase() ? 1 : 0);
-        }, 0) / Math.max(1, exam.totalQuestions)) * 100);
-
-        setResult({
-            examId: exam.id,
-            examTitle: exam.title,
-            examCourse: exam.course,
-            examType: exam.type,
-            totalQuestions: exam.totalQuestions,
-            timeSpent,
-            tabViolations: tabViolationsRef.current,
-            questions: exam.questions.map(q => ({
-                id: q.id,
-                order: q.order,
-                type: q.type,
-                text: q.text,
-                options: q.options,
-                correctAnswer: q.correctAnswer ?? fallbackCorrectAnswers[q.id] ?? "",
-                studentAnswer: answers[q.id] || "",
-            })),
-        });
-        markExamCompleted({ examId: exam.id, score, completedAt: new Date().toISOString() });
-        router.push(`/student/result/${exam.id}`);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        (async () => {
+            try {
+                // Save final answers
+                await saveAttemptAnswers(attemptId, JSON.stringify(answers));
+                // Submit attempt
+                await apiSubmitAttempt(attemptId);
+            } catch { /* best-effort */ }
+            router.push(`/student/result/${attemptId}`);
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [submitted]);
 
-    const setAnswer = (qId: number, value: string) => setAnswers(prev => ({ ...prev, [qId]: value }));
-    const toggleFlag = (qId: number) => { setFlagged(prev => { const next = new Set(prev); next.has(qId) ? next.delete(qId) : next.add(qId); return next; }); };
+    const setAnswer = (qId: string, value: string) => setAnswers(prev => ({ ...prev, [qId]: value }));
+    const toggleFlag = (qId: string) => { setFlagged(prev => { const next = new Set(prev); next.has(qId) ? next.delete(qId) : next.add(qId); return next; }); };
 
     const handleSubmitClick = () => {
         if (timeSpent < minimumTimeSeconds) { setShowEarlyWarning(true); return; }
         setShowConfirm(true);
     };
     const confirmSubmit = () => {
-        if (timeSpent < (exam.duration * 60 * 0.2) && answeredCount === exam.totalQuestions) { setShowConfirm(false); setShowReport(true); return; }
+        if (exam && timeSpent < (exam.duration * 60 * 0.2) && answeredCount === exam.totalQuestions) { setShowConfirm(false); setShowReport(true); return; }
         setSubmitted(true); setShowConfirm(false);
     };
     const forceSubmitAfterReport = () => { setSubmitted(true); setShowReport(false); };
 
     const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-    const timePercent = (timeLeft / (exam.duration * 60)) * 100;
+    const timePercent = exam ? (timeLeft / (exam.duration * 60)) * 100 : 100;
     const isLowTime = timeLeft < 300;
+
+    // ── Loading / Error states ──
+    if (loading) {
+        return (
+            <div style={{ minHeight: "100vh", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center", color: "var(--gray-500)" }}>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>Loading Exam…</div>
+                    <p style={{ fontSize: "0.9rem" }}>Please wait while we prepare your exam session.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (loadErr || !exam || !question) {
+        return (
+            <div style={{ minHeight: "100vh", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center", color: "var(--danger)", maxWidth: 400 }}>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>Cannot Start Exam</div>
+                    <p style={{ fontSize: "0.9rem", color: "var(--gray-600)" }}>{loadErr || "Exam data is unavailable."}</p>
+                    <button onClick={() => router.push("/student/dashboard")} style={{ marginTop: "1rem", padding: "0.75rem 1.5rem", borderRadius: 12, background: "var(--primary-500)", border: "none", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Back to Dashboard</button>
+                </div>
+            </div>
+        );
+    }
 
     /* ─── EXAM UI ─── */
     return (
         <div style={{ minHeight: "100vh", background: "var(--gray-50)", display: "flex", flexDirection: "column", userSelect: "none" }}>
 
-            {/* Top Bar — responsive */}
+            {/* Top Bar */}
             <div className="exam-topbar">
                 <div className="exam-topbar-info">
                     <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--gray-900)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{exam.title}</div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>{exam.course} · {exam.type}</div>
                 </div>
                 <div style={{
                     display: "flex", alignItems: "center", gap: "0.75rem",
@@ -273,7 +331,7 @@ export default function ExamSession() {
                 <div style={{ height: "100%", background: isLowTime ? "var(--danger)" : "var(--primary-500)", width: `${timePercent}%`, transition: "width 1s linear" }} />
             </div>
 
-            {/* Main Content — responsive flex → column on mobile */}
+            {/* Main Content */}
             <div className="exam-main-layout">
 
                 {/* Question Panel */}
@@ -372,7 +430,7 @@ export default function ExamSession() {
                     </div>
                 </div>
 
-                {/* Navigator Sidebar — becomes bottom panel on mobile */}
+                {/* Navigator Sidebar */}
                 <div className="exam-navigator-sidebar">
                     <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)", marginBottom: "1rem" }}>Question Navigator</div>
                     <div className="nav-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginBottom: "1.5rem" }}>
@@ -481,6 +539,29 @@ export default function ExamSession() {
                             <button onClick={() => setShowReport(false)} style={{ flex: 1, padding: "0.75rem", borderRadius: 12, background: "var(--primary-500)", border: "none", fontWeight: 700, cursor: "pointer", color: "#fff" }}>Go Back & Review</button>
                             <button onClick={forceSubmitAfterReport} style={{ flex: 1, padding: "0.75rem", borderRadius: 12, background: "var(--gray-100)", border: "none", fontWeight: 600, cursor: "pointer", color: "var(--gray-700)" }}>Submit Anyway</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {showTeacherWarning && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000, padding: "1rem" }}>
+                    <div style={{ background: "#fff", borderRadius: 24, padding: "2.5rem", maxWidth: 480, width: "100%", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" }}>
+                        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--danger-light)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem", color: "var(--danger)" }}>
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+                        </div>
+                        <h2 style={{ fontSize: "1.5rem", fontWeight: 900, marginBottom: "0.75rem", color: "var(--danger)" }}>Teacher Warning</h2>
+                        <div style={{ background: "var(--gray-50)", borderRadius: 16, padding: "1.5rem", marginBottom: "2rem", border: "1px solid var(--gray-200)" }}>
+                            <p style={{ color: "var(--gray-800)", fontSize: "1rem", fontWeight: 600, lineHeight: 1.6 }}>
+                                "{teacherWarningMsg}"
+                            </p>
+                        </div>
+                        <button onClick={() => setShowTeacherWarning(false)} style={{ 
+                            padding: "1rem 2.5rem", borderRadius: 14, background: "var(--primary-500)", 
+                            border: "none", fontWeight: 800, cursor: "pointer", color: "#fff", width: "100%",
+                            fontSize: "1rem", boxShadow: "0 4px 12px rgba(37,99,235,0.3)"
+                        }}>
+                            I Understand, Return to Exam
+                        </button>
                     </div>
                 </div>
             )}

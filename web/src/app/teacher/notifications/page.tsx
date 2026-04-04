@@ -1,48 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import {
     MessageSquare, Calendar, Megaphone, ClipboardList,
-    BookOpen, Users, Bell, FileText, CheckCheck, Clock,
-    ChevronRight, X,
+    Bell, CheckCheck, Clock, ChevronRight,
 } from "lucide-react";
-import { useCalendarStore } from "@/store/calendarStore";
-import { useAnnouncementStore } from "@/store/announcementStore";
-import { useChatStore } from "@/store/chatStore";
-import { useNotificationStore } from "@/store/notificationStore";
-
-// ─── constants ────────────────────────────────────────────────────────────────
-const TEACHER_ID = "teacher-1";
-const TODAY_ISO   = new Date().toISOString().slice(0, 10);
-const WEEK_MS     = 7 * 24 * 60 * 60 * 1000;
-const MN          = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+import {
+    listNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    type BackendNotification,
+} from "@/lib/admin-api";
 
 // ─── category meta ────────────────────────────────────────────────────────────
-type Category = "message" | "calendar" | "announcement" | "exam";
+type Category = "message" | "calendar" | "announcement" | "exam" | "other";
 
 const CAT_META: Record<Category, { label: string; accent: string; bg: string; iconColor: string }> = {
     message:      { label: "Message",      accent: "var(--primary-500)", bg: "var(--primary-100)",   iconColor: "var(--primary-600)" },
     calendar:     { label: "Calendar",     accent: "var(--warning)",     bg: "var(--warning-light)", iconColor: "#92400e" },
     announcement: { label: "Announcement", accent: "var(--purple)",      bg: "var(--purple-light)",  iconColor: "#7c3aed" },
     exam:         { label: "Exam",         accent: "var(--danger)",      bg: "var(--danger-light)",  iconColor: "#991b1b" },
-};
-
-const CAL_TYPE_COLOR: Record<string, string> = {
-    class: "var(--primary-600)", exam: "#991b1b", meeting: "#92400e", reminder: "#065f46",
-};
-const CAL_TYPE_BG: Record<string, string> = {
-    class: "var(--primary-100)", exam: "var(--danger-light)", meeting: "var(--warning-light)", reminder: "var(--success-light)",
-};
-const CAL_TYPE_ACCENT: Record<string, string> = {
-    class: "var(--primary-500)", exam: "var(--danger)", meeting: "var(--warning)", reminder: "var(--success)",
+    other:        { label: "Other",        accent: "var(--gray-500)",    bg: "var(--gray-100)",      iconColor: "var(--gray-600)" },
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function relTime(isoOrMs: string | number): string {
+function relTime(iso: string): string {
     try {
-        const d   = typeof isoOrMs === "number" ? isoOrMs : new Date(isoOrMs).getTime();
-        const ago = Date.now() - d;
+        const ago = Date.now() - new Date(iso).getTime();
         const min = Math.floor(ago / 60_000);
         if (min < 1)  return "Just now";
         if (min < 60) return `${min}m ago`;
@@ -50,85 +35,30 @@ function relTime(isoOrMs: string | number): string {
         if (h < 24)   return `${h}h ago`;
         const dy = Math.floor(h / 24);
         if (dy < 7)   return `${dy}d ago`;
-        const dt = new Date(d);
+        const dt = new Date(iso);
+        const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
         return `${MN[dt.getMonth()]} ${dt.getDate()}`;
     } catch { return ""; }
 }
 
-function calDateLabel(dateIso: string): string {
-    const today    = TODAY_ISO;
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
-    if (dateIso === today)    return "TODAY";
-    if (dateIso === tomorrow) return "TOMORROW";
-    return "UPCOMING";
+function typeToCategory(type: string): Category {
+    const t = type?.toLowerCase() ?? "";
+    if (t.includes("message") || t.includes("chat")) return "message";
+    if (t.includes("calendar") || t.includes("event")) return "calendar";
+    if (t.includes("announcement")) return "announcement";
+    if (t.includes("exam") || t.includes("submission") || t.includes("grade") || t.includes("result")) return "exam";
+    return "other";
 }
 
-function calLabelColor(tag: string): string {
-    if (tag === "TODAY")    return "var(--primary-500)";
-    if (tag === "TOMORROW") return "var(--warning)";
-    return "var(--success)";
+function categoryHref(cat: Category): string {
+    switch (cat) {
+        case "message": return "/teacher/chat";
+        case "calendar": return "/teacher/calendar";
+        case "announcement": return "/teacher/announcements";
+        case "exam": return "/teacher/exams";
+        default: return "/teacher/dashboard";
+    }
 }
-
-// ─── notification item type ────────────────────────────────────────────────────
-interface Notif {
-    id: string;
-    category: Category;
-    title: string;
-    body: string;
-    sortMs: number;
-    timeLabel: string;
-    href: string;
-    /** extra badge for calendar events (TODAY / TOMORROW / UPCOMING) */
-    badge?: string;
-}
-
-// ─── static exam submission seeds ─────────────────────────────────────────────
-const EXAM_SEEDS: Notif[] = [
-    {
-        id: "exam-sub-1",
-        category: "exam",
-        title: "Abebe Kebede submitted Chapter 7 Quiz",
-        body: "Grade 11-A · Awaiting your review and grading.",
-        sortMs: Date.now() - 15 * 60_000,
-        timeLabel: "15m ago",
-        href: "/teacher/exams",
-    },
-    {
-        id: "exam-sub-2",
-        category: "exam",
-        title: "Sara Haile submitted Integration Assessment",
-        body: "Grade 11-A · Awaiting your review and grading.",
-        sortMs: Date.now() - 45 * 60_000,
-        timeLabel: "45m ago",
-        href: "/teacher/exams",
-    },
-    {
-        id: "exam-sub-3",
-        category: "exam",
-        title: "Dawit Tadesse submitted Chapter 7 Quiz",
-        body: "Grade 11-A · Awaiting your review and grading.",
-        sortMs: Date.now() - 62 * 60_000,
-        timeLabel: "1h ago",
-        href: "/teacher/exams",
-    },
-    {
-        id: "exam-sub-4",
-        category: "exam",
-        title: "Midterm grading deadline reminder",
-        body: "Admin: Grade 11-B midterm papers are due for grading by Friday.",
-        sortMs: Date.now() - 2 * 60 * 60_000,
-        timeLabel: "2h ago",
-        href: "/teacher/exams",
-    },
-];
-
-// ─── icon components ──────────────────────────────────────────────────────────
-const CAL_TYPE_ICON: Record<string, React.ReactNode> = {
-    class:    <BookOpen   size={18} strokeWidth={2} />,
-    exam:     <ClipboardList size={18} strokeWidth={2} />,
-    meeting:  <Users      size={18} strokeWidth={2} />,
-    reminder: <Bell       size={18} strokeWidth={2} />,
-};
 
 // ─── filter tabs ──────────────────────────────────────────────────────────────
 type FilterTab = "all" | Category;
@@ -143,120 +73,69 @@ const FILTER_TABS: { key: FilterTab; label: string; Icon: React.ComponentType<{ 
 
 // ─── main component ───────────────────────────────────────────────────────────
 export default function TeacherNotifications() {
-    const { events }        = useCalendarStore();
-    const { announcements } = useAnnouncementStore();
-    const { conversations } = useChatStore();
-    const { readIds, markRead, markAllRead, setTotal } = useNotificationStore();
-
+    const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [err, setErr] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
-    // ── build unified notification list ──
-    const allNotifs: Notif[] = useMemo(() => {
-        const items: Notif[] = [];
-
-        // 1. MESSAGES — last non-teacher message per conversation
-        for (const conv of conversations) {
-            const incoming = [...conv.messages]
-                .reverse()
-                .find((m) => m.senderId !== TEACHER_ID);
-            if (!incoming) continue;
-            const roleLabel =
-                conv.type === "group"
-                    ? `in ${conv.title}`
-                    : conv.participants.find((p) => p.id !== TEACHER_ID)?.role === "parent"
-                    ? "(Parent)"
-                    : "";
-            items.push({
-                id: `msg-${conv.id}`,
-                category: "message",
-                title: `${incoming.senderName} ${roleLabel}`.trim(),
-                body: incoming.text.length > 80 ? incoming.text.slice(0, 80) + "…" : incoming.text,
-                sortMs: new Date(incoming.ts).getTime(),
-                timeLabel: relTime(incoming.ts),
-                href: "/teacher/chat",
-            });
+    const load = useCallback(async () => {
+        setLoading(true);
+        setErr(null);
+        try {
+            const data = await listNotifications();
+            setNotifications(data);
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Failed to load notifications");
+        } finally {
+            setLoading(false);
         }
+    }, []);
 
-        // 2. CALENDAR — today + next 7 days
-        const nowMs = Date.now();
-        for (const ev of events) {
-            const evMs = new Date(ev.date + "T00:00:00").getTime();
-            if (evMs < new Date(TODAY_ISO).getTime()) continue;
-            if (evMs - nowMs > WEEK_MS) continue;
-            const tag = calDateLabel(ev.date);
-            const evDt = new Date(ev.date + "T00:00:00");
-            items.push({
-                id: `cal-${ev.id}`,
-                category: "calendar",
-                title: ev.title,
-                body: `${MN[evDt.getMonth()]} ${evDt.getDate()}${ev.time ? ` at ${ev.time}` : ""}${ev.description ? ` · ${ev.description}` : ""}`,
-                sortMs: tag === "TODAY" ? nowMs + 1 : evMs,  // today items float to top
-                timeLabel: tag === "TODAY" ? "Today" : `${MN[evDt.getMonth()]} ${evDt.getDate()}`,
-                href: "/teacher/calendar",
-                badge: tag,
-            });
-        }
+    useEffect(() => { load(); }, [load]);
 
-        // 3. ANNOUNCEMENTS — all from store
-        for (const ann of announcements) {
-            items.push({
-                id: `ann-${ann.id}`,
-                category: "announcement",
-                title: ann.title,
-                body: ann.status === "scheduled"
-                    ? `Scheduled for ${ann.scheduledDate ?? ann.date} · ${ann.target}`
-                    : `Sent ${ann.date} · ${ann.target}`,
-                sortMs: ann.status === "scheduled"
-                    ? Date.now() - 30 * 60_000  // treat scheduled as 30m ago
-                    : Date.now() - 2 * 60 * 60_000,
-                timeLabel: ann.status === "scheduled" ? "Scheduled" : ann.date,
-                href: "/teacher/announcements",
-                badge: ann.status === "scheduled" ? "SCHEDULED" : undefined,
-            });
-        }
-
-        // 4. EXAMS — static seeds
-        items.push(...EXAM_SEEDS);
-
-        // sort newest first
-        return items.sort((a, b) => b.sortMs - a.sortMs);
-    }, [events, announcements, conversations]);
-
-    useEffect(() => {
-        setTotal(allNotifs.length);
-    }, [allNotifs.length, setTotal]);
-
-    const readSet = useMemo(() => new Set(readIds), [readIds]);
+    // ── derived ──
+    const items = useMemo(() =>
+        notifications
+            .map(n => ({
+                ...n,
+                category: typeToCategory(n.type),
+                timeLabel: relTime(n.createdAt),
+                isRead: !!n.readAt,
+            }))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [notifications]);
 
     const counts = useMemo(() => {
-        const next: Record<FilterTab, number> = {
-            all: 0,
-            message: 0,
-            calendar: 0,
-            announcement: 0,
-            exam: 0,
-        };
-
-        for (const notif of allNotifs) {
-            if (!readSet.has(notif.id)) {
+        const next: Record<FilterTab, number> = { all: 0, message: 0, calendar: 0, announcement: 0, exam: 0, other: 0 };
+        for (const n of items) {
+            if (!n.isRead) {
                 next.all += 1;
-                next[notif.category] += 1;
+                if (n.category in next) next[n.category as FilterTab] += 1;
             }
         }
-
         return next;
-    }, [allNotifs, readSet]);
+    }, [items]);
 
     const filtered = useMemo(
-        () => activeTab === "all" ? allNotifs : allNotifs.filter((n) => n.category === activeTab),
-        [activeTab, allNotifs]
+        () => activeTab === "all" ? items : items.filter(n => n.category === activeTab),
+        [activeTab, items],
     );
 
-    function handleMarkAll() {
-        markAllRead(allNotifs.map((n) => n.id));
+    const totalUnread = counts.all;
+
+    async function handleMarkRead(id: string) {
+        try {
+            await markNotificationRead(id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, readAt: new Date().toISOString() } : n));
+        } catch { /* ignore */ }
     }
 
-    const totalUnread = counts.all;
+    async function handleMarkAll() {
+        try {
+            await markAllNotificationsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
+        } catch { /* ignore */ }
+    }
 
     return (
         <div className="page-wrapper">
@@ -265,7 +144,7 @@ export default function TeacherNotifications() {
                 <div>
                     <h1 className="page-title">Notifications</h1>
                     <p className="page-subtitle">
-                        {totalUnread > 0 ? `${totalUnread} unread notification${totalUnread !== 1 ? "s" : ""}` : "All caught up!"}
+                        {loading ? "Loading…" : totalUnread > 0 ? `${totalUnread} unread notification${totalUnread !== 1 ? "s" : ""}` : "All caught up!"}
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -273,7 +152,7 @@ export default function TeacherNotifications() {
                         <button
                             className="btn btn-secondary"
                             style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: 6 }}
-                            onClick={handleMarkAll}
+                            onClick={() => void handleMarkAll()}
                         >
                             <CheckCheck size={14} strokeWidth={2} />
                             Mark all as read
@@ -290,6 +169,8 @@ export default function TeacherNotifications() {
                 </div>
             </div>
 
+            {err && <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)" }}>{err}</div>}
+
             {/* ── filter tabs ── */}
             <div
                 style={{
@@ -305,7 +186,7 @@ export default function TeacherNotifications() {
                 }}
             >
                 {FILTER_TABS.map(({ key, label, Icon }) => {
-                    const uc = counts[key];
+                    const uc = counts[key] ?? 0;
                     const active = activeTab === key;
                     return (
                         <button
@@ -354,7 +235,11 @@ export default function TeacherNotifications() {
             </div>
 
             {/* ── notification list ── */}
-            {filtered.length === 0 ? (
+            {loading ? (
+                <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--gray-400)" }}>
+                    Loading notifications…
+                </div>
+            ) : filtered.length === 0 ? (
                 <div
                     className="card"
                     style={{
@@ -374,35 +259,24 @@ export default function TeacherNotifications() {
             ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                     {filtered.map((notif) => {
-                        const isRead = readSet.has(notif.id);
-                        const meta   = notif.category === "calendar"
-                            ? null  // handled separately with event-type colors
-                            : CAT_META[notif.category];
-
-                        // for calendar items, use the event type accent from ev.type stored in title lookup
-                        // we stored badge = tag (TODAY/TOMORROW/UPCOMING), accent comes from CAL_TYPE_ACCENT
-                        // but we can't easily recover ev.type here; use CAL_TYPE_ACCENT via the stored accent
-                        const accent = notif.category === "calendar"
-                            ? "var(--warning)"  // default calendar accent
-                            : meta!.accent;
-                        const bg = notif.category === "calendar"
-                            ? "var(--warning-light)"
-                            : meta!.bg;
-                        const iconColor = notif.category === "calendar"
-                            ? "#92400e"
-                            : meta!.iconColor;
+                        const meta = CAT_META[notif.category] ?? CAT_META.other;
+                        const accent = meta.accent;
+                        const bg = meta.bg;
+                        const iconColor = meta.iconColor;
+                        const isRead = notif.isRead;
 
                         const IconComp =
                             notif.category === "message"      ? MessageSquare :
                             notif.category === "calendar"     ? Calendar :
                             notif.category === "announcement" ? Megaphone :
-                            ClipboardList;
+                            notif.category === "exam"         ? ClipboardList :
+                            Bell;
 
                         return (
                             <div
                                 key={notif.id}
                                 className="card"
-                                onClick={() => markRead(notif.id)}
+                                onClick={() => void handleMarkRead(notif.id)}
                                 style={{
                                     padding: "1rem 1.25rem",
                                     borderLeft: `4px solid ${isRead ? "var(--gray-200)" : accent}`,
@@ -442,26 +316,6 @@ export default function TeacherNotifications() {
                                             >
                                                 {notif.title}
                                             </span>
-                                            {notif.badge && (
-                                                <span
-                                                    style={{
-                                                        fontSize: "0.6rem",
-                                                        fontWeight: 700,
-                                                        background: notif.badge === "TODAY"
-                                                            ? "var(--primary-500)"
-                                                            : notif.badge === "TOMORROW"
-                                                            ? "var(--warning)"
-                                                            : notif.badge === "SCHEDULED"
-                                                            ? "var(--purple)"
-                                                            : "var(--success)",
-                                                        color: "#fff",
-                                                        borderRadius: 20,
-                                                        padding: "2px 7px",
-                                                    }}
-                                                >
-                                                    {notif.badge}
-                                                </span>
-                                            )}
                                         </div>
                                         <p
                                             style={{
@@ -512,8 +366,8 @@ export default function TeacherNotifications() {
                                                 />
                                             )}
                                             <Link
-                                                href={notif.href}
-                                                onClick={(e) => { e.stopPropagation(); markRead(notif.id); }}
+                                                href={categoryHref(notif.category)}
+                                                onClick={(e) => { e.stopPropagation(); void handleMarkRead(notif.id); }}
                                                 style={{
                                                     display: "flex",
                                                     alignItems: "center",

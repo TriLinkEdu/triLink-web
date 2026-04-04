@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAnnouncementVisibleToRole, useAnnouncementStore } from "@/store/announcementStore";
+import { announcementsForMe, studentDashboard, type Announcement } from "@/lib/admin-api";
 import { useExamStore } from "@/store/examStore";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
@@ -36,26 +36,31 @@ const IconTarget = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="n
 export default function StudentDashboard() {
     const router = useRouter();
     const [filter, setFilter] = useState<"all" | "available" | "completed">("all");
-    const { announcements } = useAnnouncementStore();
+    const [apiAnnouncements, setApiAnnouncements] = useState<Announcement[]>([]);
+    const [apiDash, setApiDash] = useState<{ activeEnrollments: number; unreadNotifications: number } | null>(null);
     const publishedExams = useExamStore(s => s.publishedExams);
     const completedExams = useExamStore(s => s.completedExams);
-    const studentClass = "Grade 11-A";
-    const sentAnnouncements = announcements.filter(
-        (a) => a.status === "sent" && isAnnouncementVisibleToRole(a, "student", { className: studentClass })
-    );
 
-    const baseExams: Exam[] = [
-        { id: 1, course: "Mathematics", type: "Midterm", title: "Ch.5-8 Midterm Exam", date: "2026-02-20", time: "09:00", duration: 120, totalQuestions: 40, status: "available", room: "ICT Lab 1" },
-        { id: 2, course: "Physics", type: "Quiz", title: "Ch.6 Mechanics Quiz", date: "2026-02-20", time: "14:00", duration: 30, totalQuestions: 15, status: "available", room: "ICT Lab 2" },
-        { id: 3, course: "Chemistry", type: "Test", title: "Organic Chemistry Test", date: "2026-02-21", time: "10:00", duration: 60, totalQuestions: 25, status: "upcoming", room: "ICT Lab 1" },
-        { id: 4, course: "English", type: "Quiz", title: "Grammar & Vocabulary Quiz", date: "2026-02-19", time: "11:00", duration: 20, totalQuestions: 10, status: "completed", score: 88, room: "ICT Lab 2" },
-        { id: 5, course: "Biology", type: "Test", title: "Cell Biology Test", date: "2026-02-18", time: "09:00", duration: 45, totalQuestions: 20, status: "completed", score: 94, room: "ICT Lab 1" },
-        { id: 6, course: "Mathematics", type: "Quiz", title: "Integration Quick Quiz", date: "2026-02-17", time: "10:00", duration: 15, totalQuestions: 8, status: "completed", score: 75, room: "ICT Lab 2" },
-        { id: 7, course: "Physics", type: "Final", title: "Semester Final Exam", date: "2026-03-10", time: "08:00", duration: 180, totalQuestions: 60, status: "upcoming", room: "ICT Lab 1" },
-    ];
+    useEffect(() => {
+        let c = false;
+        (async () => {
+            try {
+                const [ann, dash] = await Promise.all([announcementsForMe(), studentDashboard()]);
+                if (!c) {
+                    setApiAnnouncements(ann);
+                    setApiDash(dash);
+                }
+            } catch {
+                if (!c) {
+                    setApiAnnouncements([]);
+                    setApiDash(null);
+                }
+            }
+        })();
+        return () => { c = true; };
+    }, []);
 
     const publishedForStudent: Exam[] = publishedExams
-        .filter((e) => e.classGroup === studentClass)
         .map((e) => {
             const completed = completedExams.find((x) => x.examId === e.id);
             const openSource = e.opensAt || e.publishedAt;
@@ -84,15 +89,11 @@ export default function StudentDashboard() {
             };
         });
 
-    const exams: Exam[] = [
-        ...publishedForStudent,
-        ...baseExams.filter((base) => !publishedForStudent.some((p) => p.title === base.title)),
-    ];
+    const exams: Exam[] = publishedForStudent;
 
     const filtered = filter === "all" ? exams : exams.filter(e => filter === "available" ? (e.status === "available") : e.status === "completed");
     const availableCount = exams.filter(e => e.status === "available").length;
     const completedCount = exams.filter(e => e.status === "completed").length;
-    const avgScore = exams.filter(e => e.score).reduce((a, e) => a + (e.score || 0), 0) / (completedCount || 1);
 
     const typeColor: Record<string, string> = { Quiz: "var(--primary-500)", Test: "var(--warning)", Midterm: "var(--purple)", Final: "var(--danger)" };
     const typeBg: Record<string, string> = { Quiz: "var(--primary-50)", Test: "var(--warning-light)", Midterm: "var(--purple-light)", Final: "var(--danger-light)" };
@@ -101,9 +102,10 @@ export default function StudentDashboard() {
         <IconActivity key="a" />,
         <IconCheckCircle key="c" />,
         <IconTarget key="t" />,
+        <IconChart key="ch" />,
     ];
-    const statColors = ["var(--success)", "var(--primary-500)", "var(--purple)"];
-    const statBgs = ["var(--success-light)", "var(--primary-50)", "var(--purple-light)"];
+    const statColors = ["var(--success)", "var(--primary-500)", "var(--purple)", "var(--warning)"];
+    const statBgs = ["var(--success-light)", "var(--primary-50)", "var(--purple-light)", "var(--warning-light)"];
 
     return (
         <div>
@@ -117,9 +119,10 @@ export default function StudentDashboard() {
 
             <div className="stats-grid" style={{ marginBottom: "1.5rem" }}>
                 {[
-                    { label: "Available Now", value: availableCount },
-                    { label: "Completed", value: completedCount },
-                    { label: "Avg. Score", value: `${Math.round(avgScore)}%` },
+                    { label: "Active enrollments", value: apiDash ? String(apiDash.activeEnrollments) : "—" },
+                    { label: "Unread notifications", value: apiDash ? String(apiDash.unreadNotifications) : "—" },
+                    { label: "Available exams", value: String(availableCount) },
+                    { label: "Completed (local)", value: String(completedCount) },
                 ].map((s, i) => (
                     <div key={i} className="stat-card">
                         <div className="stat-icon" style={{ width: 42, height: 42, borderRadius: 12, background: statBgs[i], color: statColors[i] }}>
@@ -133,19 +136,19 @@ export default function StudentDashboard() {
                 ))}
             </div>
 
-            {sentAnnouncements.length > 0 && (
+            {apiAnnouncements.length > 0 && (
                 <div style={{ background: "#fff", borderRadius: 16, padding: "1.25rem", border: "1.5px solid var(--gray-100)", marginBottom: "1.25rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                         <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--gray-900)" }}>Announcements</span>
-                        <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--gray-400)" }}>{sentAnnouncements.length} new</span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--gray-400)" }}>{apiAnnouncements.length} from school</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {sentAnnouncements.map(a => (
+                        {apiAnnouncements.slice(0, 12).map(a => (
                             <div key={a.id} style={{ background: "var(--primary-50)", borderRadius: 12, padding: "0.75rem 1rem", borderLeft: "4px solid var(--primary-500)" }}>
                                 <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--gray-900)" }}>{a.title}</div>
-                                <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem" }}>{a.message}</div>
-                                <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: "0.35rem" }}>From your teacher · {a.date}</div>
+                                <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem", whiteSpace: "pre-wrap" }}>{a.body}</div>
+                                <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: "0.35rem" }}>{new Date(a.createdAt).toLocaleString()} · {a.audience}</div>
                             </div>
                         ))}
                     </div>
