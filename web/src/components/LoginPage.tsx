@@ -1,7 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setTokens, setStoredUser } from "@/lib/auth";
+import { refreshStoredProfile, setTokens, setStoredUser } from "@/lib/auth";
+import { apiPath, getApiBase } from "@/lib/api";
+
+type PortalRole = "admin" | "teacher" | "student" | "parent";
 
 interface LoginPageProps {
     role: string;
@@ -39,8 +42,8 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
         setLoading(true);
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
-            const loginPath = process.env.NEXT_PUBLIC_AUTH_LOGIN_PATH ?? "/api/auth/login";
+            const apiBase = getApiBase();
+            const loginPath = process.env.NEXT_PUBLIC_AUTH_LOGIN_PATH ?? apiPath.login;
 
             const res = await fetch(`${apiBase}${loginPath}`, {
                 method: "POST",
@@ -72,11 +75,14 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                     department: u.department,
                     childName: u.childName,
                     relationship: u.relationship,
+                    profileImageFileId: u.profileImageFileId,
                 });
             } else {
                 // Fallback: at minimum store email + role
                 setStoredUser({ firstName: "", lastName: "", email: email.toLowerCase(), role: role.toLowerCase() });
             }
+
+            await refreshStoredProfile();
 
             router.push(dashboardPath);
         } catch (err) {

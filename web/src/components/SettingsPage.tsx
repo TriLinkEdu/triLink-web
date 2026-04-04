@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { authFetch, getStoredUser } from "@/lib/auth";
+import { apiPath, getApiBase } from "@/lib/api";
 
 export default function SettingsPage() {
     const [currentPassword, setCurrentPassword] = useState("");
@@ -39,9 +40,9 @@ export default function SettingsPage() {
         setLoading(true);
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:4000";
+            const apiBase = getApiBase();
 
-            const response = await authFetch(`${apiBase}/api/auth/change-password`, {
+            const response = await authFetch(`${apiBase}${apiPath.changePassword}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ currentPassword, newPassword }),
