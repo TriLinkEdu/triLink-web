@@ -1,10 +1,16 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     BookOpen, ClipboardList, Users, Bell,
-    Clock, ChevronLeft, ChevronRight, X, Plus, Trash2,
+    Clock, ChevronLeft, ChevronRight, X, Plus,
 } from "lucide-react";
-import { useCalendarStore, EventType, CalendarEvent } from "@/store/calendarStore";
+import type { EventType, CalendarEvent } from "@/store/calendarStore";
+import {
+    createCalendarEvent,
+    getActiveAcademicYear,
+    listCalendarEvents,
+    type CalendarEventRecord,
+} from "@/lib/admin-api";
 
 const TODAY = new Date();
 const toLocalISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -16,6 +22,20 @@ const todayISO = toLocalISODate(TODAY);
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function mapApiToEvent(r: CalendarEventRecord): CalendarEvent {
+    const type: EventType = (["class", "exam", "meeting", "reminder"] as const).includes(r.type as EventType)
+        ? (r.type as EventType)
+        : "reminder";
+    return {
+        id: r.id,
+        title: r.title,
+        date: r.date,
+        time: r.time ?? undefined,
+        type,
+        description: r.description ?? undefined,
+    };
+}
 
 type LucideIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 
@@ -43,7 +63,9 @@ interface Toast { id: string; title: string; body: string; type: EventType; }
 const BLANK_FORM = (date: string) => ({ title: "", date, time: "", type: "class" as EventType, description: "" });
 
 export default function TeacherCalendar() {
-    const { events, addEvent, removeEvent } = useCalendarStore();
+    const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [academicYearId, setAcademicYearId] = useState<string | null>(null);
+    const [calErr, setCalErr] = useState<string | null>(null);
 
     const [viewYear,  setViewYear]  = useState(TODAY.getFullYear());
     const [viewMonth, setViewMonth] = useState(TODAY.getMonth());
@@ -52,34 +74,38 @@ export default function TeacherCalendar() {
     const [form,      setForm]      = useState(BLANK_FORM(todayISO));
     const [toasts,    setToasts]    = useState<Toast[]>([]);
     const [pastDatePopup, setPastDatePopup] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
 
-    const initialEvents = useRef(events);
+    const monthRange = useCallback(() => {
+        const from = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`;
+        const last = new Date(viewYear, viewMonth + 1, 0).getDate();
+        const to = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+        return { from, to };
+    }, [viewYear, viewMonth]);
 
-    // Show notifications on mount for today's and upcoming events
-    useEffect(() => {
-        const todayEvts  = initialEvents.current.filter(e => e.date === todayISO);
-        const upcomingEvts = initialEvents.current.filter(e => {
-            const diff = parseLocalISODate(e.date).getTime() - parseLocalISODate(todayISO).getTime();
-            return diff > 0 && diff <= 7 * 864e5;
-        });
-        const newToasts: Toast[] = [
-            ...todayEvts.map(e => ({
-                id: `t-today-${e.id}`, type: e.type,
-                title: `Today: ${e.title}`,
-                body: e.time ? `Scheduled at ${e.time}` : "All day",
-            })),
-            ...(upcomingEvts.length > 0 ? [{
-                id: "t-upcoming", type: "reminder" as EventType,
-                title: `${upcomingEvts.length} upcoming event${upcomingEvts.length > 1 ? "s" : ""} this week`,
-                body: upcomingEvts.slice(0, 2).map(e => e.title).join(", ") + (upcomingEvts.length > 2 ? "…" : ""),
-            }] : []),
-        ];
-        if (newToasts.length) {
-            setToasts(newToasts);
-            setTimeout(() => setToasts([]), 6000);
+    const reloadEvents = useCallback(async () => {
+        setCalErr(null);
+        try {
+            const year = await getActiveAcademicYear();
+            if (!year?.id) {
+                setAcademicYearId(null);
+                setEvents([]);
+                setCalErr("No active academic year. Ask an admin to activate one.");
+                return;
+            }
+            setAcademicYearId(year.id);
+            const { from, to } = monthRange();
+            const raw = await listCalendarEvents({ academicYearId: year.id, from, to });
+            setEvents(raw.map(mapApiToEvent));
+        } catch (e) {
+            setCalErr(e instanceof Error ? e.message : "Could not load calendar");
+            setEvents([]);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [monthRange]);
+
+    useEffect(() => {
+        reloadEvents();
+    }, [reloadEvents]);
 
     // Calendar math
     const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
@@ -120,26 +146,42 @@ export default function TeacherCalendar() {
         setShowModal(true);
     }
 
-    function handleAdd() {
+    async function handleAdd() {
         if (!form.title.trim() || !form.date) return;
         if (isPastDate(form.date)) {
             setPastDatePopup("You cannot add an event to a past date.");
             return;
         }
-        const added = addEvent({ title: form.title.trim(), date: form.date, time: form.time || undefined, type: form.type, description: form.description || undefined });
-        if (!added) {
-            setPastDatePopup("You cannot add an event to a past date.");
+        if (!academicYearId) {
+            setPastDatePopup("No active academic year. Ask an admin to activate one.");
             return;
         }
-        const dateParts = form.date.split("-");
-        const toast: Toast = {
-            id: `t-added-${Date.now()}`, type: form.type,
-            title: `Event added: ${form.title.trim()}`,
-            body: `${MONTH_NAMES[parseInt(dateParts[1]) - 1]} ${parseInt(dateParts[2])}${form.time ? ` at ${form.time}` : ""}`,
-        };
-        setToasts(p => [...p, toast]);
-        setTimeout(() => setToasts(p => p.filter(t => t.id !== toast.id)), 4000);
-        setShowModal(false);
+        setSaving(true);
+        try {
+            await createCalendarEvent({
+                academicYearId,
+                title: form.title.trim(),
+                date: form.date,
+                time: form.time || undefined,
+                type: form.type,
+                description: form.description?.trim() || undefined,
+            });
+            await reloadEvents();
+            const dateParts = form.date.split("-");
+            const toast: Toast = {
+                id: `t-added-${Date.now()}`,
+                type: form.type,
+                title: `Event added: ${form.title.trim()}`,
+                body: `${MONTH_NAMES[parseInt(dateParts[1], 10) - 1]} ${parseInt(dateParts[2], 10)}${form.time ? ` at ${form.time}` : ""}`,
+            };
+            setToasts((p) => [...p, toast]);
+            setTimeout(() => setToasts((p) => p.filter((t) => t.id !== toast.id)), 4000);
+            setShowModal(false);
+        } catch (e) {
+            setPastDatePopup(e instanceof Error ? e.message : "Could not save event");
+        } finally {
+            setSaving(false);
+        }
     }
 
     const isToday = (d: number) =>
@@ -167,10 +209,16 @@ export default function TeacherCalendar() {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Calendar</h1>
-                    <p className="page-subtitle">Manage your schedule — {events.length} event{events.length !== 1 ? "s" : ""} scheduled</p>
+                    <p className="page-subtitle">Synced with TriLink - {events.length} event{events.length !== 1 ? "s" : ""} this month</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => openModal()} style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2.5} /> Add Event</button>
+                <button type="button" className="btn btn-primary" onClick={() => openModal()} style={{ display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} strokeWidth={2.5} /> Add Event</button>
             </div>
+
+            {calErr && (
+                <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)", fontSize: "0.9rem" }}>
+                    {calErr}
+                </div>
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "1.5rem", alignItems: "start" }}>
                 {/* ── Calendar card ── */}
@@ -283,11 +331,6 @@ export default function TeacherCalendar() {
                                             <span style={{ fontSize: "0.68rem", background: TYPE_CFG[ev.type].bg, color: TYPE_CFG[ev.type].color, borderRadius: 20, padding: "2px 8px", fontWeight: 700, flexShrink: 0 }}>
                                                 {TYPE_CFG[ev.type].label}
                                             </span>
-                                            <button
-                                                onClick={() => removeEvent(ev.id)}
-                                                title="Remove event"
-                                                style={{ background: "var(--danger-light)", color: "#991b1b", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}
-                                            ><Trash2 size={13} strokeWidth={2} /> Remove</button>
                                         </div>
                                     ))}
                                 </div>
@@ -320,11 +363,6 @@ export default function TeacherCalendar() {
                                             {isEvToday && <span style={{ fontSize: "0.62rem", background: "var(--primary-500)", color: "#fff", borderRadius: 20, padding: "1px 6px", fontWeight: 700, display: "inline-block", marginTop: 3 }}>TODAY</span>}
                                             {!isEvToday && diffDays === 1 && <span style={{ fontSize: "0.62rem", background: "var(--warning-light)", color: "#92400e", borderRadius: 20, padding: "1px 6px", fontWeight: 700, display: "inline-block", marginTop: 3 }}>TOMORROW</span>}
                                         </div>
-                                        <button
-                                            onClick={() => removeEvent(ev.id)}
-                                            title="Remove event"
-                                            style={{ color: "var(--gray-400)", padding: "4px 5px", borderRadius: 4, border: "1px solid var(--gray-200)", background: "#fff", cursor: "pointer", flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center" }}
-                                        ><X size={12} strokeWidth={2.5} /></button>
                                     </div>
                                 );
                             })}
@@ -410,8 +448,17 @@ export default function TeacherCalendar() {
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleAdd} disabled={!form.title.trim() || !form.date}>Add Event</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => void handleAdd()}
+                                disabled={!form.title.trim() || !form.date || saving || !academicYearId}
+                            >
+                                {saving ? "Saving…" : "Add Event"}
+                            </button>
                         </div>
                     </div>
                 </div>

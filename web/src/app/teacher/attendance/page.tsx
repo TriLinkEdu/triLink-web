@@ -1,68 +1,146 @@
-﻿"use client";
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useAttendanceStore } from "@/store/attendanceStore";
-import type { AttendanceStatus } from "@/store/attendanceStore";
+"use client";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import {
+    getActiveAcademicYear,
+    listMyClassOfferings,
+    listEnrollments,
+    listUsers,
+    listAttendanceSessions,
+    createAttendanceSession,
+    putSessionMarks,
+    getSessionMarks,
+    type ClassOffering,
+    type PublicUser,
+    type AttendanceSession,
+    type AttendanceMark,
+} from "@/lib/admin-api";
 
+type AttendanceStatus = "present" | "absent" | "excused";
 type ExcuseEntry = { note: string; saved: boolean };
 type DraftState = { attendance: Record<string, AttendanceStatus>; excuses: Record<string, ExcuseEntry> };
+type StudentRow = { id: string; name: string; email: string };
 
 const MAX_VISIBLE_TABS = 4;
 
-export default function TeacherAttendance() {
-    const { classes, studentsByClass, sessions, records, submitSession } = useAttendanceStore();
+function offeringLabel(o: ClassOffering) {
+    return o.displayName || o.name?.trim() || "Untitled Class";
+}
 
-    const myClasses = useMemo(() => classes.filter(c => c.teacher === "Mr. Solomon"), [classes]);
-    const [selectedClass, setSelectedClass] = useState(myClasses[0]?.name ?? "");
+export default function TeacherAttendance() {
+    // ── API state ──
+    const [offerings, setOfferings] = useState<ClassOffering[]>([]);
+    const [studentsByOffering, setStudentsByOffering] = useState<Record<string, StudentRow[]>>({});
+    const [sessionsByOffering, setSessionsByOffering] = useState<Record<string, AttendanceSession[]>>({});
+    const [marksBySession, setMarksBySession] = useState<Record<string, AttendanceMark[]>>({});
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [err, setErr] = useState<string | null>(null);
+
+    // ── UI state ──
+    const [selectedOfferingId, setSelectedOfferingId] = useState("");
     const [showMoreDropdown, setShowMoreDropdown] = useState(false);
     const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
     const [toast, setToast] = useState<string | null>(null);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const moreRef = useRef<HTMLDivElement>(null);
 
-    // keep selectedClass valid when myClasses changes
-    useEffect(() => {
-        if (myClasses.length > 0 && !myClasses.find(c => c.name === selectedClass)) {
-            setSelectedClass(myClasses[0].name);
-        }
-    }, [myClasses, selectedClass]);
-
     const today = useMemo(() => new Date().toISOString().split("T")[0], []);
-    const students = studentsByClass[selectedClass] ?? [];
+    const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-    const currentSession = useMemo(
-        () => sessions.find(s => s.className === selectedClass && s.date === today),
-        [sessions, selectedClass, today]
-    );
-    const isLocked = !!(currentSession?.locked && !currentSession.unlockGranted);
-    const isUnlockedForEdit = !!(currentSession?.locked && currentSession.unlockGranted);
+    // ── Load data ──
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        setErr(null);
+        try {
+            const year = await getActiveAcademicYear();
+            if (!year?.id) {
+                setErr("No active academic year. Ask an admin to activate one.");
+                setLoading(false);
+                return;
+            }
+            const mine = await listMyClassOfferings(year.id);
+            setOfferings(mine);
+            if (mine.length > 0 && !mine.find(o => o.id === selectedOfferingId)) {
+                setSelectedOfferingId(mine[0].id);
+            }
 
-    // Derive attendance from draft, else fall back to store records for today
+            // Load enrolled students for each offering
+            const allUsers = await listUsers("student");
+            const userMap = new Map(allUsers.map(u => [u.id, u]));
+            const studentsMap: Record<string, StudentRow[]> = {};
+            const sessionsMap: Record<string, AttendanceSession[]> = {};
+            const marksMap: Record<string, AttendanceMark[]> = {};
+
+            for (const o of mine) {
+                // Get enrolled students
+                const enrollments = await listEnrollments({ classOfferingId: o.id, academicYearId: year.id });
+                studentsMap[o.id] = enrollments.map(e => {
+                    const u = userMap.get(e.studentId);
+                    return {
+                        id: e.studentId,
+                        name: u ? `${u.firstName} ${u.lastName}` : e.studentId.slice(0, 8),
+                        email: u?.email ?? "",
+                    };
+                });
+
+                // Get attendance sessions
+                const sessions = await listAttendanceSessions(o.id);
+                sessionsMap[o.id] = sessions;
+
+                // For today's session, load marks
+                const todaySession = sessions.find(s => s.date === today);
+                if (todaySession) {
+                    const marks = await getSessionMarks(todaySession.id);
+                    marksMap[todaySession.id] = marks;
+                }
+            }
+
+            setStudentsByOffering(studentsMap);
+            setSessionsByOffering(sessionsMap);
+            setMarksBySession(marksMap);
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Failed to load data");
+        } finally {
+            setLoading(false);
+        }
+    }, [today, selectedOfferingId]);
+
+    useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Derived state ──
+    const students = studentsByOffering[selectedOfferingId] ?? [];
+    const sessions = sessionsByOffering[selectedOfferingId] ?? [];
+    const currentSession = useMemo(() => sessions.find(s => s.date === today), [sessions, today]);
+    const isLocked = !!currentSession; // already submitted today
+    const currentMarks = currentSession ? (marksBySession[currentSession.id] ?? []) : [];
+
+    // Derive attendance from draft, else from API marks for today, else default present
     const attendance = useMemo<Record<string, AttendanceStatus>>(() => {
-        if (drafts[selectedClass]) return drafts[selectedClass].attendance;
+        if (drafts[selectedOfferingId]) return drafts[selectedOfferingId].attendance;
         const base: Record<string, AttendanceStatus> = Object.fromEntries(
             students.map(s => [s.id, "present" as AttendanceStatus])
         );
-        records
-            .filter(r => r.className === selectedClass && r.date === today)
-            .forEach(r => {
-                if (r.studentId in base) {
-                    base[r.studentId] = (r.corrected && r.correctedStatus) ? r.correctedStatus : r.status;
-                }
-            });
+        for (const m of currentMarks) {
+            if (m.studentId in base) {
+                base[m.studentId] = m.status as AttendanceStatus;
+            }
+        }
         return base;
-    }, [drafts, selectedClass, records, students, today]);
+    }, [drafts, selectedOfferingId, students, currentMarks]);
 
     const excuseEntries = useMemo<Record<string, ExcuseEntry>>(() => {
-        if (drafts[selectedClass]) return drafts[selectedClass].excuses;
-        return Object.fromEntries(
-            records
-                .filter(r => r.className === selectedClass && r.date === today && r.excuseNote)
-                .map(r => [r.studentId, { note: r.excuseNote!, saved: true }])
-        );
-    }, [drafts, selectedClass, records, today]);
+        if (drafts[selectedOfferingId]) return drafts[selectedOfferingId].excuses;
+        const base: Record<string, ExcuseEntry> = {};
+        for (const m of currentMarks) {
+            if (m.status === "excused" && m.note) {
+                base[m.studentId] = { note: m.note, saved: true };
+            }
+        }
+        return base;
+    }, [drafts, selectedOfferingId, currentMarks]);
 
     const setDraft = (att: Record<string, AttendanceStatus>, exc: Record<string, ExcuseEntry>) =>
-        setDrafts(prev => ({ ...prev, [selectedClass]: { attendance: att, excuses: exc } }));
+        setDrafts(prev => ({ ...prev, [selectedOfferingId]: { attendance: att, excuses: exc } }));
 
     const togglePresent = (id: string) => {
         if (isLocked) return;
@@ -118,18 +196,33 @@ export default function TeacherAttendance() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-    const confirmSubmit = () => {
-        const entries = students.map(s => ({
-            studentId: s.id,
-            studentName: s.name,
-            status: attendance[s.id] ?? "present" as AttendanceStatus,
-            ...(excuseEntries[s.id]?.note.trim() ? { excuseNote: excuseEntries[s.id].note.trim() } : {}),
-        }));
-        // Clear draft before submitting so store becomes source of truth on next render
-        setDrafts(prev => { const n = { ...prev }; delete n[selectedClass]; return n; });
-        submitSession({ className: selectedClass, date: today, teacherName: "Mr. Solomon", entries });
-        showToast(isUnlockedForEdit ? "Attendance re-submitted and locked." : "Attendance submitted successfully!");
-        setShowSubmitConfirm(false);
+    const confirmSubmit = async () => {
+        setSubmitting(true);
+        try {
+            // Create session for today
+            const session = await createAttendanceSession({ classOfferingId: selectedOfferingId, date: today });
+            // Submit marks
+            const marks = students.map(s => {
+                const status = attendance[s.id] ?? "present";
+                let note: string | undefined = undefined;
+                if (status === "excused") {
+                    note = excuseEntries[s.id]?.note || undefined;
+                }
+                return { studentId: s.id, status, note };
+            });
+            await putSessionMarks(session.id, marks);
+            // Clear draft
+            setDrafts(prev => { const n = { ...prev }; delete n[selectedOfferingId]; return n; });
+            showToast("Attendance submitted successfully!");
+            setShowSubmitConfirm(false);
+            // Reload
+            await loadData();
+        } catch (e) {
+            showToast(e instanceof Error ? e.message : "Submit failed");
+        } finally {
+            setSubmitting(false);
+            setShowSubmitConfirm(false);
+        }
     };
 
     const handleSubmit = () => {
@@ -145,13 +238,56 @@ export default function TeacherAttendance() {
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const visibleClasses = myClasses.slice(0, MAX_VISIBLE_TABS);
-    const hiddenClasses = myClasses.slice(MAX_VISIBLE_TABS);
+    const visibleClasses = offerings.slice(0, MAX_VISIBLE_TABS);
+    const hiddenClasses = offerings.slice(MAX_VISIBLE_TABS);
 
-    const hasSessionToday = (className: string) =>
-        sessions.some(s => s.className === className && s.date === today && s.locked);
+    const hasSessionToday = (offeringId: string) =>
+        (sessionsByOffering[offeringId] ?? []).some(s => s.date === today);
 
-    const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    if (loading) {
+        return (
+            <div className="page-wrapper">
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Attendance</h1>
+                        <p className="page-subtitle">Loading…</p>
+                    </div>
+                </div>
+                <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--gray-400)" }}>Loading classes and students…</div>
+            </div>
+        );
+    }
+
+    if (err) {
+        return (
+            <div className="page-wrapper">
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Attendance</h1>
+                        <p className="page-subtitle">Error</p>
+                    </div>
+                </div>
+                <div className="card" style={{ color: "var(--danger)", padding: "2rem" }}>{err}</div>
+            </div>
+        );
+    }
+
+    if (offerings.length === 0) {
+        return (
+            <div className="page-wrapper">
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">Attendance</h1>
+                        <p className="page-subtitle">{todayStr}</p>
+                    </div>
+                </div>
+                <div className="card" style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--gray-400)" }}>
+                    <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No classes assigned</div>
+                    <div style={{ fontSize: "0.85rem" }}>Ask an admin to assign you to class offerings for this academic year.</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-wrapper">
@@ -175,13 +311,11 @@ export default function TeacherAttendance() {
                             </button>
                         </div>
                         <div className="modal-body" style={{ fontSize: "0.9rem", color: "var(--gray-700)", lineHeight: 1.7 }}>
-                            {isUnlockedForEdit
-                                ? `Re-submit attendance for ${selectedClass} on ${today}. This will lock the updated attendance record.`
-                                : `Submit attendance for ${selectedClass} on ${today}. After submission, this session will be locked.`}
+                            Submit attendance for {offeringLabel(offerings.find(o => o.id === selectedOfferingId)!)} on {today}. After submission, this session will be locked.
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowSubmitConfirm(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={confirmSubmit}>Confirm Submit</button>
+                            <button className="btn btn-secondary" onClick={() => setShowSubmitConfirm(false)} disabled={submitting}>Cancel</button>
+                            <button className="btn btn-primary" onClick={() => void confirmSubmit()} disabled={submitting}>{submitting ? "Submitting…" : "Confirm Submit"}</button>
                         </div>
                     </div>
                 </div>
@@ -207,7 +341,7 @@ export default function TeacherAttendance() {
                         </button>
                         <button className="btn btn-primary" onClick={handleSubmit} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
-                            {isUnlockedForEdit ? "Re-submit Attendance" : "Submit Attendance"}
+                            Submit Attendance
                         </button>
                     </div>
                 )}
@@ -224,36 +358,25 @@ export default function TeacherAttendance() {
                 </div>
             )}
 
-            {/* Admin-unlocked-for-edit banner */}
-            {isUnlockedForEdit && (
-                <div style={{ marginBottom: "1.25rem", padding: "0.875rem 1.25rem", borderRadius: 12, background: "var(--success-light)", border: "1.5px solid var(--success)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#065f46" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></svg>
-                    <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#065f46" }}>Edit Unlocked by Admin</div>
-                        <div style={{ fontSize: "0.8rem", color: "#064e3b", marginTop: 2 }}>You may now edit and re-submit this attendance.</div>
-                    </div>
-                </div>
-            )}
-
             {/* Class Tabs with overflow */}
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
                 {visibleClasses.map(c => (
                     <button
                         key={c.id}
-                        className={`btn ${selectedClass === c.name ? "btn-primary" : "btn-secondary"}`}
-                        onClick={() => setSelectedClass(c.name)}
+                        className={`btn ${selectedOfferingId === c.id ? "btn-primary" : "btn-secondary"}`}
+                        onClick={() => setSelectedOfferingId(c.id)}
                         style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}
                     >
-                        {c.name}
-                        {hasSessionToday(c.name) && (
-                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: selectedClass === c.name ? "rgba(255,255,255,0.85)" : "var(--success)", display: "inline-block", flexShrink: 0 }} />
+                        {offeringLabel(c)}
+                        {hasSessionToday(c.id) && (
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: selectedOfferingId === c.id ? "rgba(255,255,255,0.85)" : "var(--success)", display: "inline-block", flexShrink: 0 }} />
                         )}
                     </button>
                 ))}
                 {hiddenClasses.length > 0 && (
                     <div ref={moreRef} style={{ position: "relative" }}>
                         <button
-                            className={`btn ${hiddenClasses.some(c => c.name === selectedClass) ? "btn-primary" : "btn-secondary"}`}
+                            className={`btn ${hiddenClasses.some(c => c.id === selectedOfferingId) ? "btn-primary" : "btn-secondary"}`}
                             onClick={() => setShowMoreDropdown(v => !v)}
                             style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
                         >
@@ -265,11 +388,11 @@ export default function TeacherAttendance() {
                                 {hiddenClasses.map(c => (
                                     <button
                                         key={c.id}
-                                        onClick={() => { setSelectedClass(c.name); setShowMoreDropdown(false); }}
-                                        style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "none", background: selectedClass === c.name ? "var(--primary-50)" : "transparent", color: selectedClass === c.name ? "var(--primary-600)" : "var(--gray-700)", fontWeight: selectedClass === c.name ? 700 : 500, fontSize: "0.875rem", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                                        onClick={() => { setSelectedOfferingId(c.id); setShowMoreDropdown(false); }}
+                                        style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "none", background: selectedOfferingId === c.id ? "var(--primary-50)" : "transparent", color: selectedOfferingId === c.id ? "var(--primary-600)" : "var(--gray-700)", fontWeight: selectedOfferingId === c.id ? 700 : 500, fontSize: "0.875rem", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.5rem" }}
                                     >
-                                        {c.name}
-                                        {hasSessionToday(c.name) && (
+                                        {offeringLabel(c)}
+                                        {hasSessionToday(c.id) && (
                                             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", display: "inline-block", marginLeft: "auto" }} />
                                         )}
                                     </button>
@@ -284,8 +407,8 @@ export default function TeacherAttendance() {
             {students.length === 0 && (
                 <div className="card" style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--gray-400)" }}>
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 1rem", display: "block" }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                    <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No students assigned</div>
-                    <div style={{ fontSize: "0.85rem" }}>Students will appear here once assigned to this class by the admin.</div>
+                    <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No students enrolled</div>
+                    <div style={{ fontSize: "0.85rem" }}>Students will appear here once enrolled in this class by the admin.</div>
                 </div>
             )}
 
@@ -324,10 +447,10 @@ export default function TeacherAttendance() {
                         <div className="card-header">
                             <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
-                                {selectedClass} — {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                                {offeringLabel(offerings.find(o => o.id === selectedOfferingId)!)} - {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                             </h3>
                             <div style={{ fontSize: "0.8rem", color: isLocked ? "var(--warning)" : "var(--gray-500)" }}>
-                                {isLocked ? "Read-only — submitted" : "Click the checkbox to toggle present/absent"}
+                                {isLocked ? "Read-only - submitted" : "Click the checkbox to toggle present/absent"}
                             </div>
                         </div>
                         <div className="table-wrapper">
@@ -336,7 +459,7 @@ export default function TeacherAttendance() {
                                     <tr>
                                         <th style={{ width: 48 }}>#</th>
                                         <th>Student</th>
-                                        <th style={{ width: 90 }}>ID</th>
+                                        <th style={{ width: 140 }}>Email</th>
                                         {!isLocked && <th style={{ width: 70, textAlign: "center" }}>Present</th>}
                                         <th style={{ width: 130 }}>Status</th>
                                         <th>Excuse Note</th>
@@ -360,7 +483,14 @@ export default function TeacherAttendance() {
                                                         <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>{s.name}</span>
                                                     </div>
                                                 </td>
-                                                <td style={{ color: "var(--gray-500)", fontSize: "0.8rem" }}>{s.id}</td>
+                                                <td style={{ color: "var(--gray-500)", fontSize: "0.8rem" }}>
+                                                    {s.email}
+                                                    {isLocked && isExcused && currentMarks.find(m => m.studentId === s.id)?.note && (
+                                                        <div style={{ marginTop: "0.25rem", color: "#b45309", fontSize: "0.75rem", fontWeight: 500 }}>
+                                                            Note: {currentMarks.find(m => m.studentId === s.id)?.note}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 {!isLocked && (
                                                     <td style={{ textAlign: "center" }}>
                                                         <button
@@ -394,9 +524,9 @@ export default function TeacherAttendance() {
                                                         <div>
                                                             {(isLocked || excuse?.saved) ? (
                                                                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                                                    <span style={{ fontSize: "0.8rem", color: "#5b21b6", fontStyle: "italic" }}>{excuse?.note || "—"}</span>
+                                                                    <span style={{ fontSize: "0.8rem", color: "#5b21b6", fontStyle: "italic" }}>{excuse?.note || ""}</span>
                                                                     {!isLocked && (
-                                                                        <button onClick={() => setDrafts(prev => ({ ...prev, [selectedClass]: { attendance: prev[selectedClass]?.attendance ?? attendance, excuses: { ...prev[selectedClass]?.excuses ?? excuseEntries, [s.id]: { ...excuse, saved: false } } } }))}
+                                                                        <button onClick={() => setDrafts(prev => ({ ...prev, [selectedOfferingId]: { attendance: prev[selectedOfferingId]?.attendance ?? attendance, excuses: { ...prev[selectedOfferingId]?.excuses ?? excuseEntries, [s.id]: { ...excuse!, saved: false } } } }))}
                                                                             style={{ padding: "0.15rem 0.4rem", borderRadius: 5, border: "1px solid var(--gray-200)", background: "#fff", fontSize: "0.68rem", color: "var(--gray-500)", cursor: "pointer" }}>Edit</button>
                                                                     )}
                                                                 </div>
