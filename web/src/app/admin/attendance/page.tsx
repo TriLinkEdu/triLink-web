@@ -1,259 +1,376 @@
 "use client";
-import { useState, useMemo } from "react";
-import { useAttendanceStore } from "@/store/attendanceStore";
-import type { AttendanceStatus } from "@/store/attendanceStore";
+
+import { useCallback, useEffect, useState } from "react";
+import { CalendarCheck2, CalendarDays, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
+import {
+  type AttendanceMark,
+  type AttendanceSession,
+  type AcademicYear,
+  type ClassOffering,
+  type Enrollment,
+  type PublicUser,
+  classAttendanceReport,
+  createAttendanceSession,
+  getSessionMarks,
+  listAttendanceSessions,
+  listAcademicYears,
+  listClassOfferings,
+  listEnrollments,
+  listUsers,
+  putSessionMarks,
+} from "@/lib/admin-api";
+
+const STATUSES = ["present", "absent", "excused"];
+
+function AttendanceSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="attendance-hero admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 500 }}>
+          <div className="admin-skeleton shimmer" style={{ width: 150, height: 12, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "82%", height: 34, marginBottom: 10 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "65%", height: 14 }} />
+        </div>
+      </div>
+      <div className="attendance-summary-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div className="card attendance-summary-card admin-dash-skeleton-block" key={i}>
+            <div className="admin-skeleton shimmer" style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 10 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12, marginBottom: 8 }} />
+            <div className="admin-skeleton shimmer" style={{ width: "35%", height: 22 }} />
+          </div>
+        ))}
+      </div>
+      <div className="card admin-dash-skeleton-block">
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 270, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminAttendance() {
-    const { sessions, records, unlockSession, correctRecord, revertRecord } = useAttendanceStore();
+  const [years, setYears] = useState<AcademicYear[]>([]);
+  const [yearId, setYearId] = useState("");
+  const [offerings, setOfferings] = useState<ClassOffering[]>([]);
+  const [classId, setClassId] = useState("");
+  const [sessions, setSessions] = useState<AttendanceSession[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [marks, setMarks] = useState<AttendanceMark[]>([]);
+  const [enrolled, setEnrolled] = useState<Enrollment[]>([]);
+  const [students, setStudents] = useState<PublicUser[]>([]);
+  const [report, setReport] = useState<Awaited<ReturnType<typeof classAttendanceReport>> | null>(null);
+  const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    const [search, setSearch] = useState("");
-    const [dateFilter, setDateFilter] = useState("");
-    const [classFilter, setClassFilter] = useState("");
+  const studentMap = new Map(students.map((s) => [s.id, s]));
 
-    // Correction modal state
-    const [correcting, setCorrecting] = useState<null | { recordId: string; studentName: string; className: string; current: AttendanceStatus }>(null);
-    const [newStatus, setNewStatus] = useState<AttendanceStatus>("present");
-    const [reason, setReason] = useState("");
+  const loadOfferings = useCallback(async (y: string) => {
+    if (!y) {
+      setOfferings([]);
+      return;
+    }
+    setOfferings(await listClassOfferings(y));
+  }, []);
 
-    const lockedSessions = useMemo(() =>
-        [...sessions]
-            .filter(s => s.locked)
-            .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
-        [sessions]
-    );
+  const loadClassData = useCallback(async (cid: string) => {
+    const [sess, enr, rep] = await Promise.all([
+      listAttendanceSessions(cid),
+      listEnrollments({ classOfferingId: cid }),
+      classAttendanceReport(cid),
+    ]);
+    setSessions(sess);
+    setEnrolled(enr);
+    setReport(rep);
+    const first = sess[0]?.id ?? "";
+    setSessionId(first);
+    if (first) setMarks(await getSessionMarks(first));
+    else setMarks([]);
+  }, []);
 
-    const filteredRecords = useMemo(() => {
-        let r = records;
-        if (search) r = r.filter(x => x.studentName.toLowerCase().includes(search.toLowerCase()) || x.studentId.toLowerCase().includes(search.toLowerCase()));
-        if (dateFilter) r = r.filter(x => x.date === dateFilter);
-        if (classFilter) r = r.filter(x => x.className === classFilter);
-        return r;
-    }, [records, search, dateFilter, classFilter]);
-
-    const uniqueClasses = useMemo(() => [...new Set(records.map(r => r.className))].sort(), [records]);
-
-    const openCorrect = (recordId: string, studentName: string, className: string, current: AttendanceStatus) => {
-        setCorrecting({ recordId, studentName, className, current });
-        setNewStatus(current);
-        setReason("");
+  useEffect(() => {
+    let c = false;
+    (async () => {
+      try {
+        const ylist = await listAcademicYears();
+        if (c) return;
+        setYears(ylist);
+        const active = ylist.find((x) => x.isActive && !x.isArchived);
+        const y = active?.id ?? ylist[0]?.id ?? "";
+        setYearId(y);
+        if (y) await loadOfferings(y);
+        setStudents(await listUsers("student"));
+      } catch (e) {
+        if (!c) setErr(e instanceof Error ? e.message : "Init failed");
+      } finally {
+        if (!c) setLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
     };
+  }, [loadOfferings]);
 
-    const submitCorrection = () => {
-        if (!correcting || !reason.trim()) return;
-        correctRecord(correcting.recordId, newStatus, reason.trim());
-        setCorrecting(null);
+  useEffect(() => {
+    if (!classId) {
+      setSessions([]);
+      setSessionId("");
+      setMarks([]);
+      setEnrolled([]);
+      setReport(null);
+      return;
+    }
+    let c = false;
+    (async () => {
+      try {
+        const [sess, enr, rep] = await Promise.all([
+          listAttendanceSessions(classId),
+          listEnrollments({ classOfferingId: classId }),
+          classAttendanceReport(classId),
+        ]);
+        if (c) return;
+        setSessions(sess);
+        setEnrolled(enr);
+        setReport(rep);
+        const first = sess[0]?.id ?? "";
+        setSessionId(first);
+        if (first) setMarks(await getSessionMarks(first));
+        else setMarks([]);
+      } catch (e) {
+        if (!c) setErr(e instanceof Error ? e.message : "Load class failed");
+      }
+    })();
+    return () => {
+      c = true;
     };
+  }, [classId]);
 
-    const statusBadge = (status: AttendanceStatus, corrected?: boolean) => {
-        const cls = status === "present" ? "badge-success" : status === "excused" ? "badge-warning" : "badge-danger";
-        return (
-            <span className={`badge ${cls}`} style={{ fontSize: "0.7rem" }}>
-                {corrected && <span style={{ marginRight: 3 }}>✏️</span>}
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-            </span>
-        );
+  useEffect(() => {
+    if (!sessionId) {
+      setMarks([]);
+      return;
+    }
+    let c = false;
+    (async () => {
+      try {
+        const m = await getSessionMarks(sessionId);
+        if (!c) setMarks(m);
+      } catch (e) {
+        if (!c) setErr(e instanceof Error ? e.message : "Marks failed");
+      }
+    })();
+    return () => {
+      c = true;
     };
+  }, [sessionId]);
 
-    return (
-        <div className="page-wrapper">
-            {/* Correction modal */}
-            {correcting && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ background: "#fff", borderRadius: 16, padding: "2rem", width: 420, maxWidth: "90vw", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-                        <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.25rem" }}>Correct Attendance</h3>
-                        <p style={{ fontSize: "0.8rem", color: "var(--gray-500)", marginBottom: "1.25rem" }}>
-                            {correcting.studentName} · {correcting.className}
-                        </p>
+  const createSession = async () => {
+    if (!classId || !newDate) return;
+    try {
+      await createAttendanceSession({ classOfferingId: classId, date: newDate });
+      await loadClassData(classId);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Create session failed");
+    }
+  };
 
-                        <div style={{ marginBottom: "1rem" }}>
-                            <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.4rem" }}>New Status</label>
-                            <div style={{ display: "flex", gap: "0.5rem" }}>
-                                {(["present", "absent", "excused"] as AttendanceStatus[]).map(s => (
-                                    <button key={s} onClick={() => setNewStatus(s)}
-                                        style={{ flex: 1, padding: "0.5rem", borderRadius: 8, border: `2px solid ${newStatus === s ? (s === "present" ? "var(--success)" : s === "excused" ? "var(--warning)" : "var(--danger)") : "var(--gray-200)"}`, background: newStatus === s ? (s === "present" ? "var(--success-light)" : s === "excused" ? "var(--warning-light)" : "var(--danger-light)") : "#fff", fontWeight: 600, fontSize: "0.8rem", cursor: "pointer", color: newStatus === s ? (s === "present" ? "#065f46" : s === "excused" ? "#92400e" : "#991b1b") : "var(--gray-600)" }}>
-                                        {s.charAt(0).toUpperCase() + s.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+  const markForStudent = (studentId: string) => marks.find((m) => m.studentId === studentId)?.status ?? "";
 
-                        <div style={{ marginBottom: "1.25rem" }}>
-                            <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.4rem" }}>Reason *</label>
-                            <textarea
-                                value={reason}
-                                onChange={e => setReason(e.target.value)}
-                                rows={3}
-                                placeholder="Provide a reason for the correction…"
-                                style={{ width: "100%", padding: "0.65rem 0.9rem", borderRadius: 10, border: "1.5px solid var(--gray-200)", fontSize: "0.875rem", resize: "vertical", outline: "none", boxSizing: "border-box" }}
-                                onFocus={e => e.target.style.borderColor = "var(--primary-400)"}
-                                onBlur={e => e.target.style.borderColor = "var(--gray-200)"}
-                            />
-                        </div>
+  const saveMarks = async () => {
+    if (!sessionId || !enrolled.length) return;
+    const payload = enrolled.map((e) => ({
+      studentId: e.studentId,
+      status: markForStudent(e.studentId) || "absent",
+    }));
+    try {
+      await putSessionMarks(sessionId, payload);
+      setMarks(await getSessionMarks(sessionId));
+      if (classId) setReport(await classAttendanceReport(classId));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Save marks failed");
+    }
+  };
 
-                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                            <button className="btn btn-secondary" onClick={() => setCorrecting(null)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={submitCorrection} disabled={!reason.trim()}>Save Correction</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+  const updateLocalMark = (studentId: string, status: string) => {
+    setMarks((prev) => {
+      const other = prev.filter((m) => m.studentId !== studentId);
+      return [...other, { id: "local", sessionId, studentId, status } as AttendanceMark];
+    });
+  };
 
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Attendance Management</h1>
-                    <p className="page-subtitle">Review submitted sessions and correct records</p>
-                </div>
-            </div>
+  const activeYearLabel = years.find((y) => y.id === yearId)?.label ?? "None";
+  const presentCount = marks.filter((m) => m.status === "present").length;
+  const totalCount = enrolled.length;
+  const presentRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
-            {/* Submitted Sessions Panel */}
-            <div className="card" style={{ marginBottom: "1.5rem" }}>
-                <div className="card-header">
-                    <h3 className="card-title">Submitted Sessions</h3>
-                    <span className="badge badge-primary">{lockedSessions.length} sessions</span>
-                </div>
-                {lockedSessions.length === 0 ? (
-                    <p style={{ color: "var(--gray-400)", fontSize: "0.875rem", padding: "1rem 0" }}>No submitted sessions yet.</p>
-                ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {lockedSessions.map(s => {
-                            const sessionRecords = records.filter(r => r.sessionId === s.id);
-                            const presentCount = sessionRecords.filter(r => (r.corrected ? r.correctedStatus : r.status) === "present").length;
-                            const absentCount = sessionRecords.filter(r => (r.corrected ? r.correctedStatus : r.status) === "absent").length;
-                            const excusedCount = sessionRecords.filter(r => (r.corrected ? r.correctedStatus : r.status) === "excused").length;
+  if (loading && years.length === 0) {
+    return <AttendanceSkeleton />;
+  }
 
-                            return (
-                                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.875rem 1rem", background: "var(--gray-50)", borderRadius: 10, gap: "1rem", flexWrap: "wrap" }}>
-                                    <div style={{ flex: 1, minWidth: 200 }}>
-                                        <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>{s.className}</div>
-                                        <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", marginTop: 2 }}>
-                                            {s.teacherName} · {s.date} · Submitted {new Date(s.submittedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                                        </div>
-                                    </div>
-                                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                                        <span className="badge badge-success" style={{ fontSize: "0.7rem" }}>{presentCount} Present</span>
-                                        <span className="badge badge-danger" style={{ fontSize: "0.7rem" }}>{absentCount} Absent</span>
-                                        {excusedCount > 0 && <span className="badge badge-warning" style={{ fontSize: "0.7rem" }}>{excusedCount} Excused</span>}
-                                    </div>
-                                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                                        {s.unlockGranted ? (
-                                            <span className="badge badge-success" style={{ fontSize: "0.7rem" }}>✓ Edit Unlocked</span>
-                                        ) : (
-                                            <button className="btn btn-secondary" style={{ fontSize: "0.78rem", padding: "0.35rem 0.85rem", display: "flex", alignItems: "center", gap: "0.35rem" }}
-                                                onClick={() => unlockSession(s.id)}>
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></svg>
-                                                Unlock Edit
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Records Table */}
-            <div className="card">
-                <div className="card-header">
-                    <h3 className="card-title">Attendance Records</h3>
-                    <span className="badge badge-primary">{filteredRecords.length} records</span>
-                </div>
-
-                {/* Filters */}
-                <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                    <input
-                        type="text"
-                        placeholder="Search student…"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        style={{ flex: 1, minWidth: 160, padding: "0.5rem 0.85rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", fontSize: "0.875rem", outline: "none" }}
-                        onFocus={e => e.target.style.borderColor = "var(--primary-400)"}
-                        onBlur={e => e.target.style.borderColor = "var(--gray-200)"}
-                    />
-                    <input
-                        type="date"
-                        value={dateFilter}
-                        onChange={e => setDateFilter(e.target.value)}
-                        style={{ padding: "0.5rem 0.85rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", fontSize: "0.875rem", outline: "none" }}
-                        onFocus={e => e.target.style.borderColor = "var(--primary-400)"}
-                        onBlur={e => e.target.style.borderColor = "var(--gray-200)"}
-                    />
-                    <select
-                        value={classFilter}
-                        onChange={e => setClassFilter(e.target.value)}
-                        style={{ padding: "0.5rem 0.85rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", fontSize: "0.875rem", outline: "none", background: "#fff" }}
-                    >
-                        <option value="">All Classes</option>
-                        {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    {(search || dateFilter || classFilter) && (
-                        <button className="btn btn-secondary" onClick={() => { setSearch(""); setDateFilter(""); setClassFilter(""); }} style={{ fontSize: "0.8rem" }}>
-                            Clear
-                        </button>
-                    )}
-                </div>
-
-                <div className="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Student</th>
-                                <th>ID</th>
-                                <th>Class</th>
-                                <th>Date</th>
-                                <th>Teacher</th>
-                                <th>Status</th>
-                                <th>Note</th>
-                                <th style={{ textAlign: "center" }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredRecords.length === 0 ? (
-                                <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--gray-400)", padding: "2rem" }}>No records found</td></tr>
-                            ) : filteredRecords.map(r => (
-                                <tr key={r.id}>
-                                    <td style={{ fontWeight: 600, fontSize: "0.875rem" }}>{r.studentName}</td>
-                                    <td style={{ color: "var(--gray-500)", fontSize: "0.8rem" }}>{r.studentId}</td>
-                                    <td style={{ fontSize: "0.8rem" }}>{r.className}</td>
-                                    <td style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>{r.date}</td>
-                                    <td style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>{r.teacherName}</td>
-                                    <td>
-                                        {statusBadge(r.corrected && r.correctedStatus ? r.correctedStatus : r.status, r.corrected)}
-                                    </td>
-                                    <td style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontStyle: r.excuseNote ? "italic" : "normal" }}>
-                                        {r.excuseNote ?? "—"}
-                                        {r.corrected && r.correctionReason && (
-                                            <span style={{ display: "block", color: "var(--primary-500)", fontStyle: "normal" }} title={r.correctionReason}>
-                                                ✏️ {r.correctionReason.length > 25 ? r.correctionReason.slice(0, 25) + "…" : r.correctionReason}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <div style={{ display: "flex", gap: "0.35rem", justifyContent: "center" }}>
-                                            <button
-                                                className="btn btn-secondary"
-                                                style={{ fontSize: "0.72rem", padding: "0.25rem 0.6rem" }}
-                                                onClick={() => openCorrect(r.id, r.studentName, r.className, r.corrected && r.correctedStatus ? r.correctedStatus : r.status)}
-                                            >
-                                                Correct
-                                            </button>
-                                            {r.corrected && (
-                                                <button
-                                                    className="btn btn-secondary"
-                                                    style={{ fontSize: "0.72rem", padding: "0.25rem 0.6rem", color: "var(--danger)" }}
-                                                    onClick={() => revertRecord(r.id)}
-                                                >
-                                                    Revert
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+  return (
+    <div className="page-wrapper">
+      <div className="attendance-hero">
+        <div>
+          <p className="attendance-kicker">
+            <Sparkles size={14} />
+            Daily Tracking
+          </p>
+          <h1 className="attendance-title">Attendance</h1>
+          <p className="attendance-subtitle">Take attendance by class and date with fast status updates</p>
         </div>
-    );
+      </div>
+      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
+
+      <div className="attendance-summary-grid">
+        <div className="card attendance-summary-card">
+          <div className="attendance-summary-icon blue">
+            <CalendarDays size={18} />
+          </div>
+          <div className="attendance-summary-label">Academic year</div>
+          <div className="attendance-summary-value attendance-summary-small">{activeYearLabel}</div>
+          <div className="attendance-summary-note">Selected scope</div>
+        </div>
+        <div className="card attendance-summary-card">
+          <div className="attendance-summary-icon teal">
+            <ClipboardCheck size={18} />
+          </div>
+          <div className="attendance-summary-label">Sessions</div>
+          <div className="attendance-summary-value">{sessions.length}</div>
+          <div className="attendance-summary-note">For selected class</div>
+        </div>
+        <div className="card attendance-summary-card">
+          <div className="attendance-summary-icon orange">
+            <Users size={18} />
+          </div>
+          <div className="attendance-summary-label">Enrolled students</div>
+          <div className="attendance-summary-value">{enrolled.length}</div>
+          <div className="attendance-summary-note">Class roster size</div>
+        </div>
+        <div className="card attendance-summary-card">
+          <div className="attendance-summary-icon purple">
+            <CalendarCheck2 size={18} />
+          </div>
+          <div className="attendance-summary-label">Present rate</div>
+          <div className="attendance-summary-value">{presentRate}%</div>
+          <div className="attendance-summary-note">Current session snapshot</div>
+        </div>
+      </div>
+
+      <div className="card attendance-panel" style={{ marginBottom: "1rem", display: "grid", gap: "0.75rem", maxWidth: 520 }}>
+        <label>
+          Academic year
+          <select
+            value={yearId}
+            onChange={(e) => {
+              const v = e.target.value;
+              setYearId(v);
+              loadOfferings(v);
+              setClassId("");
+            }}
+            style={{ display: "block", marginTop: 4, padding: "0.5rem", width: "100%" }}
+          >
+            {years.length === 0 && <option value="">No years</option>}
+            {years.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.label}
+                {y.isActive ? " ★" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Class offering
+          <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ display: "block", marginTop: 4, padding: "0.5rem", width: "100%" }}>
+            <option value="">Select…</option>
+            {offerings.map((o) => {
+              const title =
+                o.displayName?.trim() ||
+                o.name?.trim() ||
+                [o.gradeName, o.sectionName].filter(Boolean).join(" ") ||
+                "Class";
+              return (
+                <option key={o.id} value={o.id}>
+                  {title}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      </div>
+
+      {report && (
+        <div className="card attendance-panel" style={{ marginBottom: "1rem" }}>
+          <div className="attendance-panel-head">
+            <h3 className="card-title attendance-section-title">Class report</h3>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => classId && loadClassData(classId)}>
+              <RefreshCcw size={13} />
+              Refresh
+            </button>
+          </div>
+          <p style={{ fontSize: "0.85rem", color: "var(--gray-600)" }}>{report.sessions.length} session(s)</p>
+        </div>
+      )}
+
+      {classId && (
+        <div className="card attendance-panel">
+          <h3 className="card-title attendance-section-title" style={{ marginBottom: "0.75rem" }}>
+            Sessions & marks
+          </h3>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
+            <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+            <button type="button" className="btn btn-primary" onClick={createSession}>
+              Create session
+            </button>
+          </div>
+          <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={{ padding: "0.5rem", minWidth: 280, marginBottom: "1rem" }}>
+            {sessions.length === 0 && <option value="">No sessions</option>}
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.date}
+              </option>
+            ))}
+          </select>
+
+          {sessionId && enrolled.length > 0 && (
+            <>
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrolled.map((e) => {
+                      const st = studentMap.get(e.studentId);
+                      const cur = markForStudent(e.studentId) || "absent";
+                      return (
+                        <tr key={e.studentId}>
+                          <td>{st ? `${st.firstName} ${st.lastName}` : e.studentId}</td>
+                          <td>
+                            <select value={cur} onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)} style={{ padding: "0.35rem" }}>
+                              {STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={saveMarks}>
+                Save marks
+              </button>
+            </>
+          )}
+          {sessionId && enrolled.length === 0 && <p style={{ color: "var(--gray-500)" }}>No enrollments in this class — add students from the class detail page.</p>}
+        </div>
+      )}
+    </div>
+  );
 }
