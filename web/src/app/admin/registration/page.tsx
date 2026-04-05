@@ -196,7 +196,7 @@ export default function AdminRegistration() {
         setEmailStatus("idle");
 
         if (!validateForm()) {
-            setErrorMessage("Please fix the errors above");
+            setErrorMessage("Please check the form for missing or invalid fields (e.g. Phone, Subject, etc.)");
             return;
         }
 
