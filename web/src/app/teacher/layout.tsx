@@ -12,19 +12,26 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     const pathname = usePathname();
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [isClient, setIsClient] = useState(false);
     const user = useCurrentUser("teacher");
     const { total, readIds } = useNotificationStore();
     const notifUnread = Math.max(0, total - readIds.length);
+    
     useEffect(() => {
+        setIsClient(true);
+    }, []);
+    
+    useEffect(() => {
+        if (!isClient) return;
         if (pathname === "/teacher/login") {
             setIsAuthorized(true);
             return;
         }
 
         const token = getAccessToken();
-        const user = getStoredUser();
+        const userStored = getStoredUser();
 
-        if (!token || !user || user.role !== "teacher") {
+        if (!token || !userStored || userStored.role !== "teacher") {
             clearAuth();
             setIsAuthorized(false);
             router.replace("/teacher/login");
@@ -32,7 +39,19 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         }
 
         setIsAuthorized(true);
-    }, [pathname, router]);
+    }, [pathname, router, isClient]);
+
+    if (!isClient) {
+        return (
+            <div className="admin-shell-loading">
+                <main className="admin-shell-loading-main" style={{ marginLeft: 0 }}>
+                    <div className="admin-shell-loading-content">
+                        <div className="admin-shell-loading-hero admin-loading-shimmer" />
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     if (pathname === "/teacher/login") return <>{children}</>;
     if (!isAuthorized) return null;
@@ -83,7 +102,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                 <Header
                     userId={user.id}
                     userName={user.fullName || "Teacher"}
-                    userRole={user.subject ? `${user.subject} Teacher` : "Teacher"}
+                    userRole={(user.subject && user.section) ? `${user.subject} Teacher · ${user.section}` : user.subject ? `${user.subject} Teacher` : "Teacher"}
                     userInitials={user.initials}
                     userProfileHref="/teacher/profile"
                     userProfileImageFileId={user.profileImageFileId}

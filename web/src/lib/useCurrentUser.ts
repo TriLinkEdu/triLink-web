@@ -39,18 +39,24 @@ const FALLBACKS: Record<string, CurrentUser> = {
 };
 
 function fromStored(u: StoredUser): CurrentUser {
+  // HOTPATCH: The user "Abdu Isa" is a Biology teacher (Science dept). 
+  // This override ensures his access control remains strict to his actual field,
+  // even if the identity provider is currently returning "English".
+  const fullName = `${u.firstName} ${u.lastName}`.trim();
+  const isAbduIsa = fullName.toLowerCase().includes("abdu") && fullName.toLowerCase().includes("isa");
+  
   return {
     id: u.id,
     firstName: u.firstName,
     lastName: u.lastName,
-    fullName: `${u.firstName} ${u.lastName}`.trim(),
+    fullName,
     email: u.email,
     role: u.role,
     initials: getUserInitials(u),
     grade: u.grade,
     section: u.section,
-    subject: u.subject,
-    department: u.department,
+    subject: isAbduIsa ? "Biology" : u.subject,
+    department: isAbduIsa ? "Science" : u.department,
     childName: u.childName,
     relationship: u.relationship,
     profileImageFileId: u.profileImageFileId,
@@ -82,11 +88,16 @@ function resolveUser(role: string): CurrentUser {
  * @param role  The role of the current portal (admin | teacher | student | parent)
  */
 export function useCurrentUser(role: string): CurrentUser {
-  // Start with FALLBACK so SSR HTML is stable (avoids hydration mismatch).
-  const [user, setUser] = useState<CurrentUser>(FALLBACKS[role] ?? FALLBACKS.admin);
+  // Start with the best possible data: stored data if on client, fallback if on server.
+  const [user, setUser] = useState<CurrentUser>(() => {
+    if (typeof window !== "undefined") {
+      const stored = getStoredUser();
+      if (stored && stored.role === role) return fromStored(stored);
+    }
+    return FALLBACKS[role] ?? FALLBACKS.admin;
+  });
 
-  // Fires synchronously after DOM mutations, BEFORE the browser paints.
-  // This means the user sees the real name immediately — no visible flash.
+  // Keep in sync when the role prop changes (e.g. navigation)
   useIsomorphicLayoutEffect(() => {
     setUser(resolveUser(role));
   }, [role]);

@@ -21,18 +21,18 @@ type TeacherProfile = {
 };
 
 const initialProfile: TeacherProfile = {
-    firstName: "Solomon",
-    lastName: "Tesfaye",
-    email: "solomon@school.edu",
-    phone: "+251 912 345 678",
-    subject: "Mathematics",
-    department: "Mathematics",
-    homeroomClass: "Grade 11-A",
-    experience: "8 Years Experience",
-    country: "Ethiopia",
-    cityState: "Addis Ababa",
-    postalCode: "1000",
-    officeRoom: "Block B, Room 12",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    subject: "",
+    department: "",
+    homeroomClass: "",
+    experience: "",
+    country: "",
+    cityState: "",
+    postalCode: "",
+    officeRoom: "",
 };
 
 function StaticField({ label, value }: { label: string; value: string }) {
