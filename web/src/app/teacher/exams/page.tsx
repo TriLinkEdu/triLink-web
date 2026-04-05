@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import {
@@ -10,6 +10,7 @@ import {
     publishExam as apiPublishExam,
     createQuestion as apiCreateQuestion,
     addQuestionsToExam,
+    updateExamMaxPoints,
     listQuestions,
     listExamAttempts,
     gradeAttempt as apiGradeAttempt,
@@ -26,6 +27,8 @@ import autoTable from "jspdf-autotable";
 import { createPortal } from "react-dom";
 import ExamMonitor from "@/components/ExamMonitor";
 import Select from "@/components/Select";
+import { refreshStoredProfile } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 
 /* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
@@ -58,6 +61,61 @@ function preprocess(tex: string): string {
 }
 
 /* ─── Render LaTeX ─── */
+function offeringLabel(o: ClassOffering) {
+    const subj = o.subjectName || (o as any).subject?.name || "";
+    const sec = o.sectionName || (o as any).section?.name || "";
+    if (subj && sec) return `${subj} - ${sec}`;
+    return o.displayName || o.name?.trim() || "Untitled Class";
+}
+
+function normSub(s: string) {
+    return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+import { filterOfferingsBySubject, subjectNameMatchesProfile } from "@/lib/teacher-utils";
+
+type QuestionListRow = { subjectId: string; subject?: { name?: string } };
+
+function allowedBankSubjectIds(offerings: ClassOffering[], profileSubject: string | undefined | null) {
+    const scoped = filterOfferingsBySubject(offerings, profileSubject);
+    return new Set(scoped.map((o) => o.subjectId).filter(Boolean));
+}
+
+function questionInTeacherSubjectBank(
+    q: QuestionListRow,
+    allowedSubjectIds: Set<string>,
+    profileSubject: string | undefined | null,
+) {
+    if (allowedSubjectIds.size > 0 && allowedSubjectIds.has(q.subjectId)) return true;
+    const qName = q.subject?.name ?? "";
+    if (profileSubject?.trim() && subjectNameMatchesProfile(qName, profileSubject)) return true;
+    return false;
+}
+
+function TeacherExamsSkeleton() {
+    return (
+        <div className="page-wrapper">
+            <div className="page-header admin-dash-skeleton-block">
+                <div style={{ width: "100%", maxWidth: 380 }}>
+                    <div className="admin-skeleton shimmer" style={{ width: 200, height: 12, marginBottom: 12 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "72%", height: 26, marginBottom: 8 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "58%", height: 12 }} />
+                </div>
+            </div>
+            <div className="admin-skeleton shimmer" style={{ width: 300, height: 38, borderRadius: 8, marginBottom: "1.25rem" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: "1.25rem", alignItems: "start" }}>
+                <div className="card admin-dash-skeleton-block" style={{ padding: "1.25rem" }}>
+                    <div className="admin-skeleton shimmer" style={{ width: 100, height: 14, marginBottom: 14 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "100%", height: 140, borderRadius: 12 }} />
+                </div>
+                <div className="card admin-dash-skeleton-block" style={{ padding: "1.25rem" }}>
+                    <div className="admin-skeleton shimmer" style={{ width: "100%", height: 220, borderRadius: 12 }} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function renderLatex(raw: string): string {
     if (!raw) return "";
     let out = raw.replace(/\$\$([\s\S]+?)\$\$/g, (_m, tex) => {
@@ -598,11 +656,29 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
 
 export default function TeacherExams() {
     const [isClient, setIsClient] = useState(false);
+    const user = useCurrentUser("teacher");
+    
+    // Enforce subject from profile
+    useEffect(() => {
+        if (user?.subject) {
+            setSubject(user.subject);
+        }
+    }, [user?.subject]);
     const [activeTab, setActiveTab] = useState<"create" | "bank" | "results">("create");
 
     // ── API-loaded data ──
     const [offerings, setOfferings] = useState<ClassOffering[]>([]);
     const [selectedOfferingId, setSelectedOfferingId] = useState("");
+
+    /** Classes shown in the quiz dropdown: only subjects that match the teacher's profile when set (e.g. English teacher ≠ Biology class). */
+    const offeringsForClassSelect = useMemo(() => {
+        const profile = user?.subject?.trim();
+        if (!profile) return offerings;
+        return offerings.filter((o) => {
+            const sn = o.subjectName || (o as { subject?: { name?: string } }).subject?.name || "";
+            return subjectNameMatchesProfile(sn, profile);
+        });
+    }, [offerings, user?.subject]);
     const [activeYearId, setActiveYearId] = useState("");
     const [publishedExams, setPublishedExams] = useState<ApiExam[]>([]);
     const [rosterByExam, setRosterByExam] = useState<Record<string, ExamRosterStudent[]>>({});
@@ -615,7 +691,7 @@ export default function TeacherExams() {
     const classGroup = offerings.find(o => o.id === selectedOfferingId)?.displayName || 
                       offerings.find(o => o.id === selectedOfferingId)?.name || 
                       "Selected Class";
-    const [subject, setSubject] = useState("Mathematics");
+    const [subject, setSubject] = useState("");
     const [duration, setDuration] = useState("30");
 
     // Questions
@@ -641,13 +717,26 @@ export default function TeacherExams() {
     const [scheduledOpenAt, setScheduledOpenAt] = useState("");
     const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3000); };
 
-    const addQuestion = () => { setQuestions(p => [...p, blankQ()]); setActiveQ(questions.length); };
+    const addQuestion = () => {
+        setQuestions((p) => {
+            const next = [...p, blankQ()];
+            setActiveQ(next.length - 1);
+            return next;
+        });
+    };
     const removeQuestion = (idx: number) => { if (questions.length === 1) return; setQuestions(p => p.filter((_, i) => i !== idx)); setActiveQ(Math.min(idx, questions.length - 2)); };
 
     const getQuizValidationError = () => {
         if (!quizTitle.trim()) return "Enter a quiz title";
-        const bad = questions.filter(qq => !qq.correct || !qq.text.trim());
-        if (bad.length) return `${bad.length} question(s) incomplete`;
+        if (user?.subject?.trim() && offerings.length > 0 && offeringsForClassSelect.length === 0) {
+            return "No class matches your subject profile. Ask an admin to assign the correct subject classes.";
+        }
+        if (offerings.length > 0 && !selectedOfferingId) return "Select a class for this quiz";
+        const withText = questions.filter((qq) => qq.text.trim());
+        if (withText.length === 0) return "Add at least one question with text";
+        for (const qq of questions) {
+            if (qq.text.trim() && !qq.correct) return "Select the correct answer for each question that has text";
+        }
         return null;
     };
 
@@ -658,9 +747,51 @@ export default function TeacherExams() {
         const safeDuration = Number.isNaN(parsedDuration) ? 30 : Math.max(5, parsedDuration);
 
         try {
+            if (!activeYearId) {
+                showToast("Academic year is still loading. Wait a moment and try again.", false);
+                return;
+            }
+
+            const offering = offerings.find((o) => o.id === selectedOfferingId);
+            const subjectId = offering?.subjectId ?? "";
+            if (!subjectId) {
+                showToast("Select a class before publishing or scheduling.", false);
+                return;
+            }
+            if (user?.subject?.trim()) {
+                const sn = offering?.subjectName || (offering as { subject?: { name?: string } } | undefined)?.subject?.name || "";
+                if (!subjectNameMatchesProfile(sn, user.subject)) {
+                    showToast(`Select a class that matches your subject (${user.subject}).`, false);
+                    return;
+                }
+            }
+
             // Close time: open + duration + 1 hour buffer
             const opensDate = new Date(opensAtIso);
             const closesDate = new Date(opensDate.getTime() + (safeDuration + 60) * 60_000);
+
+            const items: { questionId: string; orderIndex: number; points: number }[] = [];
+            let order = 0;
+            for (let idx = 0; idx < questions.length; idx++) {
+                const qq = questions[idx];
+                if (!qq.text.trim()) continue;
+                const created = await apiCreateQuestion({
+                    type: "mcq",
+                    stem: qq.text,
+                    optionsJson: JSON.stringify([qq.options.A, qq.options.B, qq.options.C, qq.options.D]),
+                    answerKey: qq.correct ? qq.options[qq.correct] : undefined,
+                    subjectId,
+                });
+                items.push({ questionId: created.id, orderIndex: order, points: qq.points });
+                order += 1;
+            }
+
+            if (items.length === 0) {
+                showToast("Add at least one question with text before publishing.", false);
+                return;
+            }
+
+            const totalPoints = items.reduce((s, it) => s + it.points, 0);
 
             // 1. Create exam in backend
             const exam = await apiCreateExam({
@@ -670,35 +801,14 @@ export default function TeacherExams() {
                 opensAt: opensDate.toISOString(),
                 closesAt: closesDate.toISOString(),
                 durationMinutes: safeDuration,
-                maxPoints: 100,
+                maxPoints: Math.max(1, totalPoints),
             });
 
-            // 2. Create each question in backend + link to exam
-            const items: { questionId: string; orderIndex: number; points: number }[] = [];
-            const offering = offerings.find(o => o.id === selectedOfferingId);
-            const subjectId = offering?.subjectId ?? "";
+            await addQuestionsToExam(exam.id, items);
+            await updateExamMaxPoints(exam.id, Math.max(1, totalPoints));
 
-            for (let idx = 0; idx < questions.length; idx++) {
-                const qq = questions[idx];
-                if (!qq.text.trim()) continue;
-                const q = await apiCreateQuestion({
-                    type: "mcq",
-                    stem: qq.text,
-                    optionsJson: JSON.stringify([qq.options.A, qq.options.B, qq.options.C, qq.options.D]),
-                    answerKey: qq.correct ? qq.options[qq.correct] : undefined,
-                    subjectId,
-                });
-                items.push({ questionId: q.id, orderIndex: idx, points: qq.points });
-            }
-
-            if (items.length > 0) {
-                await addQuestionsToExam(exam.id, items);
-            }
-
-            // 3. Publish
-            if (mode === "published") {
-                await apiPublishExam(exam.id);
-            }
+            // Publish for both immediate and scheduled so the quiz is live in the system (opensAt controls availability).
+            await apiPublishExam(exam.id);
 
             await loadBank();
 
@@ -721,24 +831,35 @@ export default function TeacherExams() {
         }
     };
 
-    const handlePublishConfirm = () => {
+    const handlePublishConfirm = async () => {
         const error = getQuizValidationError();
-        if (error) { showToast(error, false); setShowPublishConfirm(false); return; }
-        publishQuiz("published", new Date().toISOString());
+        if (error) {
+            showToast(error, false);
+            setShowPublishConfirm(false);
+            return;
+        }
         setShowPublishConfirm(false);
+        await publishQuiz("published", new Date().toISOString());
     };
 
-    const handleScheduleConfirm = () => {
+    const handleScheduleConfirm = async () => {
         const error = getQuizValidationError();
-        if (error) { showToast(error, false); setShowScheduleConfirm(false); return; }
-        if (!scheduledOpenAt) { showToast("Choose date and time for schedule", false); return; }
+        if (error) {
+            showToast(error, false);
+            setShowScheduleConfirm(false);
+            return;
+        }
+        if (!scheduledOpenAt) {
+            showToast("Choose date and time for schedule", false);
+            return;
+        }
         const opensAt = new Date(scheduledOpenAt);
         if (Number.isNaN(opensAt.getTime()) || opensAt.getTime() <= Date.now()) {
             showToast("Scheduled time must be in the future", false);
             return;
         }
-        publishQuiz("scheduled", opensAt.toISOString());
         setShowScheduleConfirm(false);
+        await publishQuiz("scheduled", opensAt.toISOString());
     };
 
     // Add a bank question into the current quiz
@@ -753,7 +874,9 @@ export default function TeacherExams() {
     // Load a bank question directly into full quiz builder for detailed editing.
     const editFromBank = (item: BankQ) => {
         setActiveTab("create");
-        setSubject(item.subj);
+        const profile = user?.subject?.trim();
+        const useProfile = profile && SUBJECT_CONFIG[profile];
+        setSubject(useProfile ? profile : item.subj);
         setQuestions([{ ...blankQ(), text: item.q }]);
         setActiveQ(0);
         if (!quizTitle.trim()) {
@@ -783,29 +906,38 @@ export default function TeacherExams() {
         setApiErr(null);
         try {
             const year = await getActiveAcademicYear();
-            if (!year) { setApiLoading(false); return; }
+            if (!year?.id) {
+                setActiveYearId("");
+                setOfferings([]);
+                setPublishedExams([]);
+                setResults([]);
+                setRosterByExam({});
+                setApiErr("No active academic year. Ask an admin to activate one.");
+                return;
+            }
             setActiveYearId(year.id);
             const mine = await listMyClassOfferings(year.id);
             setOfferings(mine);
-            if (mine.length > 0 && !selectedOfferingId) {
-                setSelectedOfferingId(mine[0].id);
-            }
+            setSelectedOfferingId((prev) => {
+                if (prev && mine.some((o) => o.id === prev)) return prev;
+                return mine[0]?.id ?? "";
+            });
 
-            // Fetch published exams
+            const myOfferingIds = new Set(mine.map((o) => o.id));
             const exams = await apiListExams(year.id);
-            setPublishedExams(exams);
+            const filteredExams = exams.filter((ex) => !!ex.classOfferingId && myOfferingIds.has(ex.classOfferingId));
+            setPublishedExams(filteredExams);
 
-            // For each exam, load roster if class-scoped
             const rosters: Record<string, ExamRosterStudent[]> = {};
             const rows: ResultRow[] = [];
-            const activeExams = exams.filter(e => e.published);
+            const activeExams = filteredExams.filter(e => e.published);
 
             await Promise.all(activeExams.map(async (ex) => {
                 try {
                     const rosterData = await getExamStudentRoster(ex.id);
                     rosters[ex.id] = rosterData.students;
                     
-                    const exOffering = offerings.find(o => o.id === ex.classOfferingId);
+                    const exOffering = mine.find(o => o.id === ex.classOfferingId);
                     const exSubject = (exOffering as any)?.subjectName || (exOffering as any)?.subject?.name || "Academic";
 
                     for (const s of rosterData.students) {
@@ -841,32 +973,142 @@ export default function TeacherExams() {
         } finally {
             setApiLoading(false);
         }
-    }, [selectedOfferingId, subject]);
+    }, []);
 
     const loadBank = useCallback(async () => {
         try {
             const rawqs = await listQuestions();
-            const mapped: BankQ[] = rawqs.map((q: any) => ({
-                id: q.id,
-                q: q.stem,
-                subj: q.subject?.name || q.subjectId || "Assorted",
-                type: q.type === "mcq" ? "Multiple Choice" : "Short Answer",
-                used: 0
-            }));
+            const profileSub = user?.subject;
+            const allowedIds = allowedBankSubjectIds(offerings, profileSub);
+            const scoped = filterOfferingsBySubject(offerings, profileSub);
+            const subjectIdToLabel = new Map<string, string>();
+            for (const o of scoped) {
+                if (!o.subjectId) continue;
+                const label = o.subjectName || (o as { subject?: { name?: string } }).subject?.name || "";
+                if (label) subjectIdToLabel.set(o.subjectId, label);
+            }
+            const mapped: BankQ[] = rawqs
+                .filter((q) =>
+                    questionInTeacherSubjectBank(
+                        {
+                            subjectId: q.subjectId,
+                            subject: (q as { subject?: { name?: string } }).subject,
+                        },
+                        allowedIds,
+                        profileSub,
+                    ),
+                )
+                .map((q) => ({
+                    id: q.id,
+                    q: q.stem,
+                    subj:
+                        (q as { subject?: { name?: string } }).subject?.name ||
+                        subjectIdToLabel.get(q.subjectId) ||
+                        q.subjectId ||
+                        "Assorted",
+                    type: q.type === "mcq" ? "Multiple Choice" : "Short Answer",
+                    used: 0,
+                }));
             setBank(mapped);
-        } catch {}
-    }, []);
+        } catch { /* keep prior bank on failure */ }
+    }, [user?.subject, offerings]);
+
+    const saveQuestionsToBank = useCallback(async () => {
+        const offering = offerings.find((o) => o.id === selectedOfferingId);
+        const subjectId = offering?.subjectId ?? "";
+        if (!subjectId) {
+            showToast("Select a class so questions are saved under the correct subject", false);
+            return;
+        }
+        if (user?.subject?.trim() && offering) {
+            const sn = (offering as any).subjectName || (offering as any).subject?.name || "";
+            if (!subjectNameMatchesProfile(sn, user.subject)) {
+                showToast(`Select a class that matches your subject (${user.subject}) before saving to the bank.`, false);
+                return;
+            }
+        }
+        const toSave = questions.filter((qq) => qq.text.trim() && qq.correct);
+        if (toSave.length === 0) {
+            showToast("Add question text and choose a correct answer for at least one question", false);
+            return;
+        }
+        const subjLabel =
+            (offering as any).subjectName ||
+            (offering as any).subject?.name ||
+            user?.subject ||
+            "Assorted";
+        try {
+            const newRows: BankQ[] = [];
+            for (const qq of toSave) {
+                const correctKey = qq.correct as "A" | "B" | "C" | "D";
+                const created = await apiCreateQuestion({
+                    type: "mcq",
+                    stem: qq.text,
+                    optionsJson: JSON.stringify([qq.options.A, qq.options.B, qq.options.C, qq.options.D]),
+                    answerKey: qq.options[correctKey],
+                    subjectId,
+                });
+                newRows.push({
+                    id: created.id,
+                    q: created.stem,
+                    subj: subjLabel,
+                    type: created.type === "mcq" ? "Multiple Choice" : "Short Answer",
+                    used: 0,
+                });
+            }
+            setBank((prev) => {
+                const seen = new Set(prev.map((b) => b.id));
+                const merged = [...prev];
+                for (const row of newRows) {
+                    if (!seen.has(row.id)) {
+                        seen.add(row.id);
+                        merged.unshift(row);
+                    }
+                }
+                return merged;
+            });
+            await loadBank();
+            // GET /questions can lag or omit nested fields; keep rows we just created in the list.
+            setBank((prev) => {
+                const ids = new Set(prev.map((b) => b.id));
+                const missing = newRows.filter((r) => !ids.has(r.id));
+                return missing.length ? [...missing, ...prev] : prev;
+            });
+            showToast(toSave.length === 1 ? "Saved to exam bank ✓" : `Saved ${toSave.length} questions to exam bank ✓`);
+        } catch (e) {
+            showToast(e instanceof Error ? e.message : "Could not save to exam bank", false);
+        }
+    }, [offerings, selectedOfferingId, questions, loadBank, user?.subject]);
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
     useEffect(() => {
-        if (isClient) { 
-            loadResultsData(); 
-            loadBank();
+        if (!isClient) return;
+        void refreshStoredProfile();
+    }, [isClient]);
+
+    useEffect(() => {
+        if (isClient) loadResultsData();
+    }, [isClient, loadResultsData]);
+
+    useEffect(() => {
+        if (!isClient) return;
+        loadBank();
+    }, [isClient, loadBank]);
+
+    useEffect(() => {
+        if (!isClient) return;
+        if (offeringsForClassSelect.length === 0) {
+            if (user?.subject?.trim() && offerings.length > 0) setSelectedOfferingId("");
+            return;
         }
-    }, [isClient, loadResultsData, loadBank]);
+        setSelectedOfferingId((p) => {
+            if (p && offeringsForClassSelect.some((o) => o.id === p)) return p;
+            return offeringsForClassSelect[0].id;
+        });
+    }, [offeringsForClassSelect, user?.subject, offerings.length, isClient]);
     // ── Grade sender / published exams via real API ───────────────────────────────
 
     const openEvaluate = async (res: ResultRow) => {
@@ -1085,6 +1327,14 @@ export default function TeacherExams() {
 
         doc.save(`transcript_${classGroup.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`);
     };
+
+    if (!isClient || (apiLoading && offerings.length === 0 && !apiErr)) {
+        return (
+            <div className="page-wrapper">
+                <TeacherExamsSkeleton />
+            </div>
+        );
+    }
 
     return (
         <div className="page-wrapper">
@@ -1314,7 +1564,7 @@ export default function TeacherExams() {
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowPublishConfirm(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handlePublishConfirm}>Confirm Publish</button>
+                            <button type="button" className="btn btn-primary" onClick={() => void handlePublishConfirm()}>Confirm Publish</button>
                         </div>
                     </div>
                 </div>
@@ -1369,7 +1619,7 @@ export default function TeacherExams() {
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowScheduleConfirm(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleScheduleConfirm}>Confirm Schedule</button>
+                            <button type="button" className="btn btn-primary" onClick={() => void handleScheduleConfirm()}>Confirm Schedule</button>
                         </div>
                     </div>
                 </div>
@@ -1387,6 +1637,12 @@ export default function TeacherExams() {
                 </div>
             </div>
 
+            {apiErr && (
+                <div className="card" style={{ marginBottom: "1rem", padding: "0.85rem 1rem", color: "var(--danger)", border: "1.5px solid var(--danger-light)", background: "var(--danger-light)" }}>
+                    {apiErr}
+                </div>
+            )}
+
             <div className="tabs" style={{ marginBottom: "1.5rem" }}>
                 <button className={`tab ${activeTab === "create" ? "active" : ""}`} onClick={() => setActiveTab("create")}>Create Quiz</button>
                 <button className={`tab ${activeTab === "bank" ? "active" : ""}`} onClick={() => setActiveTab("bank")}>Exam Bank ({bank.length})</button>
@@ -1403,23 +1659,28 @@ export default function TeacherExams() {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                                 <div className="input-group"><label>Quiz Title</label><div className="input-field"><input value={quizTitle} onChange={e => setQuizTitle(e.target.value)} placeholder={`e.g., ${subject} Chapter Quiz`} /></div></div>
                                 <div className="input-group"><label>Subject</label>
-                                    <Select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
-                                        {Array.from(new Set(offerings.map(o => (o as any).subjectName || (o as any).subject?.name).filter(Boolean))).map(s => (
-                                            <option key={s as string} value={s as string}>{s as string}</option>
-                                        ))}
-                                        {offerings.length === 0 && <option>Mathematics</option>}
-                                    </Select>
+                                    <div style={{ padding: "0.75rem 1rem", background: user?.subject ? "var(--gray-100)" : "#fff5f5", border: "1.5px solid " + (user?.subject ? "var(--gray-200)" : "#fca5a5"), borderRadius: "12px", fontSize: "0.9rem", color: user?.subject ? "var(--gray-600)" : "#c53030", fontWeight: 600 }}>
+                                        {user?.subject || "No subject assigned - Please update profile"}
+                                    </div>
                                 </div>
                                 <div className="input-group"><label>Class</label>
                                     <Select value={selectedOfferingId} onChange={e => {
                                         setSelectedOfferingId(e.target.value);
-                                        const o = offerings.find(x => x.id === e.target.value);
-                                        if (o) setSubject((o as any).subjectName || (o as any).subject?.name || "Mathematics");
-                                    }} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
-                                        {offerings.map(o => (
-                                            <option key={o.id} value={o.id}>{o.displayName || o.name || o.id.slice(0,8)}</option>
+                                        const o = offeringsForClassSelect.find(x => x.id === e.target.value) ?? offerings.find(x => x.id === e.target.value);
+                                        if (o) {
+                                            const sName = (o as any).subjectName || (o as any).subject?.name;
+                                            if (sName) setSubject(sName);
+                                            else if (user?.subject) setSubject(user.subject);
+                                        }
+                                    }} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "12px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
+                                        <option value="">Select a class...</option>
+                                        {offeringsForClassSelect.map(o => (
+                                            <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
                                         ))}
-                                        {offerings.length === 0 && <option value="">No classes found</option>}
+                                        {offerings.length === 0 && <option value="">No classes assigned for this year</option>}
+                                        {offerings.length > 0 && offeringsForClassSelect.length === 0 && (
+                                            <option value="">No class matches your subject ({user?.subject || "—"})</option>
+                                        )}
                                     </Select>
                                 </div>
                                 <div className="input-group"><label>Duration (min)</label><div className="input-field"><input type="number" value={duration} min={5} max={180} onChange={e => setDuration(e.target.value)} /></div></div>
@@ -1487,16 +1748,12 @@ export default function TeacherExams() {
                         </div>
 
                         <div style={{ display: "flex", gap: "0.75rem" }}>
-                            <button className="btn btn-secondary" onClick={addQuestion} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <button type="button" className="btn btn-secondary" onClick={addQuestion} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                                 Add Question
                             </button>
-                            <button className="btn btn-outline" onClick={async () => {
-                                if (!quizTitle.trim()) { showToast("Enter a title first", false); return; }
-                                await loadBank();
-                                showToast("Saved to exam bank ✓");
-                            }}>Save to Bank</button>
-                            <button className="btn btn-outline" onClick={() => {
+                            <button type="button" className="btn btn-outline" onClick={() => void saveQuestionsToBank()}>Save to Bank</button>
+                            <button type="button" className="btn btn-outline" onClick={() => {
                                 const error = getQuizValidationError();
                                 if (error) { showToast(error, false); return; }
                                 setShowScheduleModal(true);
@@ -1504,7 +1761,7 @@ export default function TeacherExams() {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
                                 Schedule Quiz
                             </button>
-                            <button className="btn btn-primary" onClick={() => {
+                            <button type="button" className="btn btn-primary" onClick={() => {
                                 const error = getQuizValidationError();
                                 if (error) { showToast(error, false); return; }
                                 setShowPublishConfirm(true);
@@ -1563,7 +1820,14 @@ export default function TeacherExams() {
             {activeTab === "bank" && (
                 <div className="card">
                     <div className="card-header">
-                        <h3 className="card-title">Exam Bank ({filteredBank.length})</h3>
+                        <div>
+                            <h3 className="card-title">Exam Bank ({filteredBank.length})</h3>
+                            <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "var(--gray-500)", maxWidth: 520 }}>
+                                {user?.subject?.trim()
+                                    ? `Only questions for your subject (${user.subject}) appear here — not other subjects.`
+                                    : "Questions are limited to subjects from your assigned classes."}
+                            </p>
+                        </div>
                         <div className="header-search" style={{ width: 240 }}>
                             <input value={bankSearch} onChange={e => setBankSearch(e.target.value)} placeholder="Search questions or subject…" />
                         </div>
@@ -1587,7 +1851,13 @@ export default function TeacherExams() {
                                     </tr>
                                 ))}
                                 {filteredBank.length === 0 && (
-                                    <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--gray-400)", padding: "2rem", fontStyle: "italic" }}>No questions match your search.</td></tr>
+                                    <tr>
+                                        <td colSpan={5} style={{ textAlign: "center", color: "var(--gray-400)", padding: "2rem", fontStyle: "italic" }}>
+                                            {bank.length === 0
+                                                ? "No questions in your subject bank yet. Save from the Create tab or publish a quiz."
+                                                : "No questions match your search."}
+                                        </td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>

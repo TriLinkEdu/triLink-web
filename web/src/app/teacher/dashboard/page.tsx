@@ -13,7 +13,7 @@ import {
   Star, 
   Users 
 } from "lucide-react";
-import { getActiveAcademicYear, listAllClassOfferings as listOfferings, teacherDashboard, type ClassOffering } from "@/lib/admin-api";
+import { getActiveAcademicYear, listMyClassOfferings as listOfferings, teacherDashboard, type ClassOffering } from "@/lib/admin-api";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 function DashboardSkeleton() {
@@ -45,11 +45,19 @@ function DashboardSkeleton() {
 }
 
 function offeringLabel(o: ClassOffering) {
+  const subj = o.subjectName || (o as any).subject?.name || "";
+  const sec = o.sectionName || (o as any).section?.name || "";
+  if (subj && sec) return `${subj} - ${sec}`;
   return o.displayName || o.name?.trim() || "Untitled Class";
-}
+  }
 
 export default function TeacherDashboard() {
   const user = useCurrentUser("teacher");
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [dash, setDash] = useState<Awaited<ReturnType<typeof teacherDashboard>> | null>(null);
   const [offerings, setOfferings] = useState<ClassOffering[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,9 +70,10 @@ export default function TeacherDashboard() {
       const [d, year] = await Promise.all([teacherDashboard(), getActiveAcademicYear()]);
       setDash(d);
       if (year?.id) {
+        // /api/class-offerings/mine is already scoped to this teacher; avoid filtering by profile strings (labels often differ).
         const mine = await listOfferings(year.id);
-        // Only show teacher's own offerings in the dashboard list for relevance
-        setOfferings(mine.filter(o => o.teacherId === user.id));
+        const { filterOfferingsBySubject } = await import("@/lib/teacher-utils");
+        setOfferings(filterOfferingsBySubject(mine, user?.subject));
       } else {
         setOfferings([]);
       }
@@ -73,13 +82,13 @@ export default function TeacherDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user.id]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  if (loading || !dash) return <DashboardSkeleton />;
+  if (!isClient || loading || !dash) return <DashboardSkeleton />;
 
   const stats = [
     {

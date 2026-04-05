@@ -13,6 +13,8 @@ import {
     type PublicUser,
     type Exam,
 } from "@/lib/admin-api";
+import { useCurrentUser } from "@/lib/useCurrentUser";
+import { filterOfferingsBySubject } from "@/lib/teacher-utils";
 
 type StudentRow = {
     id: string;
@@ -25,10 +27,34 @@ type StudentRow = {
 };
 
 function offeringLabel(o: ClassOffering) {
+    const g = o.gradeName || (o as any).grade?.name || "";
+    const s = o.sectionName || (o as any).section?.name || "";
+    if (g && s) return `${g} - ${s}`;
     return o.displayName || o.name?.trim() || `Class ${o.id.slice(0, 8)}`;
 }
 
+function TeacherStudentsSkeleton() {
+    return (
+        <div className="page-wrapper">
+            <div className="page-header admin-dash-skeleton-block">
+                <div style={{ width: "100%", maxWidth: 380 }}>
+                    <div className="admin-skeleton shimmer" style={{ width: 120, height: 12, marginBottom: 12 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "55%", height: 28, marginBottom: 8 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "70%", height: 12 }} />
+                </div>
+            </div>
+            <div className="card admin-dash-skeleton-block">
+                <div className="admin-skeleton shimmer" style={{ width: "100%", height: 320, borderRadius: 12 }} />
+            </div>
+        </div>
+    );
+}
+
 export default function TeacherStudents() {
+    const user = useCurrentUser("teacher");
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => { setIsClient(true); }, []);
+
     const [offerings, setOfferings] = useState<ClassOffering[]>([]);
     const [students, setStudents] = useState<StudentRow[]>([]);
     const [selectedOffering, setSelectedOffering] = useState("");
@@ -36,30 +62,34 @@ export default function TeacherStudents() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
 
-    const loadData = useCallback(async () => {
+    const loadOfferings = useCallback(async () => {
+        if (!isClient) return;
         setLoading(true);
         setErr(null);
         try {
             const year = await getActiveAcademicYear();
-            if (!year) { setErr("No active academic year"); setLoading(false); return; }
-
-            const mine = await listMyClassOfferings(year.id);
-            setOfferings(mine);
-            if (mine.length > 0 && !mine.find(o => o.id === selectedOffering)) {
-                setSelectedOffering(mine[0].id);
+            if (!year) {
+                setErr("No active academic year");
+                return;
             }
+            const mine = await listMyClassOfferings(year.id);
+            const scoped = filterOfferingsBySubject(mine, user?.subject);
+            setOfferings(scoped);
+            setSelectedOffering((prev) => (prev && scoped.some((o) => o.id === prev) ? prev : scoped[0]?.id ?? ""));
         } catch (e) {
             setErr(e instanceof Error ? e.message : "Failed to load data");
         } finally {
             setLoading(false);
         }
-    }, [selectedOffering]);
+    }, [isClient, user?.subject]);
 
-    useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        loadOfferings();
+    }, [loadOfferings]);
 
     // Load students for selected offering
     useEffect(() => {
-        if (!selectedOffering) return;
+        if (!isClient || !selectedOffering) return;
         let cancelled = false;
 
         (async () => {
@@ -172,13 +202,8 @@ export default function TeacherStudents() {
 
     const selected = useMemo(() => rankedStudents.find(s => s.id === selectedStudentId), [rankedStudents, selectedStudentId]);
 
-    if (loading && offerings.length === 0) {
-        return (
-            <div className="page-wrapper">
-                <div className="page-header"><div><h1 className="page-title">Students</h1><p className="page-subtitle">Loading…</p></div></div>
-                <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--gray-400)" }}>Loading class data…</div>
-            </div>
-        );
+    if (!isClient || (loading && offerings.length === 0)) {
+        return <TeacherStudentsSkeleton />;
     }
 
     if (err) {
@@ -192,31 +217,29 @@ export default function TeacherStudents() {
 
     return (
         <div className="page-wrapper">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: "0.75rem" }}>
                 <div>
                     <h1 className="page-title">Students</h1>
                     <p className="page-subtitle">Student analytics per class</p>
                 </div>
-                {/* Class selector */}
-                {offerings.length > 1 && (
-                    <Select
-                        value={selectedOffering}
-                        onChange={e => setSelectedOffering(e.target.value)}
-                        style={{
-                            padding: "0.5rem 0.75rem",
-                            borderRadius: 8,
-                            border: "1.5px solid var(--gray-200)",
-                            fontSize: "0.85rem",
-                            fontWeight: 500,
-                            background: "#fff",
-                            color: "var(--gray-700)",
-                            cursor: "pointer",
-                        }}
+            </div>
+
+            {/* Class Tabs (Buttons instead of dropdown) */}
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                {offerings.map(c => (
+                    <button
+                        key={c.id}
+                        className={`btn ${selectedOffering === c.id ? "btn-primary" : "btn-secondary"}`}
+                        onClick={() => setSelectedOffering(c.id)}
+                        style={{ display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.6rem 1.25rem", borderRadius: "12px", fontSize: "0.85rem", fontWeight: 600 }}
                     >
-                        {offerings.map(o => (
-                            <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
-                        ))}
-                    </Select>
+                        {offeringLabel(c)}
+                    </button>
+                ))}
+                {offerings.length === 0 && !loading && (
+                    <div style={{ fontSize: "0.85rem", color: "var(--gray-500)", background: "var(--gray-50)", padding: "0.75rem 1.25rem", borderRadius: 12, border: "1.5px dashed var(--gray-200)" }}>
+                        No classes found for your subject ({user?.subject || "—"})
+                    </div>
                 )}
             </div>
 

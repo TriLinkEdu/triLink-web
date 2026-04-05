@@ -14,6 +14,7 @@ import {
     type AttendanceSession,
     type AttendanceMark,
 } from "@/lib/admin-api";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 type AttendanceStatus = "present" | "absent" | "excused";
 type ExcuseEntry = { note: string; saved: boolean };
@@ -23,11 +24,35 @@ type StudentRow = { id: string; name: string; email: string };
 const MAX_VISIBLE_TABS = 4;
 
 function offeringLabel(o: ClassOffering) {
+    const g = o.gradeName || (o as any).grade?.name || "";
+    const s = o.sectionName || (o as any).section?.name || "";
+    if (g && s) return `${g} - ${s}`;
     return o.displayName || o.name?.trim() || "Untitled Class";
-}
+    }
 
+function TeacherAttendanceSkeleton() {
+    return (
+        <div className="page-wrapper">
+            <div className="page-header admin-dash-skeleton-block">
+                <div style={{ width: "100%", maxWidth: 360 }}>
+                    <div className="admin-skeleton shimmer" style={{ width: 140, height: 12, marginBottom: 12 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "65%", height: 28, marginBottom: 8 }} />
+                    <div className="admin-skeleton shimmer" style={{ width: "45%", height: 12 }} />
+                </div>
+            </div>
+            <div className="admin-skeleton shimmer" style={{ width: "100%", maxWidth: 520, height: 44, borderRadius: 10, marginBottom: "1rem" }} />
+            <div className="card admin-dash-skeleton-block">
+                <div className="admin-skeleton shimmer" style={{ width: "100%", height: 280, borderRadius: 12 }} />
+            </div>
+        </div>
+    );
+}
 export default function TeacherAttendance() {
     // ── API state ──
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => { setIsClient(true); }, []);
+    const user = useCurrentUser("teacher");
+    
     const [offerings, setOfferings] = useState<ClassOffering[]>([]);
     const [studentsByOffering, setStudentsByOffering] = useState<Record<string, StudentRow[]>>({});
     const [sessionsByOffering, setSessionsByOffering] = useState<Record<string, AttendanceSession[]>>({});
@@ -59,9 +84,18 @@ export default function TeacherAttendance() {
                 return;
             }
             const mine = await listMyClassOfferings(year.id);
-            setOfferings(mine);
-            if (mine.length > 0 && !mine.find(o => o.id === selectedOfferingId)) {
-                setSelectedOfferingId(mine[0].id);
+            const { filterOfferingsBySubject } = await import("@/lib/teacher-utils");
+            const scoped = filterOfferingsBySubject(mine, user?.subject);
+            setOfferings(scoped);
+            if (scoped.length > 0 && !scoped.find(o => o.id === selectedOfferingId)) {
+                setSelectedOfferingId(scoped[0].id);
+            }
+            if (scoped.length === 0) {
+                setStudentsByOffering({});
+                setSessionsByOffering({});
+                setMarksBySession({});
+                setLoading(false);
+                return;
             }
 
             // Load enrolled students for each offering
@@ -71,7 +105,7 @@ export default function TeacherAttendance() {
             const sessionsMap: Record<string, AttendanceSession[]> = {};
             const marksMap: Record<string, AttendanceMark[]> = {};
 
-            for (const o of mine) {
+            for (const o of scoped) {
                 // Get enrolled students
                 const enrollments = await listEnrollments({ classOfferingId: o.id, academicYearId: year.id });
                 studentsMap[o.id] = enrollments.map(e => {
@@ -103,7 +137,7 @@ export default function TeacherAttendance() {
         } finally {
             setLoading(false);
         }
-    }, [today, selectedOfferingId]);
+    }, [today, selectedOfferingId, user?.subject]);
 
     useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -245,17 +279,7 @@ export default function TeacherAttendance() {
         (sessionsByOffering[offeringId] ?? []).some(s => s.date === today);
 
     if (loading) {
-        return (
-            <div className="page-wrapper">
-                <div className="page-header">
-                    <div>
-                        <h1 className="page-title">Attendance</h1>
-                        <p className="page-subtitle">Loading…</p>
-                    </div>
-                </div>
-                <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--gray-400)" }}>Loading classes and students…</div>
-            </div>
-        );
+        return <TeacherAttendanceSkeleton />;
     }
 
     if (err) {
