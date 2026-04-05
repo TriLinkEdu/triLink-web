@@ -35,15 +35,20 @@ export default function AdminFeedback() {
 
   const byId = new Map(users.map((u) => [u.id, u]));
 
+  const resolveAuthor = (t: FeedbackTicket) => {
+    const u = t.authorId ? byId.get(t.authorId) : undefined;
+    return u != null
+      ? `${u.firstName} ${u.lastName}`
+      : t.isAnonymous || !t.authorId
+        ? "Anonymous"
+        : `${t.authorId.slice(0, 8)}…`;
+  };
+
   const filtered = rows.filter((t) => {
     if (!filterText.trim()) return true;
     const q = filterText.toLowerCase();
-    const u = t.authorId ? byId.get(t.authorId) : undefined;
-    const author = u ? `${u.firstName} ${u.lastName}`.toLowerCase() : "";
-    const anon = t.isAnonymous || !t.authorId;
-    const authorMatch = anon ? "anonymous".includes(q) : author.includes(q);
     return (
-      authorMatch ||
+      resolveAuthor(t).toLowerCase().includes(q) ||
       (t.message ?? "").toLowerCase().includes(q) ||
       (t.category ?? "").toLowerCase().includes(q) ||
       (t.status ?? "").toLowerCase().includes(q)
@@ -118,13 +123,7 @@ export default function AdminFeedback() {
                 </tr>
               ) : (
                 visibleRows.map((t) => {
-                  const u = t.authorId ? byId.get(t.authorId) : undefined;
-                  const authorLabel =
-                    u != null
-                      ? `${u.firstName} ${u.lastName}`
-                      : t.isAnonymous || !t.authorId
-                        ? "Anonymous"
-                        : `${t.authorId.slice(0, 8)}…`;
+                  const authorLabel = resolveAuthor(t);
                   return (
                     <tr key={t.id}>
                       <td>{t.category}</td>
