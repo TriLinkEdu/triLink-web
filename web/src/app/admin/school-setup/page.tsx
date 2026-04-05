@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, CalendarDays, Layers3, LayoutGrid, RefreshCcw, Sparkles } from "lucide-react";
+import Select from "@/components/Select";
 import {
   activateAcademicYear,
   addTerm,
@@ -468,7 +469,7 @@ export default function AdminSchoolSetup() {
           Terms
         </h3>
         <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>Academic year</label>
-        <select
+        <Select
           value={termsYearId}
           onChange={(e) => {
             const next = e.target.value;
@@ -483,7 +484,7 @@ export default function AdminSchoolSetup() {
               {y.label}
             </option>
           ))}
-        </select>
+        </Select>
         <div style={{ display: "grid", gap: "0.5rem", marginBottom: "1rem", maxWidth: 480 }}>
           <input
             placeholder="Term name"

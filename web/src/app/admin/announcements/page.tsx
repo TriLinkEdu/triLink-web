@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, CalendarDays, Megaphone, RefreshCcw, Sparkles, Users } from "lucide-react";
 import { type AcademicYear, type Announcement, createAnnouncement, deleteAnnouncement, getActiveAcademicYear, listAnnouncements } from "@/lib/admin-api";
+import Select from "@/components/Select";
 
 const AUDIENCES = ["all", "students", "teachers", "parents"];
 
@@ -169,13 +170,13 @@ export default function AdminAnnouncements() {
         <div style={{ display: "grid", gap: "0.75rem", maxWidth: 560 }}>
           <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
           <textarea placeholder="Body" value={body} onChange={(e) => setBody(e.target.value)} rows={5} style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-          <select value={audience} onChange={(e) => setAudience(e.target.value)} style={{ padding: "0.5rem", maxWidth: 200 }}>
+          <Select value={audience} onChange={(e) => setAudience(e.target.value)} style={{ padding: "0.5rem", maxWidth: 200 }}>
             {AUDIENCES.map((a) => (
               <option key={a} value={a}>
                 {a}
               </option>
             ))}
-          </select>
+          </Select>
           <button type="button" className="btn btn-primary" onClick={publish} disabled={loading}>
             Publish
           </button>

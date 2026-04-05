@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { getApiBase, getFileUrl } from "@/lib/api";
+import Select from "@/components/Select";
 
 const TEACHER_SECURITY_STORAGE_KEY = "trilink-teacher-security-v1";
 const DEFAULT_TEACHER_PASSWORD = "Teacher@123!";
@@ -861,7 +862,7 @@ export default function TeacherSettings() {
                                 <div className="input-group">
                                     <label>Display Language</label>
                                     <div className="input-field" style={{ padding: "0.5rem 1rem" }}>
-                                        <select
+                                        <Select
                                             value={language}
                                             onChange={(e) => setLanguage(e.target.value)}
                                             style={{
@@ -879,7 +880,7 @@ export default function TeacherSettings() {
                                             <option value="am">Amharic</option>
                                             <option value="fr">French</option>
                                             <option value="ar">Arabic</option>
-                                        </select>
+                                        </Select>
                                     </div>
                                 </div>
                             </div>

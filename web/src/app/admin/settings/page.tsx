@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Select from "@/components/Select";
 import {
   activateAcademicYear,
   getSchoolSettings,
@@ -35,6 +36,7 @@ export default function AdminSettings() {
   const [prefTheme, setPrefTheme] = useState<"light" | "dark" | "system">("system");
   const [prefCompactTables, setPrefCompactTables] = useState(false);
   const [userBlob, setUserBlob] = useState<Record<string, unknown>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
     setErr(null);
@@ -212,14 +214,14 @@ export default function AdminSettings() {
           </label>
           <label>
             Date format
-            <select
+            <Select
               value={schoolDateFormat}
               onChange={(e) => setSchoolDateFormat(e.target.value)}
-              style={{ display: "block", width: "100%", maxWidth: 280, marginTop: 6, padding: "0.5rem" }}
+              style={{ display: "block", width: "100%", maxWidth: 280, marginTop: 6, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--gray-200)", background: "var(--gray-50)" }}
             >
               <option value="mdy">Month / day / year (US-style)</option>
               <option value="dmy">Day / month / year</option>
-            </select>
+            </Select>
           </label>
           <button type="button" className="btn btn-primary" onClick={saveSchool}>
             Save school profile

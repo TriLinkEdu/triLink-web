@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getUser, patchUser, uploadProfileImage, type PublicUser } from "@/lib/admin-api";
-import { authFetch, getStoredUser } from "@/lib/auth";
+import { authFetch, getStoredUser, setStoredUser } from "@/lib/auth";
 import { apiPath, getApiBase } from "@/lib/api";
+import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 
 function roleLabel(role: string): string {
   switch (role) {
@@ -30,7 +31,6 @@ export default function AdminProfile() {
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [curPwd, setCurPwd] = useState("");
@@ -61,35 +61,7 @@ export default function AdminProfile() {
     })();
   }, [stored?.id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    (async () => {
-      const fileId = u?.profileImageFileId;
-      if (!fileId) {
-        setAvatarUrl(null);
-        return;
-      }
-      try {
-        const res = await authFetch(`${getApiBase()}/api/files/${fileId}/download`, { method: "GET" });
-        if (!res.ok) throw new Error("Image load failed");
-        const blob = await res.blob();
-        const nextUrl = URL.createObjectURL(blob);
-        if (cancelled) {
-          URL.revokeObjectURL(nextUrl);
-          return;
-        }
-        objectUrl = nextUrl;
-        setAvatarUrl(nextUrl);
-      } catch {
-        if (!cancelled) setAvatarUrl(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [u?.profileImageFileId]);
+
 
   const saveProfile = async () => {
     if (!stored?.id) return;
@@ -102,6 +74,15 @@ export default function AdminProfile() {
         phone: phone.trim() || undefined,
       });
       setU(row);
+      // Sync localStorage so the Header re-renders with the updated name
+      const current = getStoredUser();
+      if (current) {
+        setStoredUser({
+          ...current,
+          firstName: row.firstName,
+          lastName: row.lastName,
+        });
+      }
       setOk("Profile updated.");
       setTimeout(() => setOk(null), 2500);
     } catch (e) {
@@ -169,6 +150,14 @@ export default function AdminProfile() {
       const uploaded = await uploadProfileImage(file);
       const row = await patchUser(stored.id, { profileImageFileId: uploaded.id });
       setU(row);
+      // Sync localStorage so Header avatar in the top-right corner updates immediately
+      const current = getStoredUser();
+      if (current) {
+        setStoredUser({
+          ...current,
+          profileImageFileId: uploaded.id,
+        });
+      }
       setOk("Profile photo updated.");
       setTimeout(() => setOk(null), 2500);
     } catch (e2) {
@@ -189,8 +178,12 @@ export default function AdminProfile() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
-        <p style={{ color: "var(--gray-500)" }}>Loading…</p>
+      <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <div style={{ width: "36px", height: "36px", border: "3px solid var(--gray-200)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <div style={{ color: "var(--gray-500)", fontWeight: 500 }}>Loading profile...</div>
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        </div>
       </div>
     );
   }
@@ -221,24 +214,13 @@ export default function AdminProfile() {
             border: "1px solid #e9d5ff",
           }}
         >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="Profile"
-              style={{
-                width: 88,
-                height: 88,
-                borderRadius: "50%",
-                objectFit: "cover",
-                margin: "0 auto 1rem",
-                border: "3px solid #ddd6fe",
-              }}
-            />
-          ) : (
-            <div className="avatar avatar-initials avatar-xl" style={{ margin: "0 auto 1rem", fontSize: "1.5rem", background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>
-              {initials}
-            </div>
-          )}
+          <AuthenticatedAvatar
+            fileId={u?.profileImageFileId}
+            initials={initials}
+            size={88}
+            alt="Profile"
+            style={{ margin: "0 auto 1rem", border: "3px solid #ddd6fe" }}
+          />
           <label style={{ display: "inline-flex", margin: "0 auto 0.75rem", cursor: avatarUploading ? "not-allowed" : "pointer" }}>
             <input
               type="file"

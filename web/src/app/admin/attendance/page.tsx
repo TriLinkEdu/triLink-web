@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck2, CalendarDays, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
+import Select from "@/components/Select";
 import {
   type AttendanceMark,
   type AttendanceSession,
@@ -259,7 +260,7 @@ export default function AdminAttendance() {
       <div className="card attendance-panel" style={{ marginBottom: "1rem", display: "grid", gap: "0.75rem", maxWidth: 520 }}>
         <label>
           Academic year
-          <select
+          <Select
             value={yearId}
             onChange={(e) => {
               const v = e.target.value;
@@ -267,7 +268,7 @@ export default function AdminAttendance() {
               loadOfferings(v);
               setClassId("");
             }}
-            style={{ display: "block", marginTop: 4, padding: "0.5rem", width: "100%" }}
+            style={{ display: "block", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", width: "100%", outline: "none", cursor: "pointer", fontWeight: 500 }}
           >
             {years.length === 0 && <option value="">No years</option>}
             {years.map((y) => (
@@ -276,11 +277,11 @@ export default function AdminAttendance() {
                 {y.isActive ? " ★" : ""}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           Class offering
-          <select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ display: "block", marginTop: 4, padding: "0.5rem", width: "100%" }}>
+          <Select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ display: "block", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "10px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", width: "100%", outline: "none", cursor: "pointer", fontWeight: 500 }}>
             <option value="">Select…</option>
             {offerings.map((o) => {
               const title =
@@ -294,7 +295,7 @@ export default function AdminAttendance() {
                 </option>
               );
             })}
-          </select>
+          </Select>
         </label>
       </div>
 
@@ -322,14 +323,14 @@ export default function AdminAttendance() {
               Create session
             </button>
           </div>
-          <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={{ padding: "0.5rem", minWidth: 280, marginBottom: "1rem" }}>
+          <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={{ padding: "0.5rem", minWidth: 280, marginBottom: "1rem" }}>
             {sessions.length === 0 && <option value="">No sessions</option>}
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.date}
               </option>
             ))}
-          </select>
+          </Select>
 
           {sessionId && enrolled.length > 0 && (
             <>
@@ -349,13 +350,13 @@ export default function AdminAttendance() {
                         <tr key={e.studentId}>
                           <td>{st ? `${st.firstName} ${st.lastName}` : e.studentId}</td>
                           <td>
-                            <select value={cur} onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)} style={{ padding: "0.35rem" }}>
+                            <Select value={cur} onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)} style={{ padding: "0.35rem" }}>
                               {STATUSES.map((s) => (
                                 <option key={s} value={s}>
                                   {s}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           </td>
                         </tr>
                       );

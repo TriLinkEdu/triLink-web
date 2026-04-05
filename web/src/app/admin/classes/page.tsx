@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BookOpen, CalendarDays, GraduationCap, RefreshCcw, Sparkles, UserRoundCheck } from "lucide-react";
+import { Search } from "lucide-react";
+import Select from "@/components/Select";
+import TablePagination from "@/components/TablePagination";
 import {
   type AcademicYear,
   type ClassOffering,
@@ -74,6 +77,9 @@ export default function AdminClasses() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<PublicUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterText, setFilterText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -86,6 +92,23 @@ export default function AdminClasses() {
     name: "",
   });
   const [editTeacherId, setEditTeacherId] = useState("");
+
+  
+  const filteredOfferings = offerings.filter(o => {
+    if (!filterText.trim()) return true;
+    const q = filterText.toLowerCase();
+    const label = labelOffering(o, gMap, sMap, subMap).toLowerCase();
+    const teacher = tMap.get(o.teacherId);
+    const tn = teacher ? `${teacher.firstName} ${teacher.lastName}`.toLowerCase() : "";
+    return label.includes(q) || tn.includes(q);
+  });
+  const total = filteredOfferings.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = filteredOfferings.slice(startIdx, endIdx);
+
 
   const showT = (msg: string) => {
     setToast(msg);
@@ -318,10 +341,10 @@ export default function AdminClasses() {
       <div className="card classes-panel" style={{ marginBottom: "1rem" }}>
         <label style={{ fontWeight: 600, display: "block", marginBottom: "0.5rem" }}>Academic year</label>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-          <select
+          <Select
             value={yearId}
             onChange={(e) => setYearId(e.target.value)}
-            style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)", minWidth: 220 }}
+            style={{ padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", fontWeight: 600, minWidth: 220, outline: "none", cursor: "pointer" }}
           >
             {years.length === 0 && <option value="">No years — create one under School setup</option>}
             {years.map((y) => (
@@ -330,7 +353,7 @@ export default function AdminClasses() {
                 {y.isActive ? " (active)" : ""}
               </option>
             ))}
-          </select>
+          </Select>
           {yearId && (
             <button type="button" className="btn btn-secondary" onClick={() => setYearActive(yearId)}>
               <RefreshCcw size={14} />
@@ -362,7 +385,7 @@ export default function AdminClasses() {
                   </td>
                 </tr>
               ) : (
-                offerings.map((o) => {
+                visibleRows.map((o) => {
                   const tn = tMap.get(o.teacherId);
                   const tname = tn ? `${tn.firstName} ${tn.lastName}` : "—";
                   return (
@@ -396,47 +419,47 @@ export default function AdminClasses() {
             <div style={{ display: "grid", gap: "0.75rem" }}>
               <label>
                 Grade
-                <select value={form.gradeId} onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                <Select value={form.gradeId} onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
                   {grades.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Section
-                <select value={form.sectionId} onChange={(e) => setForm((f) => ({ ...f, sectionId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                <Select value={form.sectionId} onChange={(e) => setForm((f) => ({ ...f, sectionId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
                   {sections.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Subject
-                <select value={form.subjectId} onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                <Select value={form.subjectId} onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Teacher
-                <select value={form.teacherId} onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+                <Select value={form.teacherId} onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
                   {teachers.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.firstName} {t.lastName} ({t.email})
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Optional label
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }} placeholder="e.g. Advanced Math" />
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }} placeholder="e.g. Advanced Math" />
               </label>
             </div>
             <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
@@ -455,13 +478,13 @@ export default function AdminClasses() {
         <div className="modal-overlay" style={{ zIndex: 9998, padding: "1rem" }}>
           <div className="modal" style={{ maxWidth: 420, width: "100%", padding: "2rem" }}>
             <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "1rem" }}>Assign teacher</h2>
-            <select value={editTeacherId} onChange={(e) => setEditTeacherId(e.target.value)} style={{ width: "100%", padding: "0.5rem" }}>
+            <Select value={editTeacherId} onChange={(e) => setEditTeacherId(e.target.value)} style={{ width: "100%", padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.firstName} {t.lastName}
                 </option>
               ))}
-            </select>
+            </Select>
             <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
               <button type="button" className="btn btn-secondary" onClick={() => setEditId(null)}>
                 Cancel

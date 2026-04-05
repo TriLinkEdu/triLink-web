@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GraduationCap, Layers3, Search, Sparkles, Users } from "lucide-react";
 import { type PublicUser, listUsers } from "@/lib/admin-api";
+import TablePagination from "@/components/TablePagination";
 
 function StudentsSkeleton() {
   return (
@@ -36,6 +37,8 @@ export default function AdminStudents() {
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const load = async () => {
     setLoading(true);
@@ -57,6 +60,15 @@ export default function AdminStudents() {
 
   const withGrade = rows.filter((s) => !!s.grade).length;
   const withSection = rows.filter((s) => !!s.section).length;
+
+  
+  const total = rows.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = rows.slice(startIdx, endIdx);
+
 
   if (loading && rows.length === 0) {
     return <StudentsSkeleton />;
@@ -140,7 +152,7 @@ export default function AdminStudents() {
                   </td>
                 </tr>
               ) : (
-                rows.map((s) => (
+                visibleRows.map((s) => (
                   <tr key={s.id}>
                     <td style={{ fontWeight: 600 }}>
                       {s.firstName} {s.lastName}

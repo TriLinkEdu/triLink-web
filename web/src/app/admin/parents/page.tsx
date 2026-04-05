@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Link2, Search, ShieldCheck, Sparkles, UserRound, Users } from "lucide-react";
 import { type ParentLink, type PublicUser, createParentLink, deleteParentLink, listParentLinks, listUsers } from "@/lib/admin-api";
+import Select from "@/components/Select";
+import TablePagination from "@/components/TablePagination";
 
 function ParentsSkeleton() {
   return (
@@ -40,6 +42,9 @@ export default function AdminParents() {
   const [links, setLinks] = useState<ParentLink[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterText, setFilterText] = useState("");
   const [form, setForm] = useState({ parentId: "", studentId: "", relationship: "Father" });
 
   const load = useCallback(async () => {
@@ -92,6 +97,24 @@ export default function AdminParents() {
       setErr(e instanceof Error ? e.message : "Delete failed");
     }
   };
+
+  
+  const filteredLinks = links.filter(l => {
+    if (!filterText.trim()) return true;
+    const q = filterText.toLowerCase();
+    const p = parentMap.get(l.parentId);
+    const s = studentMap.get(l.studentId);
+    const pn = p ? `${p.firstName} ${p.lastName}`.toLowerCase() : "";
+    const sn = s ? `${s.firstName} ${s.lastName}`.toLowerCase() : "";
+    return pn.includes(q) || sn.includes(q) || l.relationship.toLowerCase().includes(q);
+  });
+  const total = filteredLinks.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = filteredLinks.slice(startIdx, endIdx);
+
 
   if (loading && !parents.length && !students.length && !links.length) {
     return <ParentsSkeleton />;
@@ -147,31 +170,31 @@ export default function AdminParents() {
         <div style={{ display: "grid", gap: "0.75rem", maxWidth: 480 }}>
           <label>
             Parent
-            <select value={form.parentId} onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+            <Select value={form.parentId} onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
               {parents.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.firstName} {p.lastName} ({p.email})
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Student
-            <select value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+            <Select value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.firstName} {s.lastName}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Relationship
-            <select value={form.relationship} onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.5rem" }}>
+            <Select value={form.relationship} onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
               <option>Father</option>
               <option>Mother</option>
               <option>Guardian</option>
-            </select>
+            </Select>
           </label>
           <button type="button" className="btn btn-primary" onClick={addLink} disabled={loading || !parents.length || !students.length}>
             <Search size={14} />
@@ -180,7 +203,7 @@ export default function AdminParents() {
         </div>
       </div>
 
-      <div className="card parents-panel">
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <h3 className="card-title parents-section-title" style={{ marginBottom: "1rem" }}>
           Existing links
         </h3>
@@ -206,7 +229,7 @@ export default function AdminParents() {
                   </td>
                 </tr>
               ) : (
-                links.map((l) => {
+                visibleRows.map((l) => {
                   const p = parentMap.get(l.parentId);
                   const s = studentMap.get(l.studentId);
                   return (

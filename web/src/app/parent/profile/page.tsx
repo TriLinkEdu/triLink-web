@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Select from "@/components/Select";
 
 type ParentProfile = {
     firstName: string;
@@ -86,6 +87,24 @@ export default function ParentProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState<ParentProfile>(initialProfile);
     const [draft, setDraft] = useState<ParentProfile>(initialProfile);
+    const user = useCurrentUser("parent");
+
+    useEffect(() => {
+        if (user && user.email) {
+            const next = {
+                ...profile,
+                firstName: user.firstName || profile.firstName,
+                lastName: user.lastName || profile.lastName,
+                email: user.email || profile.email,
+                relationship: user.relationship || profile.relationship,
+                childName: user.childName || profile.childName,
+                childGrade: user.grade || profile.childGrade,
+                childSection: user.section || profile.childSection,
+            };
+            setProfile(next);
+            if (!isEditing) setDraft(next);
+        }
+    }, [user, isEditing]);
 
     const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
     const fullName = `${profile.firstName} ${profile.lastName}`;
@@ -209,7 +228,7 @@ export default function ParentProfilePage() {
                             <EditableField label="Occupation" value={draft.occupation} onChange={(value) => setDraft((prev) => ({ ...prev, occupation: value }))} placeholder="Occupation" />
                             <div className="input-group">
                                 <label>Relationship</label>
-                                <select
+                                <Select
                                     value={draft.relationship}
                                     onChange={(e) => setDraft((prev) => ({ ...prev, relationship: e.target.value }))}
                                     style={{
@@ -223,7 +242,7 @@ export default function ParentProfilePage() {
                                     <option>Father</option>
                                     <option>Mother</option>
                                     <option>Guardian</option>
-                                </select>
+                                </Select>
                             </div>
                         </div>
                     )}

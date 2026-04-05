@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { type FeedbackTicket, type PublicUser, listFeedback, listUsers, patchFeedback } from "@/lib/admin-api";
+import { Search } from "lucide-react";
+import Select from "@/components/Select";
+import TablePagination from "@/components/TablePagination";
 
 export default function AdminFeedback() {
   const [rows, setRows] = useState<FeedbackTicket[]>([]);
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterText, setFilterText] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -26,6 +32,22 @@ export default function AdminFeedback() {
   useEffect(() => {
     load();
   }, []);
+
+  
+  const filtered = rows.filter(t => {
+    if (!filterText.trim()) return true;
+    const q = filterText.toLowerCase();
+    const u = byId.get(t.authorId);
+    const author = u ? `${u.firstName} ${u.lastName}`.toLowerCase() : "";
+    return author.includes(q) || t.message.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.status.toLowerCase().includes(q);
+  });
+  const total = filtered.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = filtered.slice(startIdx, endIdx);
+
 
   const byId = new Map(users.map((u) => [u.id, u]));
 
@@ -47,7 +69,26 @@ export default function AdminFeedback() {
         </div>
       </div>
       {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
-      <div className="card">
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--gray-100)", display: "flex", alignItems: "center", gap: "1rem" }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: "340px" }}>
+            <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--gray-400)" }} />
+            <input
+              value={filterText}
+              onChange={(e) => { setFilterText(e.target.value); setPage(0); }}
+              placeholder="Filter feedback..."
+              style={{
+                  width: "100%",
+                  padding: "0.65rem 1rem 0.65rem 2.5rem",
+                  borderRadius: "12px",
+                  border: "1px solid var(--gray-200)",
+                  fontSize: "0.9rem",
+                  outline: "none",
+                  background: "var(--gray-50)"
+              }}
+            />
+          </div>
+        </div>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -71,7 +112,7 @@ export default function AdminFeedback() {
                   </td>
                 </tr>
               ) : (
-                rows.map((t) => {
+                visibleRows.map((t) => {
                   const u = byId.get(t.authorId);
                   return (
                     <tr key={t.id}>
@@ -82,7 +123,7 @@ export default function AdminFeedback() {
                         <span className="badge badge-primary">{t.status}</span>
                       </td>
                       <td>
-                        <select
+                        <Select
                           value={t.status}
                           onChange={(e) => setStatus(t.id, e.target.value)}
                           style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem" }}
@@ -91,7 +132,7 @@ export default function AdminFeedback() {
                           <option value="in_progress">in_progress</option>
                           <option value="resolved">resolved</option>
                           <option value="closed">closed</option>
-                        </select>
+                        </Select>
                       </td>
                     </tr>
                   );

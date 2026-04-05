@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Select from "@/components/Select";
 import {
     getActiveAcademicYear,
     listMyClassOfferings,
@@ -198,7 +199,7 @@ export default function TeacherStudents() {
                 </div>
                 {/* Class selector */}
                 {offerings.length > 1 && (
-                    <select
+                    <Select
                         value={selectedOffering}
                         onChange={e => setSelectedOffering(e.target.value)}
                         style={{
@@ -215,7 +216,7 @@ export default function TeacherStudents() {
                         {offerings.map(o => (
                             <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
                         ))}
-                    </select>
+                    </Select>
                 )}
             </div>
 

@@ -27,6 +27,8 @@ import {
 } from "@/lib/admin-api";
 import { getStoredUser } from "@/lib/auth";
 import { type RealtimeStatus, chatRealtime } from "@/lib/chat-realtime";
+import Select from "@/components/Select";
+import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 
 type Props = {
   enableNewGroup?: boolean;
@@ -637,11 +639,11 @@ export default function RestChat({ enableNewGroup = false }: Props) {
             </label>
             <label className="chat-filter-wrap">
               <MessageCircle size={16} />
-              <select value={filter} onChange={(e) => setFilter(e.target.value as ConversationFilter)}>
+              <Select value={filter} onChange={(e) => setFilter(e.target.value as ConversationFilter)}>
                 <option value="all">All conversations</option>
                 <option value="private">Direct messages</option>
                 <option value="group">Group chats</option>
-              </select>
+              </Select>
             </label>
           </div>
 
@@ -673,24 +675,14 @@ export default function RestChat({ enableNewGroup = false }: Props) {
                   >
                     <div className="chat-conv-top">
                       <div className="chat-conv-title-wrap">
-                        <div className="chat-conv-avatar" aria-hidden="true">
-                          {isPrivate ? (
-                            <>
-                              <span className="chat-avatar-text">{initials(labelName)}</span>
-                              <span className={`chat-avatar-status ${threadOnline ? "online" : "offline"}`} />
-                            </>
-                          ) : (
-                            <>
-                              <span className="chat-conv-avatar-stack">
-                                {threadAvatars.map((name, idx) => (
-                                  <span key={`${name}-${idx}`} className="chat-conv-avatar-stack-item" style={{ transform: `translateX(${idx * -6}px)` }}>
-                                    {initials(name)}
-                                  </span>
-                                ))}
-                              </span>
-                              <span className={`chat-avatar-status ${threadOnline ? "online" : "offline"}`} />
-                            </>
-                          )}
+                        <div className="chat-conv-avatar" aria-hidden="true" style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <AuthenticatedAvatar
+                            fileId={isPrivate && primaryUser ? primaryUser.profileImageFileId : null}
+                            initials={initials(labelName)}
+                            size={40}
+                            alt={labelName}
+                          />
+                          <span className={`chat-avatar-status ${threadOnline ? "online" : "offline"}`} style={{ position: "absolute", bottom: 0, right: 0, border: "2px solid white" }} />
                         </div>
                         <strong className="chat-conv-title">{labelName}</strong>
                       </div>
@@ -716,7 +708,44 @@ export default function RestChat({ enableNewGroup = false }: Props) {
 
         <main className="chat-main-card card">
           <div className="chat-main-head">
-            <div className="chat-main-title">{activeConv?.type === "private" ? (dmParticipant ? toLabel(dmParticipant) : activeConv?.title ?? "Direct message") : activeConv?.title ?? "Select a conversation"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {activeConv && (
+                <div className="chat-avatar" style={{ width: 44, height: 44, position: "relative" }}>
+                  <AuthenticatedAvatar
+                    fileId={activeConv?.type === "private" && dmParticipant ? dmParticipant.profileImageFileId : null}
+                    initials={initials(activeConv?.type === "private" && dmParticipant ? toLabel(dmParticipant) : activeConv?.title ?? "Chat")}
+                    size={44}
+                  />
+                  {activeConv?.type === "private" && dmParticipant && (
+                    <span className={`chat-avatar-status ${onlineUserIds.includes(dmParticipant.id) ? "online" : "offline"}`} style={{ position: "absolute", bottom: 0, right: 0, border: "2px solid white" }} />
+                  )}
+                </div>
+              )}
+              {activeConv?.type === "private" && dmParticipant ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileUserId(dmParticipant.id);
+                    setProfileFallbackName(toLabel(dmParticipant));
+                  }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    textAlign: "left", padding: "4px 8px", borderRadius: "8px", marginLeft: "-8px", outline: "none"
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "var(--gray-50)")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "none")}
+                >
+                  <div className="chat-main-title" style={{ fontSize: "1.05rem", marginBottom: 2 }}>{toLabel(dmParticipant)}</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 500 }}>{onlineUserIds.includes(dmParticipant.id) ? "Online" : "Offline"} &bull; View Profile</div>
+                </button>
+              ) : (
+                <div>
+                  <div className="chat-main-title" style={{ fontSize: "1.05rem" }}>
+                    {activeConv?.type === "private" ? (activeConv?.title ?? "Direct message") : activeConv?.title ?? "Select a conversation"}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="chat-main-meta">
               {activeConv?.type === "private" ? (
                 <span className="text-sm text-gray">Direct message</span>
@@ -724,10 +753,7 @@ export default function RestChat({ enableNewGroup = false }: Props) {
                 <span className="text-sm text-gray">{participantsInView.length} members, {onlineCount} online</span>
               )}
               {activeConv?.parentVisible ? <span className="chat-parent-visible-pill">Parent visible</span> : null}
-              <div className="flex items-center gap-1 text-gray" style={{ marginLeft: "auto" }}>
-                <button type="button" className="btn-icon" aria-label="Call"><Phone size={15} /></button>
-                <button type="button" className="btn-icon" aria-label="Video"><Video size={15} /></button>
-              </div>
+              
             </div>
           </div>
 
@@ -880,16 +906,24 @@ export default function RestChat({ enableNewGroup = false }: Props) {
           <div className="chat-profile-card">
             <div className={`chat-avatar-wrap ${activeConv?.type === "private" ? "private" : "group"}`}>
               {activeConv?.type === "private" ? (
-                <div className="chat-avatar">
-                  {initials(dmParticipant ? toLabel(dmParticipant) : activeConv?.title ?? "DM")}
-                  <span className={`chat-avatar-status ${dmParticipant && onlineUserIds.includes(dmParticipant.id) ? "online" : "offline"}`} />
+                <div className="chat-avatar" style={{ position: "relative" }}>
+                  <AuthenticatedAvatar
+                    fileId={dmParticipant?.profileImageFileId}
+                    initials={initials(dmParticipant ? toLabel(dmParticipant) : activeConv?.title ?? "DM")}
+                    size={44}
+                  />
+                  <span className={`chat-avatar-status ${dmParticipant && onlineUserIds.includes(dmParticipant.id) ? "online" : "offline"}`} style={{ position: "absolute", bottom: 0, right: 0, border: "2px solid white" }} />
                 </div>
               ) : (
                 <div className="chat-avatar chat-avatar-group">
                   <div className="chat-avatar-group-stack">
                     {(groupAvatarNames.length > 0 ? groupAvatarNames : [activeConv?.title ?? "Team"]).slice(0, 4).map((name, idx) => (
-                      <span key={`${name}-${idx}`} className="chat-avatar-group-chip" style={{ transform: `translateX(${idx * -7}px)` }}>
-                        {initials(name)}
+                      <span key={`${name}-${idx}`} className="chat-avatar-group-chip" style={{ transform: `translateX(${idx * -7}px)`, position: "relative" }}>
+                        <AuthenticatedAvatar
+                          fileId={null} // Group members names list usually doesn't have ID easily here but initials are fine
+                          initials={initials(name)}
+                          size={28}
+                        />
                       </span>
                     ))}
                   </div>
@@ -932,9 +966,14 @@ export default function RestChat({ enableNewGroup = false }: Props) {
                     setProfileFallbackName(p.name);
                   }}
                 >
-                  <span className="chat-participant-avatar">
-                    {initials(p.name)}
-                    <span className={`chat-avatar-status ${p.online ? "online" : "offline"}`} />
+                  <span className="chat-participant-avatar" style={{ position: "relative", display: "inline-block" }}>
+                    <AuthenticatedAvatar
+                      fileId={(p as any).profileImageFileId}
+                      initials={initials(p.name)}
+                      size={32}
+                      alt={p.name}
+                    />
+                    <span className={`chat-avatar-status ${p.online ? "online" : "offline"}`} style={{ position: "absolute", bottom: -2, right: -2, border: "2px solid white" }} />
                   </span>
                   <span>{p.name}</span>
                   <em>{activeConv?.type === "private" ? "Direct" : p.role}</em>
@@ -1049,7 +1088,12 @@ export default function RestChat({ enableNewGroup = false }: Props) {
             </div>
 
             <div className="chat-profile-pop-card">
-              <div className="chat-avatar chat-profile-pop-avatar">{initials(selectedProfile.name)}</div>
+              <AuthenticatedAvatar
+                fileId={(selectedProfile as any).profileImageFileId}
+                initials={initials(selectedProfile.name)}
+                size={82}
+                className="chat-profile-pop-avatar"
+              />
               <div>
                 <div className="chat-profile-name">{selectedProfile.name}</div>
                 <div className="chat-profile-role">{selectedProfile.role}</div>

@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { getApiBase, getFileUrl } from "@/lib/api";
+import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 
 type TeacherProfile = {
     firstName: string;
@@ -149,21 +150,13 @@ export default function TeacherProfilePage() {
             <div className="card">
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.9fr)", gap: "1rem", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-                        {user.profileImageFileId ? (
-                            <img
-                                src={getFileUrl(user.profileImageFileId)}
-                                alt={user.fullName || "User"}
-                                className="avatar avatar-glow"
-                                style={{ width: 110, height: 110, objectFit: "cover", border: "4px solid #fff" }}
-                            />
-                        ) : (
-                            <div
-                                className="avatar avatar-xl avatar-initials"
-                                style={{ fontSize: "1.5rem", flexShrink: 0, background: "linear-gradient(135deg, #ea580c, #dc2626)" }}
-                            >
-                                {initials || "T"}
-                            </div>
-                        )}
+                        <AuthenticatedAvatar
+                            fileId={user.profileImageFileId}
+                            initials={initials || "T"}
+                            size={110}
+                            alt={user.fullName || "User"}
+                            style={{ border: "4px solid #fff", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                        />
 
                         <div>
                             <h2 style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--gray-900)" }}>{fullName}</h2>

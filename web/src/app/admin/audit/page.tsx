@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { listAuditLogs, listUsers, type PublicUser } from "@/lib/admin-api";
+import Select from "@/components/Select";
+import TablePagination from "@/components/TablePagination";
 
 type Row = {
   id: string;
@@ -55,6 +57,10 @@ export default function AdminAuditPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [nameById, setNameById] = useState<Map<string, string>>(new Map());
   const [err, setErr] = useState<string | null>(null);
+  const [filterText, setFilterText] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -68,9 +74,28 @@ export default function AdminAuditPage() {
         setNameById(m);
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Load failed");
+      } finally {
+        setIsLoading(false);
       }
     })();
   }, []);
+
+  const filteredRows = rows.filter((r) => {
+    if (!filterText.trim()) return true;
+    const q = filterText.toLowerCase();
+    const who = (nameById.get(r.actorId) ?? "Staff member").toLowerCase();
+    const action = describeAction(r.action).toLowerCase();
+    const details = describeDetails(r).toLowerCase();
+    const when = new Date(r.createdAt).toLocaleString().toLowerCase();
+    return who.includes(q) || action.includes(q) || details.includes(q) || when.includes(q);
+  });
+
+  const total = filteredRows.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = filteredRows.slice(startIdx, endIdx);
 
   return (
     <div className="page-wrapper">
@@ -81,15 +106,47 @@ export default function AdminAuditPage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: "1.25rem", background: "#f8fafc", border: "1px solid var(--gray-200)" }}>
-        <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.55, color: "var(--gray-700)" }}>
-          This log helps you review who did what—sign-ins, new registrations, and password updates. Routine browsing (opening pages, lists) is not recorded here.
-          Logout is handled in the browser, so it does not create a row. Older entries roll off as new activity arrives.
-        </p>
+      <div className="card" style={{ marginBottom: "1.5rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: "12px", display: "flex", gap: "1.25rem", alignItems: "flex-start", padding: "1.5rem" }}>
+        <div style={{ padding: "0.65rem", background: "white", borderRadius: "50%", color: "var(--primary-600)", display: "flex", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 style={{ margin: "0 0 0.35rem 0", fontSize: "1.05rem", color: "var(--primary-800)", fontWeight: 700 }}>About Activity Logs</h3>
+          <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.6, color: "var(--primary-700)", opacity: 0.9 }}>
+            This log helps you review crucial security events—such as sign-ins, new user registrations, and password updates.
+            Routine browsing is not recorded here. Logouts are handled locally by the browser and will not appear. Older entries automatically roll off to keep the log relevant and performant.
+          </p>
+        </div>
       </div>
 
       {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
       <div className="card">
+        <div style={{ padding: "1rem", borderBottom: "1px solid var(--gray-200)" }}>
+          <input
+            type="text"
+            placeholder="Filter logs..."
+            value={filterText}
+            onChange={(e) => {
+              setFilterText(e.target.value);
+              setPage(0);
+            }}
+            style={{
+        width: "100%",
+        maxWidth: "340px",
+        padding: "0.65rem 1rem",
+        borderRadius: "12px",
+        border: "1px solid var(--gray-200)",
+        fontSize: "0.9rem",
+        outline: "none",
+        background: "var(--gray-50)",
+        transition: "all 0.2s"
+    }}
+          />
+        </div>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -101,14 +158,24 @@ export default function AdminAuditPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={4} style={{ color: "var(--gray-500)" }}>
-                    No activity yet. Sign out and sign in again, or register a user—the log will show those events.
+                  <td colSpan={4} style={{ textAlign: "center", padding: "5rem 2rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                      <div style={{ width: "36px", height: "36px", border: "3px solid var(--gray-200)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                      <div style={{ color: "var(--gray-500)", fontWeight: 500 }}>Loading activity logs...</div>
+                    </div>
+                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                  </td>
+                </tr>
+              ) : visibleRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ color: "var(--gray-500)", textAlign: "center", padding: "4rem 2rem" }}>
+                    No activity found matching your criteria.
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => {
+                visibleRows.map((r) => {
                   const who = nameById.get(r.actorId) ?? "Staff member";
                   return (
                     <tr key={r.id}>
@@ -123,6 +190,13 @@ export default function AdminAuditPage() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          total={total}
+          page={currentPage}
+          rowsPerPage={rowsPerPage}
+          onPageChange={setPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
       </div>
     </div>
   );

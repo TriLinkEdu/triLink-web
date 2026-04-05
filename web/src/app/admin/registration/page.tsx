@@ -13,6 +13,7 @@ import {
 import { apiPath, getApiBase } from "@/lib/api";
 import { authFetch, getAccessToken } from "@/lib/auth";
 import { listUsers, type PublicUser } from "@/lib/admin-api";
+import Select from "@/components/Select";
 
 type RegistrationType = "student" | "teacher" | "parent";
 
@@ -84,6 +85,7 @@ export default function AdminRegistration() {
     const [errors, setErrors] = useState<FormErrors>({});
     const [emailStatus, setEmailStatus] = useState<"idle" | "sent" | "failed" | "skipped">("idle");
     const [studentOptions, setStudentOptions] = useState<PublicUser[]>([]);
+    const [loadingStudents, setLoadingStudents] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -102,6 +104,7 @@ export default function AdminRegistration() {
     useEffect(() => {
         if (regType !== "parent") return;
         let c = false;
+        setLoadingStudents(true);
         (async () => {
             try {
                 const studs = await listUsers("student");
@@ -114,6 +117,8 @@ export default function AdminRegistration() {
                 }
             } catch {
                 if (!c) setStudentOptions([]);
+            } finally {
+                if (!c) setLoadingStudents(false);
             }
         })();
         return () => {
@@ -536,16 +541,17 @@ export default function AdminRegistration() {
                             <>
                                 <div className="input-group">
                                     <label htmlFor="grade">Grade <span style={{ color: "var(--red-500)" }}>*</span></label>
-                                    <select
+                                    <Select
                                         id="grade"
                                         value={formData.grade}
                                         onChange={(e) => handleInputChange("grade", e.target.value)}
                                         disabled={loading}
                                         style={{
                                             padding: "0.75rem",
-                                            background: "var(--gray-50)",
-                                            border: `1.5px solid ${errors.grade ? "var(--red-500)" : "var(--gray-200)"}`,
-                                            borderRadius: "var(--radius-md)",
+                                            background: "var(--primary-50)",
+                                            color: "var(--primary-800)",
+                                            border: `1.5px solid ${errors.grade ? "var(--red-500)" : "var(--primary-200)"}`,
+                                            borderRadius: "20px",
                                             fontFamily: "inherit",
                                         }}
                                     >
@@ -553,29 +559,30 @@ export default function AdminRegistration() {
                                         <option>Grade 10</option>
                                         <option>Grade 11</option>
                                         <option>Grade 12</option>
-                                    </select>
+                                    </Select>
                                     {errors.grade && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.grade}</p>}
                                 </div>
 
                                 <div className="input-group">
                                     <label htmlFor="section">Section <span style={{ color: "var(--red-500)" }}>*</span></label>
-                                    <select
+                                    <Select
                                         id="section"
                                         value={formData.section}
                                         onChange={(e) => handleInputChange("section", e.target.value)}
                                         disabled={loading}
                                         style={{
                                             padding: "0.75rem",
-                                            background: "var(--gray-50)",
-                                            border: `1.5px solid ${errors.section ? "var(--red-500)" : "var(--gray-200)"}`,
-                                            borderRadius: "var(--radius-md)",
+                                            background: "var(--primary-50)",
+                                            color: "var(--primary-800)",
+                                            border: `1.5px solid ${errors.section ? "var(--red-500)" : "var(--primary-200)"}`,
+                                            borderRadius: "20px",
                                             fontFamily: "inherit",
                                         }}
                                     >
                                         <option>A</option>
                                         <option>B</option>
                                         <option>C</option>
-                                    </select>
+                                    </Select>
                                     {errors.section && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.section}</p>}
                                 </div>
                             </>
@@ -619,21 +626,24 @@ export default function AdminRegistration() {
                             <>
                                 <div className="input-group">
                                     <label htmlFor="linkedStudentId">Link to student <span style={{ color: "var(--red-500)" }}>*</span></label>
-                                    <select
+                                    <Select
                                         id="linkedStudentId"
                                         value={formData.linkedStudentId}
                                         onChange={(e) => handleInputChange("linkedStudentId", e.target.value)}
-                                        disabled={loading || studentOptions.length === 0}
+                                        disabled={loading || loadingStudents || studentOptions.length === 0}
                                         style={{
                                             padding: "0.75rem",
                                             width: "100%",
-                                            background: "var(--gray-50)",
-                                            border: `1.5px solid ${errors.linkedStudentId ? "var(--red-500)" : "var(--gray-200)"}`,
-                                            borderRadius: "var(--radius-md)",
+                                            background: "var(--primary-50)",
+                                            color: "var(--primary-800)",
+                                            border: `1.5px solid ${errors.linkedStudentId ? "var(--red-500)" : "var(--primary-200)"}`,
+                                            borderRadius: "20px",
                                             fontFamily: "inherit",
                                         }}
                                     >
-                                        {studentOptions.length === 0 ? (
+                                        {loadingStudents ? (
+                                            <option value="">Loading students…</option>
+                                        ) : studentOptions.length === 0 ? (
                                             <option value="">No students — register a student first</option>
                                         ) : (
                                             studentOptions.map((s) => (
@@ -642,7 +652,7 @@ export default function AdminRegistration() {
                                                 </option>
                                             ))
                                         )}
-                                    </select>
+                                    </Select>
                                     {errors.linkedStudentId && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.linkedStudentId}</p>}
                                     <p style={{ fontSize: "0.75rem", color: "var(--gray-500)", marginTop: "0.35rem" }}>
                                         Backend requires a student UUID (<code>linkedStudentId</code>), not name-only matching.
@@ -651,23 +661,24 @@ export default function AdminRegistration() {
 
                                 <div className="input-group">
                                     <label htmlFor="relationship">Relationship <span style={{ color: "var(--red-500)" }}>*</span></label>
-                                    <select
+                                    <Select
                                         id="relationship"
                                         value={formData.relationship}
                                         onChange={(e) => handleInputChange("relationship", e.target.value)}
                                         disabled={loading}
                                         style={{
                                             padding: "0.75rem",
-                                            background: "var(--gray-50)",
-                                            border: `1.5px solid ${errors.relationship ? "var(--red-500)" : "var(--gray-200)"}`,
-                                            borderRadius: "var(--radius-md)",
+                                            background: "var(--primary-50)",
+                                            color: "var(--primary-800)",
+                                            border: `1.5px solid ${errors.relationship ? "var(--red-500)" : "var(--primary-200)"}`,
+                                            borderRadius: "20px",
                                             fontFamily: "inherit",
                                         }}
                                     >
                                         <option>Father</option>
                                         <option>Mother</option>
                                         <option>Guardian</option>
-                                    </select>
+                                    </Select>
                                     {errors.relationship && <p style={{ color: "var(--red-500)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{errors.relationship}</p>}
                                 </div>
                             </>

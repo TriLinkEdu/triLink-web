@@ -5,6 +5,7 @@ import {
     Clock, ChevronLeft, ChevronRight, X, Plus,
 } from "lucide-react";
 import type { EventType, CalendarEvent } from "@/store/calendarStore";
+import Select from "@/components/Select";
 import {
     createCalendarEvent,
     getActiveAcademicYear,
@@ -424,7 +425,7 @@ export default function TeacherCalendar() {
                             {/* Type */}
                             <div>
                                 <label style={{ display: "block", fontWeight: 600, fontSize: "0.8rem", color: "var(--gray-700)", marginBottom: 5 }}>Type</label>
-                                <select
+                                <Select
                                     style={INPUT_STYLE}
                                     value={form.type}
                                     onChange={e => setForm(p => ({ ...p, type: e.target.value as EventType }))}
@@ -433,7 +434,7 @@ export default function TeacherCalendar() {
                                     <option value="exam">Exam</option>
                                     <option value="meeting">Meeting</option>
                                     <option value="reminder">Reminder</option>
-                                </select>
+                                </Select>
                             </div>
                             {/* Description */}
                             <div>

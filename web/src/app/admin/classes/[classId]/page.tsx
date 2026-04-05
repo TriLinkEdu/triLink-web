@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "@/components/Select";
 import {
   type ClassOffering,
   type Enrollment,
@@ -133,7 +134,7 @@ export default function ClassDetailPage() {
           Enrollments
         </h3>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>
-          <select value={pickStudent} onChange={(e) => setPickStudent(e.target.value)} style={{ padding: "0.5rem", minWidth: 220 }}>
+          <Select value={pickStudent} onChange={(e) => setPickStudent(e.target.value)} style={{ padding: "0.5rem", minWidth: 220 }}>
             {students
               .filter((s) => !enrolledIds.has(s.id))
               .map((s) => (
@@ -141,7 +142,7 @@ export default function ClassDetailPage() {
                   {s.firstName} {s.lastName} · {s.email}
                 </option>
               ))}
-          </select>
+          </Select>
           <button type="button" className="btn btn-primary" onClick={addEnrollment} disabled={!pickStudent || students.filter((s) => !enrolledIds.has(s.id)).length === 0}>
             Add student
           </button>

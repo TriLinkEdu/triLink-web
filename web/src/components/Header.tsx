@@ -1,13 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAcademicYearStore } from "@/store/academicYearStore";
-import { clearAuth } from "@/lib/auth";
+import { clearAuth, authFetch } from "@/lib/auth";
+import { X } from "lucide-react";
 import { getActiveAcademicYear, listAcademicYears } from "@/lib/admin-api";
-import { getFileUrl } from "@/lib/api";
+import { getFileUrl, getApiBase } from "@/lib/api";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import RealtimeToast from "@/components/RealtimeToast";
+import Select from "@/components/Select";
+import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 
 interface HeaderProps {
     userName: string;
@@ -23,6 +26,27 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     const pathname = usePathname();
     const [searchText, setSearchText] = useState("");
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [suggestions, setSuggestions] = useState<{ href: string; label: string }[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+    const userMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setShowUserMenu(false);
+            }
+        }
+        if (showUserMenu) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showUserMenu]);
     
     // Academic year: admin dropdown is loaded from API (not the static list in the store).
     const { currentSystemYear, adminSelectedYear, setAdminSelectedYear } = useAcademicYearStore();
@@ -79,6 +103,25 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     
     // Real-time notifications
     const { toast, setToast } = useRealtimeNotifications(userId, userName);
+
+    useEffect(() => {
+        const q = searchText.trim().toLowerCase();
+        if (q.length < 2) {
+            setSuggestions([]);
+            return;
+        }
+        const rts = roleRoutes[role] || [];
+        const filtered = rts.filter(r => 
+            r.href.toLowerCase().includes(q) || 
+            r.keywords.some(k => k.toLowerCase().includes(q)) ||
+            (r.href.split("/").pop() || "").includes(q)
+        ).map(r => ({
+            href: r.href,
+            label: r.href.split("/").pop()?.replace(/-/g, " ").replace(/^\w/, c => c.toUpperCase()) || "Page"
+        }));
+        setSuggestions(filtered.slice(0, 5));
+        setShowSuggestions(true);
+    }, [searchText, role]);
 
     const quickActionRoutes: Record<string, { notifications?: string; messages? : string }> = {
         teacher: { notifications: "/teacher/notifications", messages: "/teacher/chat" },
@@ -184,7 +227,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     }
 
     const userBlock = (
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative" }} ref={userMenuRef}>
             <button
                 onClick={() => setShowUserMenu((v) => !v)}
                 style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
@@ -194,27 +237,16 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                         <div className="header-user-name">{userName}</div>
                         <div className="header-user-role">{userRole}</div>
                     </div>
-                    {userProfileImageFileId ? (
-                        <img 
-                            src={getFileUrl(userProfileImageFileId)}
-                            alt={userName}
-                            className="avatar" 
-                            style={{ width: 36, height: 36, objectFit: "cover" }} 
-                        />
-                    ) : (
-                        <div className="avatar avatar-initials" style={{ width: 36, height: 36, fontSize: "0.8rem" }}>
-                            {userInitials}
-                        </div>
-                    )}
+<AuthenticatedAvatar
+    fileId={userProfileImageFileId}
+    initials={userInitials}
+    size={36}
+    alt={userName}
+/>
                 </div>
             </button>
             {showUserMenu && (
                 <>
-                    {/* Backdrop */}
-                    <div
-                        onClick={() => setShowUserMenu(false)}
-                        style={{ position: "fixed", inset: 0, zIndex: 999 }}
-                    />
                     {/* Dropdown */}
                     <div style={{
                         position: "absolute", right: 0, top: "calc(100% + 8px)",
@@ -289,7 +321,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                 {role === "admin" ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginRight: "1rem" }}>
                         <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 600 }}>Year:</span>
-                        <select
+                        <Select
                             value={
                                 adminYearLabels.includes(adminSelectedYear)
                                     ? adminSelectedYear
@@ -298,8 +330,8 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                             onChange={(e) => setAdminSelectedYear(e.target.value)}
                             disabled={adminYearLabels.length === 0}
                             style={{
-                                padding: "0.3rem 0.6rem",
-                                borderRadius: "4px",
+                                padding: "0.3rem 0.8rem",
+                                borderRadius: "20px",
                                 border: "1px solid var(--gray-200)",
                                 fontSize: "0.85rem",
                                 background: "var(--gray-50)",
@@ -318,7 +350,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                                     </option>
                                 ))
                             )}
-                        </select>
+                        </Select>
                     </div>
                 ) : (
                     <div style={{ marginRight: "1rem", padding: "0.3rem 0.8rem", background: "var(--primary-50)", color: "var(--primary-600)", borderRadius: "20px", fontSize: "0.75rem", fontWeight: 700 }}>

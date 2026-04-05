@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { getStoredUser } from "../../../lib/auth";
+import { useCurrentUser } from "@/lib/useCurrentUser";
+import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 
 type StudentProfile = {
     firstName: string;
@@ -87,25 +88,31 @@ export default function StudentProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState<StudentProfile>(defaultProfile);
     const [draft, setDraft] = useState<StudentProfile>(defaultProfile);
+    const user = useCurrentUser("student");
 
     // Hydrate from auth user on mount
     useEffect(() => {
-        const user = getStoredUser && getStoredUser();
-        if (user && user.role === "student") {
+        if (user && user.email) {
             setProfile((prev) => ({
                 ...prev,
-                firstName: user.firstName || "Student",
-                lastName: user.lastName || "",
-                email: user.email || "",
+                firstName: user.firstName || prev.firstName,
+                lastName: user.lastName || prev.lastName,
+                email: user.email || prev.email,
+                grade: user.grade || prev.grade,
+                section: user.section || prev.section,
             }));
-            setDraft((prev) => ({
-                ...prev,
-                firstName: user.firstName || "Student",
-                lastName: user.lastName || "",
-                email: user.email || "",
-            }));
+            if (!isEditing) {
+                setDraft((prev) => ({
+                    ...prev,
+                    firstName: user.firstName || prev.firstName,
+                    lastName: user.lastName || prev.lastName,
+                    email: user.email || prev.email,
+                    grade: user.grade || prev.grade,
+                    section: user.section || prev.section,
+                }));
+            }
         }
-    }, []);
+    }, [user, isEditing]);
 
     const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase();
     const fullName = `${profile.firstName} ${profile.lastName}`;

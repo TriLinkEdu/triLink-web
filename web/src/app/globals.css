@@ -104,13 +104,7 @@ button {
   background: none;
 }
 
-input,
-textarea,
-select {
-  font-family: inherit;
-  outline: none;
-  border: none;
-}
+input, textarea { font-family: inherit; outline: none; border: none; } select { font-family: inherit; outline: none; border: 1px solid var(--primary-200); border-radius: 20px !important; background-color: var(--primary-50) !important; color: var(--primary-800) !important; padding: 0.6rem 1rem !important; cursor: pointer; } @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 img {
   max-width: 100%;
@@ -2832,6 +2826,7 @@ table tbody tr:last-child td {
   overflow-y: auto;
   animation: slideUp var(--transition-base);
   z-index: var(--z-modal);
+  padding: 1.75rem;
 }
 
 .modal-header {
@@ -3900,3 +3895,4 @@ table tbody tr:last-child td {
     gap: 0.5rem;
   }
 }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }

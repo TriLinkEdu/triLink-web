@@ -281,7 +281,15 @@ export default function SettingsPage() {
                         </div>
 
                         <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: "100%", marginTop: "0.5rem" }}>
-                            {loading ? "Updating..." : "Update Password"}
+                            {loading ? (
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite" }}>
+                                        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" fill="none" />
+                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
+                                    </svg>
+                                    Updating...
+                                </span>
+                            ) : "Update Password"}
                         </button>
                     </form>
                 </div>

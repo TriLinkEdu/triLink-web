@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BookOpen, Building2, Search, Sparkles, Users } from "lucide-react";
 import { type PublicUser, listUsers } from "@/lib/admin-api";
+import TablePagination from "@/components/TablePagination";
 
 function TeachersSkeleton() {
   return (
@@ -36,6 +37,8 @@ export default function AdminTeachers() {
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const load = async () => {
     setLoading(true);
@@ -56,6 +59,15 @@ export default function AdminTeachers() {
 
   const withSubject = rows.filter((t) => !!t.subject).length;
   const withDepartment = rows.filter((t) => !!t.department).length;
+
+  
+  const total = rows.length;
+  const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
+  const currentPage = Math.min(page, maxPage);
+  const startIdx = currentPage * rowsPerPage;
+  const endIdx = Math.min(startIdx + rowsPerPage, total);
+  const visibleRows = rows.slice(startIdx, endIdx);
+
 
   if (loading && rows.length === 0) {
     return <TeachersSkeleton />;
@@ -101,20 +113,34 @@ export default function AdminTeachers() {
         </div>
       </div>
 
-      <div className="card teachers-panel" style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search"
-          style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)", minWidth: 220 }}
-        />
-        <button type="button" className="btn btn-secondary" onClick={load}>
-          <Search size={14} />
-          Search
+      <div className="card" style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid var(--gray-100)", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+        <div style={{ position: "relative", width: "100%", maxWidth: "340px" }}>
+          <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--gray-400)" }} />
+          <input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(0); }}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Search faculty members..."
+            style={{ 
+                width: "100%", 
+                padding: "0.65rem 1rem 0.65rem 2.5rem", 
+                borderRadius: "12px", 
+                border: "1px solid var(--gray-200)", 
+                fontSize: "0.9rem",
+                outline: "none",
+                background: "var(--gray-50)",
+                transition: "all 0.2s"
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = "var(--primary-300)", e.currentTarget.style.background = "#fff", e.currentTarget.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.06)")}
+            onBlur={e => (e.currentTarget.style.borderColor = "var(--gray-200)", e.currentTarget.style.background = "var(--gray-50)", e.currentTarget.style.boxShadow = "none")}
+          />
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={load} style={{ height: "40px", borderRadius: "12px" }}>
+            Search
         </button>
       </div>
       {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
-      <div className="card teachers-panel">
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -137,7 +163,7 @@ export default function AdminTeachers() {
                   <td colSpan={4}>No teachers.</td>
                 </tr>
               ) : (
-                rows.map((t) => (
+                visibleRows.map((t) => (
                   <tr key={t.id}>
                     <td style={{ fontWeight: 600 }}>
                       {t.firstName} {t.lastName}

@@ -25,6 +25,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { createPortal } from "react-dom";
 import ExamMonitor from "@/components/ExamMonitor";
+import Select from "@/components/Select";
 
 
 /* ─── Natural notation → LaTeX (so teachers don't need to know LaTeX syntax) ─── */
@@ -1197,7 +1198,7 @@ export default function TeacherExams() {
                                                         style={{ width: "100%", padding: "0.3rem 0.55rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.83rem", fontFamily: "inherit", boxSizing: "border-box" as const }} />
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
-                                                    <select value={a.type}
+                                                    <Select value={a.type}
                                                         onChange={e => setEvalAssessments(p => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
                                                         style={{ width: "100%", padding: "0.3rem 0.5rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.83rem", background: "#fff", fontFamily: "inherit" }}>
                                                         <option value="continuous">continuous</option>
@@ -1207,7 +1208,7 @@ export default function TeacherExams() {
                                                         <option value="project">project</option>
                                                         <option value="final">final</option>
                                                         <option value="other">other</option>
-                                                    </select>
+                                                    </Select>
                                                 </td>
                                                 <td style={{ padding: "0.45rem 0.5rem" }}>
                                                     <input type="number" min={0} value={a.maxMark === 0 ? "" : a.maxMark}
@@ -1402,15 +1403,15 @@ export default function TeacherExams() {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                                 <div className="input-group"><label>Quiz Title</label><div className="input-field"><input value={quizTitle} onChange={e => setQuizTitle(e.target.value)} placeholder={`e.g., ${subject} Chapter Quiz`} /></div></div>
                                 <div className="input-group"><label>Subject</label>
-                                    <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
+                                    <Select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: "0.75rem 1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "4px", fontSize: "0.9rem", fontFamily: "inherit", width: "100%" }}>
                                         {Array.from(new Set(offerings.map(o => (o as any).subjectName || (o as any).subject?.name).filter(Boolean))).map(s => (
                                             <option key={s as string} value={s as string}>{s as string}</option>
                                         ))}
                                         {offerings.length === 0 && <option>Mathematics</option>}
-                                    </select>
+                                    </Select>
                                 </div>
                                 <div className="input-group"><label>Class</label>
-                                    <select value={selectedOfferingId} onChange={e => {
+                                    <Select value={selectedOfferingId} onChange={e => {
                                         setSelectedOfferingId(e.target.value);
                                         const o = offerings.find(x => x.id === e.target.value);
                                         if (o) setSubject((o as any).subjectName || (o as any).subject?.name || "Mathematics");
@@ -1419,7 +1420,7 @@ export default function TeacherExams() {
                                             <option key={o.id} value={o.id}>{o.displayName || o.name || o.id.slice(0,8)}</option>
                                         ))}
                                         {offerings.length === 0 && <option value="">No classes found</option>}
-                                    </select>
+                                    </Select>
                                 </div>
                                 <div className="input-group"><label>Duration (min)</label><div className="input-field"><input type="number" value={duration} min={5} max={180} onChange={e => setDuration(e.target.value)} /></div></div>
                             </div>

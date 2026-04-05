@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Select from "@/components/Select";
 import {
   announcementsForMe,
   createAnnouncement,
@@ -169,7 +170,7 @@ export default function TeacherAnnouncements() {
             </div>
             <div className="input-group" style={{ marginBottom: "1rem" }}>
               <label>Audience</label>
-              <select
+              <Select
                 value={audience}
                 onChange={(e) => setAudience(e.target.value as typeof audience)}
                 style={{
@@ -185,12 +186,12 @@ export default function TeacherAnnouncements() {
                 <option value="students">Students</option>
                 <option value="parents">Parents</option>
                 <option value="class">One class offering</option>
-              </select>
+              </Select>
             </div>
             {audience === "class" && (
               <div className="input-group" style={{ marginBottom: "1rem" }}>
                 <label>Class offering</label>
-                <select
+                <Select
                   value={classOfferingId}
                   onChange={(e) => setClassOfferingId(e.target.value)}
                   style={{
@@ -208,7 +209,7 @@ export default function TeacherAnnouncements() {
                       {offeringLabel(o)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
             <div className="input-group" style={{ marginBottom: "1rem" }}>
