@@ -33,13 +33,21 @@ export default function AdminFeedback() {
     load();
   }, []);
 
-  
-  const filtered = rows.filter(t => {
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  const filtered = rows.filter((t) => {
     if (!filterText.trim()) return true;
     const q = filterText.toLowerCase();
-    const u = byId.get(t.authorId);
+    const u = t.authorId ? byId.get(t.authorId) : undefined;
     const author = u ? `${u.firstName} ${u.lastName}`.toLowerCase() : "";
-    return author.includes(q) || t.message.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.status.toLowerCase().includes(q);
+    const anon = t.isAnonymous || !t.authorId;
+    const authorMatch = anon ? "anonymous".includes(q) : author.includes(q);
+    return (
+      authorMatch ||
+      (t.message ?? "").toLowerCase().includes(q) ||
+      (t.category ?? "").toLowerCase().includes(q) ||
+      (t.status ?? "").toLowerCase().includes(q)
+    );
   });
   const total = filtered.length;
   const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1);
@@ -47,9 +55,6 @@ export default function AdminFeedback() {
   const startIdx = currentPage * rowsPerPage;
   const endIdx = Math.min(startIdx + rowsPerPage, total);
   const visibleRows = filtered.slice(startIdx, endIdx);
-
-
-  const byId = new Map(users.map((u) => [u.id, u]));
 
   const setStatus = async (id: string, status: string) => {
     try {
@@ -113,12 +118,18 @@ export default function AdminFeedback() {
                 </tr>
               ) : (
                 visibleRows.map((t) => {
-                  const u = byId.get(t.authorId);
+                  const u = t.authorId ? byId.get(t.authorId) : undefined;
+                  const authorLabel =
+                    u != null
+                      ? `${u.firstName} ${u.lastName}`
+                      : t.isAnonymous || !t.authorId
+                        ? "Anonymous"
+                        : `${t.authorId.slice(0, 8)}…`;
                   return (
                     <tr key={t.id}>
                       <td>{t.category}</td>
                       <td style={{ maxWidth: 320, whiteSpace: "pre-wrap", fontSize: "0.85rem" }}>{t.message}</td>
-                      <td>{u ? `${u.firstName} ${u.lastName}` : t.authorId.slice(0, 8)}</td>
+                      <td>{authorLabel}</td>
                       <td>
                         <span className="badge badge-primary">{t.status}</span>
                       </td>

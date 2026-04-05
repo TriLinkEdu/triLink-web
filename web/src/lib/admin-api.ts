@@ -117,7 +117,9 @@ export type Announcement = {
 
 export type FeedbackTicket = {
   id: string;
-  authorId: string;
+  /** Null when ticket is anonymous (admin list hides real author id). */
+  authorId: string | null;
+  isAnonymous?: boolean;
   category: string;
   message: string;
   status: string;
