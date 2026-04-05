@@ -27,21 +27,28 @@ const adminNavItems = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
+    const [isClient, setIsClient] = (require("react").useState)(false);
+    
+    (require("react").useEffect)(() => {
+        setIsClient(true);
+    }, []);
+
     const user = useCurrentUser("admin");
     const isLoginRoute = pathname === "/admin/login";
     const token = getAccessToken();
     const stored = getStoredUser();
     const isAuthorized = isLoginRoute || (!!token && !!stored && stored.role === "admin");
 
-    useEffect(() => {
-        if (!isLoginRoute && !isAuthorized) {
+    (require("react").useEffect)(() => {
+        if (isClient && !isLoginRoute && !isAuthorized) {
             clearAuth();
             router.replace("/admin/login");
         }
-    }, [isAuthorized, isLoginRoute, router]);
+    }, [isAuthorized, isLoginRoute, router, isClient]);
 
     if (isLoginRoute) return <>{children}</>;
-    if (!isAuthorized) {
+    
+    if (!isClient || !isAuthorized) {
         return (
             <div className="admin-shell-loading">
                 <aside className="admin-shell-loading-side">

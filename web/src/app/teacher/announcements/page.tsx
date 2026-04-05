@@ -6,13 +6,35 @@ import {
   announcementsForMe,
   createAnnouncement,
   getActiveAcademicYear,
-  listAllClassOfferings as listOfferings,
+  listMyClassOfferings as listOfferings,
   type Announcement,
   type ClassOffering,
 } from "@/lib/admin-api";
 
 function offeringLabel(o: ClassOffering) {
+  const subj = o.subjectName || (o as any).subject?.name || "";
+  const sec = o.sectionName || (o as any).section?.name || "";
+  if (subj && sec) return `${subj} - ${sec}`;
   return o.displayName || o.name?.trim() || "Untitled Class";
+  }
+
+function TeacherAnnouncementsSkeleton() {
+  return (
+    <div className="page-wrapper">
+      <div className="page-header admin-dash-skeleton-block">
+        <div style={{ width: "100%", maxWidth: 400 }}>
+          <div className="admin-skeleton shimmer" style={{ width: 160, height: 12, marginBottom: 12 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "70%", height: 28, marginBottom: 8 }} />
+          <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12 }} />
+        </div>
+        <div className="admin-skeleton shimmer" style={{ width: 160, height: 40, borderRadius: 10 }} />
+      </div>
+      <div className="card admin-dash-skeleton-block">
+        <div className="admin-skeleton shimmer" style={{ width: 200, height: 14, marginBottom: 16 }} />
+        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 200, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
 }
 
 export default function TeacherAnnouncements() {
@@ -99,6 +121,10 @@ export default function TeacherAnnouncements() {
   };
 
   const sorted = [...rows].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  if (loading && rows.length === 0 && !err) {
+    return <TeacherAnnouncementsSkeleton />;
+  }
 
   return (
     <div className="page-wrapper">

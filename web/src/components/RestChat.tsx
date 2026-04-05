@@ -1112,10 +1112,7 @@ export default function RestChat({ enableNewGroup = false }: Props) {
                 <span>Phone</span>
                 <strong>{selectedProfile.phone}</strong>
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <span>User ID</span>
-                <strong>{selectedProfile.id}</strong>
-              </div>
+              
             </div>
           </div>
         </div>

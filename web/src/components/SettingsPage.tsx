@@ -108,14 +108,7 @@ export default function SettingsPage() {
                                 {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                             </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", fontWeight: 600, marginBottom: "0.35rem" }}>
-                                User ID
-                            </div>
-                            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--gray-900)", fontFamily: "monospace" }}>
-                                {user.id}
-                            </div>
-                        </div>
+
                     </div>
                 </div>
 
