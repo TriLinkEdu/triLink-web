@@ -2,6 +2,9 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import RealtimeToast from "@/components/RealtimeToast";
+import { type ToastState } from "@/hooks/useRealtimeNotifications";
+
 import {
     getActiveAcademicYear,
     listMyClassOfferings,
@@ -508,10 +511,11 @@ interface Question {
     options: Record<"A" | "B" | "C" | "D", string>;
     correct: "A" | "B" | "C" | "D" | "";
     points: number;
+    type: "mcq" | "truefalse" | "fillin";
 }
-const blankQ = (): Question => ({ id: Date.now() + Math.random(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1 });
+const blankQ = (): Question => ({ id: Date.now() + Math.random(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1, type: "mcq" });
 
-interface BankQ { id: string; q: string; subj: string; type: string; used: number; }
+interface BankQ { id: string; q: string; subj: string; type: string; used: number; options?: Record<"A"|"B"|"C"|"D", string>; correct?: string; rawType?: string; }
 
 type Assessment = { id: number; name: string; type: string; maxMark: number; result: number };
 type ResultRow = { name: string; quiz: string; subject: string; score: number; grade: string; sent: boolean; comment: string; sentAt: string; assessments: Assessment[]; _attemptId?: string; _violationCount?: number };
@@ -710,12 +714,12 @@ export default function TeacherExams() {
     const [monitoringExam, setMonitoringExam] = useState<ApiExam | null>(null);
 
     // Toast
-    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [toast, setToast] = useState<(ToastState & { ok?: boolean }) | null>(null);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [showScheduleConfirm, setShowScheduleConfirm] = useState(false);
     const [scheduledOpenAt, setScheduledOpenAt] = useState("");
-    const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3000); };
+    const showToast = (msg: string, ok = true) => { setToast({ msg, ok, type: ok ? undefined : undefined }); setTimeout(() => setToast(null), 3500); };
 
     const addQuestion = () => {
         setQuestions((p) => {
@@ -767,7 +771,9 @@ export default function TeacherExams() {
             }
 
             // Close time: open + duration + 1 hour buffer
-            const opensDate = new Date(opensAtIso);
+            // Use a small buffer (2 mins in past) for immediate publish to avoid "Outside exam window" errors
+            const baseDate = mode === "published" ? new Date(Date.now() - 120_000) : new Date(opensAtIso);
+            const opensDate = baseDate;
             const closesDate = new Date(opensDate.getTime() + (safeDuration + 60) * 60_000);
 
             const items: { questionId: string; orderIndex: number; points: number }[] = [];
@@ -775,11 +781,27 @@ export default function TeacherExams() {
             for (let idx = 0; idx < questions.length; idx++) {
                 const qq = questions[idx];
                 if (!qq.text.trim()) continue;
+
+                let optionsArr: string[] | undefined;
+                let ans: string | undefined;
+
+                if (qq.type === "mcq") {
+                    optionsArr = [qq.options.A, qq.options.B, qq.options.C, qq.options.D];
+                    ans = qq.correct ? qq.options[qq.correct] : undefined;
+                } else if (qq.type === "truefalse") {
+                    optionsArr = ["True", "False"];
+                    ans = qq.correct === "A" ? "True" : qq.correct === "B" ? "False" : undefined;
+                } else {
+                    // fillin
+                    optionsArr = undefined;
+                    ans = qq.text.includes("____") ? qq.correct : qq.correct; // Usually answerKey is stored directly
+                }
+
                 const created = await apiCreateQuestion({
-                    type: "mcq",
+                    type: qq.type,
                     stem: qq.text,
-                    optionsJson: JSON.stringify([qq.options.A, qq.options.B, qq.options.C, qq.options.D]),
-                    answerKey: qq.correct ? qq.options[qq.correct] : undefined,
+                    optionsJson: optionsArr ? JSON.stringify(optionsArr) : undefined,
+                    answerKey: ans || (qq.type === "fillin" ? qq.correct : undefined),
                     subjectId,
                 });
                 items.push({ questionId: created.id, orderIndex: order, points: qq.points });
@@ -820,8 +842,9 @@ export default function TeacherExams() {
             }
 
             setQuizTitle("");
-            setQuestions([blankQ()]);
-            setActiveQ(0);
+            // Not clearing editor state so user doesn't lose work unintentionally
+            // setQuestions([blankQ()]);
+            // setActiveQ(0);
             setScheduledOpenAt("");
 
             // Refresh results data
@@ -864,11 +887,21 @@ export default function TeacherExams() {
 
     // Add a bank question into the current quiz
     const useFromBank = (item: BankQ) => {
-        const newQ: Question = { ...blankQ(), text: item.q };
+        let qType: "mcq"|"truefalse"|"fillin" = "mcq";
+        if (item.rawType === "truefalse") qType = "truefalse";
+        else if (item.rawType === "fillin") qType = "fillin";
+
+        const newQ: Question = { 
+            ...blankQ(), 
+            text: item.q,
+            type: qType,
+            options: item.options ? { ...item.options } : { A: "", B: "", C: "", D: "" },
+            correct: item.correct || ""
+        };
         setQuestions(p => { const next = [...p, newQ]; setActiveQ(next.length - 1); return next; });
         setBank(p => p.map(b => b.id === item.id ? { ...b, used: b.used + 1 } : b));
         setActiveTab("create");
-        showToast("Question added from bank - publish on the portal when ready ✓");
+        showToast("Question added from bank ✓");
     };
 
     // Load a bank question directly into full quiz builder for detailed editing.
@@ -998,17 +1031,45 @@ export default function TeacherExams() {
                         profileSub,
                     ),
                 )
-                .map((q) => ({
-                    id: q.id,
-                    q: q.stem,
-                    subj:
-                        (q as { subject?: { name?: string } }).subject?.name ||
-                        subjectIdToLabel.get(q.subjectId) ||
-                        q.subjectId ||
-                        "Assorted",
-                    type: q.type === "mcq" ? "Multiple Choice" : "Short Answer",
-                    used: 0,
-                }));
+                .map((q) => {
+                    let opts: Record<"A"|"B"|"C"|"D", string> = { A: "", B: "", C: "", D: "" };
+                    if (q.optionsJson) {
+                        try {
+                            const arr = JSON.parse(q.optionsJson);
+                            if (Array.isArray(arr)) {
+                                opts = { A: arr[0] || "", B: arr[1] || "", C: arr[2] || "", D: arr[3] || "" };
+                            }
+                        } catch {}
+                    }
+
+                    // Map answerKey back to A/B/C/D if possible, otherwise it's a string
+                    let corr = "";
+                    if (q.type === "mcq") {
+                        if (q.answerKey === opts.A) corr = "A";
+                        else if (q.answerKey === opts.B) corr = "B";
+                        else if (q.answerKey === opts.C) corr = "C";
+                        else if (q.answerKey === opts.D) corr = "D";
+                    } else if (q.type === "truefalse") {
+                        corr = q.answerKey === "True" ? "A" : "B";
+                    } else {
+                        corr = q.answerKey || "";
+                    }
+
+                    return {
+                        id: q.id,
+                        q: q.stem,
+                        subj:
+                            (q as { subject?: { name?: string } }).subject?.name ||
+                            subjectIdToLabel.get(q.subjectId) ||
+                            q.subjectId ||
+                            "Assorted",
+                        type: q.type === "mcq" ? "Multiple Choice" : q.type === "truefalse" ? "True / False" : "Fill in Blank",
+                        used: 0,
+                        options: opts,
+                        correct: corr,
+                        rawType: q.type
+                    };
+                });
             setBank(mapped);
         } catch { /* keep prior bank on failure */ }
     }, [user?.subject, offerings]);
@@ -1040,19 +1101,32 @@ export default function TeacherExams() {
         try {
             const newRows: BankQ[] = [];
             for (const qq of toSave) {
-                const correctKey = qq.correct as "A" | "B" | "C" | "D";
+                let optionsArr: string[] | undefined;
+                let ans: string | undefined;
+
+                if (qq.type === "mcq") {
+                    optionsArr = [qq.options.A, qq.options.B, qq.options.C, qq.options.D];
+                    ans = qq.correct ? qq.options[qq.correct as "A"|"B"|"C"|"D"] : undefined;
+                } else if (qq.type === "truefalse") {
+                    optionsArr = ["True", "False"];
+                    ans = qq.correct === "A" ? "True" : qq.correct === "B" ? "False" : undefined;
+                } else {
+                    optionsArr = undefined;
+                    ans = qq.correct;
+                }
+
                 const created = await apiCreateQuestion({
-                    type: "mcq",
+                    type: qq.type,
                     stem: qq.text,
-                    optionsJson: JSON.stringify([qq.options.A, qq.options.B, qq.options.C, qq.options.D]),
-                    answerKey: qq.options[correctKey],
+                    optionsJson: optionsArr ? JSON.stringify(optionsArr) : undefined,
+                    answerKey: ans || (qq.type === "fillin" ? qq.correct : undefined),
                     subjectId,
                 });
                 newRows.push({
                     id: created.id,
                     q: created.stem,
                     subj: subjLabel,
-                    type: created.type === "mcq" ? "Multiple Choice" : "Short Answer",
+                    type: created.type === "mcq" ? "Multiple Choice" : created.type === "truefalse" ? "True / False" : "Fill in Blank",
                     used: 0,
                 });
             }
@@ -1720,30 +1794,60 @@ export default function TeacherExams() {
                                 </div>
                             </div>
 
-                            {/* Subject-aware field - snippets, tips, placeholder all derived from subject */}
-                            <LatexField label="Question Text" value={q.text} onChange={v => updateQ({ text: v })} rows={4} placeholder={SUBJECT_CONFIG[subject]?.placeholder ?? "Type question here…"} subject={subject} />
-
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
-                                {(["A", "B", "C", "D"] as const).map(opt => (
-                                    <LatexField key={opt} label={`Option ${opt}`} value={q.options[opt]} onChange={v => updateQ({ options: { ...q.options, [opt]: v } })} rows={2} placeholder={`Option ${opt}`} mini subject={subject} />
-                                ))}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "0.875rem" }}>
+                                <div className="input-group">
+                                    <label>Question Type</label>
+                                    <Select value={q.type} onChange={e => updateQ({ type: e.target.value as any, correct: "" })} style={{ padding: "0.6rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", width: "100%", fontSize: "0.85rem" }}>
+                                        <option value="mcq">Multiple Choice (Choose)</option>
+                                        <option value="truefalse">True / False</option>
+                                        <option value="fillin">Blank Space (Fill in)</option>
+                                    </Select>
+                                </div>
                             </div>
+
+                            {/* Subject-aware field - snippets, tips, placeholder all derived from subject */}
+                            <LatexField label="Question Text" value={q.text} onChange={v => updateQ({ text: v })} rows={4} placeholder={q.type === "fillin" ? "Type question, use ____ for blank" : (SUBJECT_CONFIG[subject]?.placeholder ?? "Type question here…")} subject={subject} />
+
+                            {q.type === "mcq" && (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.875rem" }}>
+                                    {(["A", "B", "C", "D"] as const).map(opt => (
+                                        <LatexField key={opt} label={`Option ${opt}`} value={q.options[opt]} onChange={v => updateQ({ options: { ...q.options, [opt]: v } })} rows={2} placeholder={`Option ${opt}`} mini subject={subject} />
+                                    ))}
+                                </div>
+                            )}
 
                             <div>
                                 <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--gray-600)", textTransform: "uppercase" as const, letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>Correct Answer</label>
-                                <div style={{ display: "flex", gap: "0.5rem" }}>
-                                    {(["A", "B", "C", "D"] as const).map(o => (
-                                        <button key={o} onClick={() => updateQ({ correct: o })} className={`btn ${q.correct === o ? "btn-primary" : "btn-secondary"}`} style={{ width: 48, position: "relative" as const }}>
-                                            {o}
-                                            {q.correct === o && (
-                                                <span style={{ position: "absolute", top: -6, right: -6, width: 14, height: 14, borderRadius: "50%", background: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                </span>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                                {q.correct && <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>✓ Option {q.correct} is correct</p>}
+                                {q.type === "mcq" && (
+                                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                                        {(["A", "B", "C", "D"] as const).map(o => (
+                                            <button key={o} onClick={() => updateQ({ correct: o })} className={`btn ${q.correct === o ? "btn-primary" : "btn-secondary"}`} style={{ width: 48, position: "relative" as const }}>
+                                                {o}
+                                                {q.correct === o && (
+                                                    <span style={{ position: "absolute", top: -6, right: -6, width: 14, height: 14, borderRadius: "50%", background: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {q.type === "truefalse" && (
+                                    <div style={{ display: "flex", gap: "0.75rem" }}>
+                                        <button onClick={() => updateQ({ correct: "A" })} className={`btn ${q.correct === "A" ? "btn-success" : "btn-secondary"}`} style={{ flex: 1, height: 42, background: q.correct === "A" ? "var(--success)" : "transparent", color: q.correct === "A" ? "#fff" : "var(--gray-600)" }}>True</button>
+                                        <button onClick={() => updateQ({ correct: "B" })} className={`btn ${q.correct === "B" ? "btn-danger" : "btn-secondary"}`} style={{ flex: 1, height: 42, background: q.correct === "B" ? "var(--danger)" : "transparent", color: q.correct === "B" ? "#fff" : "var(--gray-600)" }}>False</button>
+                                    </div>
+                                )}
+
+                                {q.type === "fillin" && (
+                                    <div className="input-field">
+                                        <input value={q.correct} onChange={e => updateQ({ correct: e.target.value })} placeholder="Correct word(s)" style={{ background: "#fff" }} />
+                                    </div>
+                                )}
+
+                                {q.correct && q.type === "mcq" && <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>✓ Option {q.correct} is correct</p>}
+                                {q.correct && q.type !== "mcq" && <p style={{ fontSize: "0.78rem", color: "var(--success)", marginTop: "0.4rem", fontWeight: 500 }}>✓ Correct answer set</p>}
                             </div>
                         </div>
 
@@ -1970,6 +2074,13 @@ export default function TeacherExams() {
             {isClient && monitoringExam && createPortal(
                 <ExamMonitor exam={monitoringExam} onClose={() => setMonitoringExam(null)} />,
                 document.body
+            )}
+
+            {toast && (
+                <RealtimeToast 
+                    toast={toast} 
+                    onClose={() => setToast(null)} 
+                />
             )}
         </div>
     );

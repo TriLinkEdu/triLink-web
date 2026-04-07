@@ -6,7 +6,9 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { getAccessToken, getStoredUser, clearAuth } from "@/lib/auth";
+import { getAccessToken, getStoredUser, clearAuth, refreshStoredProfile } from "@/lib/auth";
+import RealtimeToast from "@/components/RealtimeToast";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -16,6 +18,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     const user = useCurrentUser("teacher");
     const { total, readIds } = useNotificationStore();
     const notifUnread = Math.max(0, total - readIds.length);
+    
+    // Realtime notifications integration
+    const { toast, setToast } = useRealtimeNotifications(user.id, user.fullName);
     
     useEffect(() => {
         setIsClient(true);
@@ -39,6 +44,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         }
 
         setIsAuthorized(true);
+        // Background refresh to ensure any admin changes (like subject mapping) are picked up
+        void refreshStoredProfile();
     }, [pathname, router, isClient]);
 
     if (!isClient) {
@@ -107,8 +114,18 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                     userProfileHref="/teacher/profile"
                     userProfileImageFileId={user.profileImageFileId}
                 />
-                {children}
+                <div style={{ padding: "1.5rem" }}>
+                    {children}
+                </div>
             </div>
+            {toast && (
+                <RealtimeToast
+                    msg={toast.msg}
+                    ok={toast.ok}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
         </div>
     );
 }

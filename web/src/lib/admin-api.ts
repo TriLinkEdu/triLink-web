@@ -594,6 +594,15 @@ export type Exam = {
   published: boolean;
   createdById: string;
   createdAt: string;
+  /** Joined for students: their specific attempt for this exam */
+  attempts?: Array<{
+    id: string;
+    studentId: string;
+    startedAt: string;
+    submittedAt: string | null;
+    releasedAt: string | null;
+    score: number | null;
+  }>;
 };
 
 export type ExamQuestion = {

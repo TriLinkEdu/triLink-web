@@ -144,7 +144,8 @@ export default function TeacherNotifications() {
                 <div>
                     <h1 className="page-title">Notifications</h1>
                     <p className="page-subtitle">
-                        {loading ? "Loading…" : totalUnread > 0 ? `${totalUnread} unread notification${totalUnread !== 1 ? "s" : ""}` : "All caught up!"}
+                        {loading && <span className="admin-loading-shimmer" style={{ display: "inline-block", width: 100, height: 16, borderRadius: 4 }} />}
+                        {!loading && (totalUnread > 0 ? `${totalUnread} unread notification${totalUnread !== 1 ? "s" : ""}` : "All caught up!")}
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem" }}>

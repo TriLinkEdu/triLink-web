@@ -95,21 +95,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             Exams
           </a>
           <a
-            href="/student/chat"
-            style={{
-              padding: "0.35rem 0.7rem",
-              borderRadius: "8px",
-              background: pathname.startsWith("/student/chat") ? "var(--primary-50)" : "transparent",
-              color: pathname.startsWith("/student/chat") ? "var(--primary-600)" : "var(--gray-600)",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              textDecoration: "none",
-              border: "1px solid transparent",
-            }}
-          >
-            Chat
-          </a>
-          <a
             href="/student/settings"
             style={{
               padding: "0.35rem 0.7rem",

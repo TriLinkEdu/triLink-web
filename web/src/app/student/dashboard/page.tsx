@@ -1,251 +1,374 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { announcementsForMe, studentDashboard, type Announcement } from "@/lib/admin-api";
-import { useExamStore } from "@/store/examStore";
+import {
+    announcementsForMe,
+    studentDashboard,
+    listStudentExams,
+    getActiveAcademicYear,
+    type Announcement,
+    type Exam as BackendExam,
+} from "@/lib/admin-api";
+import { 
+    Calendar, 
+    Clock, 
+    PlayCircle, 
+    CheckCircle2, 
+    ChevronRight,
+    Sparkles,
+    BookOpen,
+    RefreshCcw,
+    Megaphone,
+    AlertCircle,
+    Layout,
+    Timer
+} from "lucide-react";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
 
 interface Exam {
-    id: number;
+    id: string;
     course: string;
-    type: "Test" | "Quiz" | "Midterm" | "Final";
+    type: string;
     title: string;
     date: string;
     time: string;
     duration: number;
     totalQuestions: number;
     status: ExamStatus;
-    score?: number;
+    score?: number | null;
     room: string;
 }
-
-/* ─── Inline SVG Icons ─── */
-const IconPlay = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>;
-const IconChart = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg>;
-const IconLock = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
-const IconCalendar = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>;
-const IconClock = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
-const IconTimer = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" x2="14" y1="2" y2="2" /><line x1="12" x2="15" y1="14" y2="11" /><circle cx="12" cy="14" r="8" /></svg>;
-const IconList = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6" /><line x1="8" x2="21" y1="12" y2="12" /><line x1="8" x2="21" y1="18" y2="18" /><line x1="3" x2="3.01" y1="6" y2="6" /><line x1="3" x2="3.01" y1="12" y2="12" /><line x1="3" x2="3.01" y1="18" y2="18" /></svg>;
-const IconBuilding = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></svg>;
-const IconCheckCircle = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
-const IconActivity = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>;
-const IconTarget = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>;
 
 export default function StudentDashboard() {
     const router = useRouter();
     const [filter, setFilter] = useState<"all" | "available" | "completed">("all");
     const [apiAnnouncements, setApiAnnouncements] = useState<Announcement[]>([]);
     const [apiDash, setApiDash] = useState<{ activeEnrollments: number; unreadNotifications: number } | null>(null);
-    const publishedExams = useExamStore(s => s.publishedExams);
-    const completedExams = useExamStore(s => s.completedExams);
+    const [apiExams, setApiExams] = useState<BackendExam[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [year, setYear] = useState<{ id: string; label: string } | null>(null);
 
+    const [isClient, setIsClient] = useState(false);
     useEffect(() => {
+        setIsClient(true);
         let c = false;
         (async () => {
+            setIsLoading(true);
             try {
-                const [ann, dash] = await Promise.all([announcementsForMe(), studentDashboard()]);
+                const activeYear = await getActiveAcademicYear();
+                setYear(activeYear);
+                
+                // Fetch announcements and dashboard regardless of academic year
+                const [ann, dash] = await Promise.all([
+                    announcementsForMe(),
+                    studentDashboard(),
+                ]);
+                
+                let examsRes: BackendExam[] = [];
+                if (activeYear) {
+                    examsRes = await listStudentExams(activeYear.id);
+                }
+                
                 if (!c) {
                     setApiAnnouncements(ann);
                     setApiDash(dash);
+                    setApiExams(examsRes);
                 }
-            } catch {
-                if (!c) {
-                    setApiAnnouncements([]);
-                    setApiDash(null);
-                }
+            } catch (err) {
+                console.error("Dashboard primary load failed:", err);
+            } finally {
+                if (!c) setIsLoading(false);
             }
         })();
         return () => { c = true; };
     }, []);
 
-    const publishedForStudent: Exam[] = publishedExams
-        .map((e) => {
-            const completed = completedExams.find((x) => x.examId === e.id);
-            const openSource = e.opensAt || e.publishedAt;
-            const openDate = new Date(openSource);
-            const openTimeMs = Number.isNaN(openDate.getTime()) ? Date.now() : openDate.getTime();
-            const safeOpenDate = Number.isNaN(openDate.getTime()) ? new Date() : openDate;
-            const nowMs = Date.now();
-            const status: ExamStatus = completed
-                ? "completed"
-                : openTimeMs > nowMs
-                ? "upcoming"
-                : "available";
+    const processedExams: Exam[] = useMemo(() => {
+        if (!isClient) return [];
+        return apiExams.map((e: BackendExam) => {
+            const attempt = e.attempts?.[0]; 
+            const now = new Date();
+            const opensAt = new Date(e.opensAt);
+            const closesAt = new Date(e.closesAt);
+            
+            let status: ExamStatus = "upcoming";
+            if (attempt?.submittedAt) {
+                status = "completed";
+            } else if (now >= opensAt && now <= closesAt) {
+                status = "available";
+            } else if (now > closesAt && !attempt?.submittedAt) {
+                status = "missed";
+            }
 
             return {
                 id: e.id,
-                course: e.course,
-                type: e.type,
+                course: (e as any).subject?.name || (e as any).classOffering?.name || "General",
+                type: (e as any).type || "Examination",
                 title: e.title,
-                date: safeOpenDate.toISOString().slice(0, 10),
-                time: safeOpenDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
-                duration: e.duration,
-                totalQuestions: e.totalQuestions,
+                date: opensAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+                time: opensAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+                duration: e.durationMinutes,
+                totalQuestions: (e as any).questionCount || 0,
                 status,
-                score: completed?.score,
-                room: "Online",
+                score: attempt?.score,
+                room: "Digital Hall"
             };
         });
+    }, [apiExams, isClient]);
 
-    const exams: Exam[] = publishedForStudent;
+    const filtered = processedExams.filter(e => {
+        if (filter === "all") return true;
+        return e.status === filter;
+    });
 
-    const filtered = filter === "all" ? exams : exams.filter(e => filter === "available" ? (e.status === "available") : e.status === "completed");
-    const availableCount = exams.filter(e => e.status === "available").length;
-    const completedCount = exams.filter(e => e.status === "completed").length;
-
-    const typeColor: Record<string, string> = { Quiz: "var(--primary-500)", Test: "var(--warning)", Midterm: "var(--purple)", Final: "var(--danger)" };
-    const typeBg: Record<string, string> = { Quiz: "var(--primary-50)", Test: "var(--warning-light)", Midterm: "var(--purple-light)", Final: "var(--danger-light)" };
-
-    const statIcons = [
-        <IconActivity key="a" />,
-        <IconCheckCircle key="c" />,
-        <IconTarget key="t" />,
-        <IconChart key="ch" />,
-    ];
-    const statColors = ["var(--success)", "var(--primary-500)", "var(--purple)", "var(--warning)"];
-    const statBgs = ["var(--success-light)", "var(--primary-50)", "var(--purple-light)", "var(--warning-light)"];
+    if (isLoading) {
+        return (
+            <div className="page-wrapper" style={{ padding: "2rem" }}>
+                <div className="admin-skeleton shimmer" style={{ height: 40, width: 250, marginBottom: "2rem", borderRadius: 12 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "2rem" }}>
+                    <div>
+                        <div className="admin-skeleton shimmer" style={{ height: 50, width: "100%", marginBottom: "1rem", borderRadius: 12 }} />
+                        <div className="admin-skeleton shimmer" style={{ height: 200, width: "100%", borderRadius: 16 }} />
+                    </div>
+                    <div className="admin-skeleton shimmer" style={{ height: 400, width: "100%", borderRadius: 16 }} />
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            <div style={{ marginBottom: "1.5rem" }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                    Exam Portal
-                </h1>
-                <p style={{ fontSize: "0.875rem", color: "var(--gray-500)", marginTop: "0.25rem" }}>Select a course exam to begin</p>
+        <div className="page-wrapper" style={{ maxWidth: 1280, margin: "0 auto", padding: "2rem" }}>
+            {/* Hero Section */}
+            <div className="student-hero" style={{ marginBottom: "2.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                    <Sparkles size={18} className="text-primary-500" />
+                    <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--primary-600)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Academic Dashboard</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div>
+                        <h1 style={{ fontSize: "2.5rem", fontWeight: 800, color: "var(--gray-900)", marginBottom: "0.5rem" }}>Welcome back!</h1>
+                        <p style={{ color: "var(--gray-500)", fontSize: "1.1rem" }}>
+                            {year ? `Viewing schedule for academic year ${year.label}` : "Configure an active year in school setup to view exams."}
+                        </p>
+                    </div>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="btn btn-secondary" 
+                        style={{ height: "fit-content", padding: "0.6rem 1.25rem", borderRadius: 12, fontWeight: 700, gap: "0.6rem" }}
+                    >
+                        <RefreshCcw size={16} />
+                        Sync Dashboard
+                    </button>
+                </div>
             </div>
 
-            <div className="stats-grid" style={{ marginBottom: "1.5rem" }}>
-                {[
-                    { label: "Active enrollments", value: apiDash ? String(apiDash.activeEnrollments) : "—" },
-                    { label: "Unread notifications", value: apiDash ? String(apiDash.unreadNotifications) : "—" },
-                    { label: "Available exams", value: String(availableCount) },
-                    { label: "Completed (local)", value: String(completedCount) },
-                ].map((s, i) => (
-                    <div key={i} className="stat-card">
-                        <div className="stat-icon" style={{ width: 42, height: 42, borderRadius: 12, background: statBgs[i], color: statColors[i] }}>
-                            {statIcons[i]}
-                        </div>
-                        <div className="stat-info">
-                            <div className="stat-label">{s.label}</div>
-                            <div className="stat-value">{s.value}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "2.5rem", alignItems: "start" }}>
+                {/* Main Content: Exams */}
+                <div className="exams-column">
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", gap: "0.75rem" }}>
+                            {(["all", "available", "completed"] as const).map(f => (
+                                <button 
+                                    key={f} 
+                                    onClick={() => setFilter(f)} 
+                                    style={{
+                                        padding: "0.6rem 1.25rem", 
+                                        borderRadius: 12, 
+                                        border: "1.5px solid",
+                                        borderColor: filter === f ? "var(--primary-500)" : "transparent",
+                                        background: filter === f ? "var(--primary-500)" : "#fff",
+                                        color: filter === f ? "#fff" : "var(--gray-600)",
+                                        fontWeight: 700, 
+                                        fontSize: "0.85rem", 
+                                        cursor: "pointer",
+                                        boxShadow: filter === f ? "0 4px 12px var(--primary-100)" : "none",
+                                        transition: "all 0.2s"
+                                    }}
+                                >
+                                    {f.charAt(0).toUpperCase() + f.slice(1)} Exams
+                                </button>
+                            ))}
                         </div>
                     </div>
-                ))}
-            </div>
 
-            {apiAnnouncements.length > 0 && (
-                <div style={{ background: "#fff", borderRadius: 16, padding: "1.25rem", border: "1.5px solid var(--gray-100)", marginBottom: "1.25rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-                        <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--gray-900)" }}>Announcements</span>
-                        <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--gray-400)" }}>{apiAnnouncements.length} from school</span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {apiAnnouncements.slice(0, 12).map(a => (
-                            <div key={a.id} style={{ background: "var(--primary-50)", borderRadius: 12, padding: "0.75rem 1rem", borderLeft: "4px solid var(--primary-500)" }}>
-                                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--gray-900)" }}>{a.title}</div>
-                                <div style={{ fontSize: "0.8rem", color: "var(--gray-600)", marginTop: "0.25rem", whiteSpace: "pre-wrap" }}>{a.body}</div>
-                                <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", marginTop: "0.35rem" }}>{new Date(a.createdAt).toLocaleString()} · {a.audience}</div>
+                    <div style={{ display: "grid", gap: "1.25rem" }}>
+                        {filtered.length === 0 ? (
+                            <div className="card" style={{ textAlign: "center", padding: "4rem 2rem", borderRadius: 24, border: "2px dashed var(--gray-200)" }}>
+                                <div style={{ width: 64, height: 64, background: "var(--gray-50)", borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem", color: "var(--gray-400)" }}>
+                                    <BookOpen size={32} />
+                                </div>
+                                <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>No exams tracked</h3>
+                                <p style={{ color: "var(--gray-500)", fontSize: "0.9rem" }}>Check back later or change your filter.</p>
                             </div>
-                        ))}
+                        ) : (
+                            filtered.map(exam => (
+                                <div key={exam.id} className="card exam-card-hover" style={{ 
+                                    padding: "1.75rem", 
+                                    borderRadius: 24, 
+                                    border: "1.5px solid var(--gray-100)",
+                                    background: "#fff",
+                                    transition: "transform 0.2s, box-shadow 0.2s",
+                                    cursor: "pointer"
+                                }} onClick={() => exam.status === "available" && router.push(`/student/exam/${exam.id}`)}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
+                                        <div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
+                                                <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "var(--primary-600)", background: "var(--primary-50)", padding: "0.25rem 0.6rem", borderRadius: 6, textTransform: "uppercase" }}>{exam.course}</span>
+                                                <span style={{ fontSize: "0.75rem", color: "var(--gray-400)" }}>•</span>
+                                                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--gray-400)" }}>{exam.type}</span>
+                                            </div>
+                                            <h3 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--gray-900)" }}>{exam.title}</h3>
+                                        </div>
+                                        
+                                        <div style={{ 
+                                            padding: "0.4rem 0.8rem", 
+                                            borderRadius: 10, 
+                                            fontSize: "0.75rem", 
+                                            fontWeight: 800,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.4rem",
+                                            background: exam.status === "available" ? "#ecfdf5" : exam.status === "completed" ? "var(--primary-50)" : "var(--gray-50)",
+                                            color: exam.status === "available" ? "#065f46" : exam.status === "completed" ? "var(--primary-700)" : "var(--gray-500)",
+                                        }}>
+                                            {exam.status === "available" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", animation: "pulse 2s infinite" }} />}
+                                            {exam.status.toUpperCase()}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: "2rem", marginBottom: "1.75rem" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--gray-500)" }}>
+                                            <Calendar size={16} />
+                                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>{exam.date}</span>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--gray-500)" }}>
+                                            <Timer size={16} />
+                                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>{exam.duration} mins</span>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--gray-500)" }}>
+                                            <Layout size={16} />
+                                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>{exam.totalQuestions} Questions</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "1.25rem", borderTop: "1px solid var(--gray-50)" }}>
+                                        {exam.status === "completed" ? (
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                                                <CheckCircle2 size={20} className="text-primary-600" />
+                                                <div>
+                                                    <div style={{ fontSize: "0.7rem", color: "var(--gray-400)", fontWeight: 600 }}>Achieved Score</div>
+                                                    <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--primary-700)" }}>{exam.score != null ? `${exam.score}%` : "Evaluating..."}</div>
+                                                </div>
+                                            </div>
+                                        ) : exam.status === "available" ? (
+                                            <button 
+                                                className="btn btn-primary"
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/student/exam/${exam.id}`); }}
+                                                style={{ padding: "0.75rem 2rem", borderRadius: 14, fontWeight: 700, gap: "0.6rem" }}
+                                            >
+                                                <PlayCircle size={18} />
+                                                Start Session
+                                            </button>
+                                        ) : (
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--gray-400)" }}>
+                                                <Clock size={18} />
+                                                <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Available at {exam.time}</span>
+                                            </div>
+                                        )}
+                                        <ChevronRight size={20} className="text-gray-300" />
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
-            )}
 
-            <div className="exam-filter-tabs">
-                {(["all", "available", "completed"] as const).map(f => (
-                    <button key={f} onClick={() => setFilter(f)} style={{
-                        padding: "0.5rem 1.25rem", borderRadius: 10, border: "1.5px solid",
-                        borderColor: filter === f ? "var(--primary-500)" : "var(--gray-200)",
-                        background: filter === f ? "var(--primary-500)" : "#fff",
-                        color: filter === f ? "#fff" : "var(--gray-600)",
-                        fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
-                        transition: "all 150ms ease", display: "flex", alignItems: "center", gap: "0.4rem",
+                {/* Sidebar: Announcements */}
+                <div className="announcements-column">
+                    <div style={{ 
+                        background: "#fff", 
+                        borderRadius: 32, 
+                        border: "1.5px solid var(--gray-100)", 
+                        overflow: "hidden" 
                     }}>
-                        {f === "all" && "All Exams"}
-                        {f === "available" && <>
-                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: filter === f ? "#fff" : "var(--success)", display: "inline-block" }} />
-                            Available
-                        </>}
-                        {f === "completed" && <>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-                            Completed
-                        </>}
-                    </button>
-                ))}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {filtered.length === 0 && (
-                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--gray-400)" }}>
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 1rem", display: "block" }}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><line x1="9" x2="15" y1="13" y2="13" /><line x1="9" x2="15" y1="17" y2="17" /></svg>
-                        <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No exams found</div>
-                        <div style={{ fontSize: "0.85rem" }}>There are no exams in this category yet.</div>
-                    </div>
-                )}
-                {filtered.map(exam => (
-                    <div key={exam.id} style={{
-                        background: "#fff", borderRadius: 16, padding: "1.25rem",
-                        border: `1.5px solid ${exam.status === "available" ? "var(--success)" : exam.status === "missed" ? "var(--danger)" : "var(--gray-100)"}`,
-                        boxShadow: exam.status === "available" ? "0 0 0 3px rgba(16,185,129,0.08)" : exam.status === "missed" ? "0 0 0 3px rgba(239,68,68,0.07)" : "none",
-                    }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                        <div style={{ padding: "1.75rem", borderBottom: "1.5px solid var(--gray-50)", background: "#fafafa" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                                <div style={{ padding: "0.35rem 0.85rem", borderRadius: 8, background: typeBg[exam.type], color: typeColor[exam.type], fontWeight: 700, fontSize: "0.75rem" }}>{exam.type}</div>
-                                <span style={{ fontSize: "0.8rem", color: "var(--gray-400)" }}>•</span>
-                                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--primary-600)" }}>{exam.course}</span>
-                            </div>
-                            <div style={{
-                                padding: "0.3rem 0.75rem", borderRadius: 8, display: "flex", alignItems: "center", gap: "0.35rem",
-                                background: exam.status === "available" ? "var(--success-light)" : exam.status === "completed" ? "var(--primary-50)" : exam.status === "upcoming" ? "var(--warning-light)" : "var(--danger-light)",
-                                color: exam.status === "available" ? "#065f46" : exam.status === "completed" ? "var(--primary-700)" : exam.status === "upcoming" ? "#92400e" : "#991b1b",
-                                fontWeight: 600, fontSize: "0.75rem",
-                            }}>
-                                {exam.status === "available" && <><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#065f46", display: "inline-block" }} /> Available Now</>}
-                                {exam.status === "completed" && `Score: ${exam.score}%`}
-                                {exam.status === "upcoming" && "Upcoming"}
-                                {exam.status === "missed" && "Missed"}
+                                <div style={{ width: 40, height: 40, background: "var(--primary-100)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary-600)" }}>
+                                    <Megaphone size={20} />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: "1.1rem", fontWeight: 800 }}>School Feed</h3>
+                                    <p style={{ fontSize: "0.75rem", color: "var(--gray-400)", fontWeight: 600 }}>Institutional Broadcasts</p>
+                                </div>
                             </div>
                         </div>
 
-                        <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--gray-900)", marginBottom: "0.5rem" }}>{exam.title}</h3>
-
-                        <div className="exam-card-meta">
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><IconCalendar /> {new Date(exam.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><IconClock /> {exam.time}</span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><IconTimer /> {exam.duration} min</span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><IconList /> {exam.totalQuestions} Q</span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}><IconBuilding /> {exam.room}</span>
-                        </div>
-
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                            {exam.status === "available" && (
-                                <button onClick={() => router.push(`/student/exam/${exam.id}`)} style={{
-                                    padding: "0.6rem 1.5rem", borderRadius: 10, display: "flex", alignItems: "center", gap: "0.4rem",
-                                    background: "linear-gradient(135deg, var(--primary-500), var(--primary-600))",
-                                    color: "#fff", fontWeight: 700, fontSize: "0.85rem", border: "none", cursor: "pointer",
-                                    boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
-                                }}><IconPlay /> Start Exam</button>
-                            )}
-                            {exam.status === "completed" && (
-                                <button onClick={() => router.push(`/student/result/${exam.id}`)} style={{
-                                    padding: "0.6rem 1.5rem", borderRadius: 10, display: "flex", alignItems: "center", gap: "0.4rem",
-                                    background: "var(--primary-50)", color: "var(--primary-600)",
-                                    fontWeight: 600, fontSize: "0.85rem", border: "1.5px solid var(--primary-200)", cursor: "pointer",
-                                }}><IconChart /> View Result</button>
-                            )}
-                            {exam.status === "upcoming" && (
-                                <span style={{ padding: "0.6rem 1.5rem", borderRadius: 10, background: "var(--gray-100)", color: "var(--gray-400)", fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                    <IconLock /> Not yet available
-                                </span>
+                        <div style={{ padding: "1.25rem", display: "grid", gap: "1rem" }}>
+                            {apiAnnouncements.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                                    <p style={{ color: "var(--gray-400)", fontSize: "0.85rem" }}>Stay tuned for updates!</p>
+                                </div>
+                            ) : (
+                                apiAnnouncements.slice(0, 8).map(a => (
+                                    <div key={a.id} style={{ 
+                                        padding: "1.25rem", 
+                                        borderRadius: 20, 
+                                        background: "var(--gray-50)", 
+                                        border: "1px solid var(--gray-100)",
+                                        position: "relative"
+                                    }}>
+                                        <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--gray-400)", marginBottom: "0.5rem", textTransform: "uppercase" }}>
+                                            {new Date(a.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </div>
+                                        <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--gray-900)", marginBottom: "0.4rem" }}>{a.title}</h4>
+                                        <p style={{ fontSize: "0.82rem", color: "var(--gray-600)", lineHeight: 1.6 }}>{a.body}</p>
+                                    </div>
+                                ))
                             )}
                         </div>
+
+                        {apiAnnouncements.length > 0 && (
+                            <div style={{ padding: "1.25rem", textAlign: "center", borderTop: "1.5px solid var(--gray-50)" }}>
+                                <button style={{ background: "none", border: "none", color: "var(--primary-600)", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
+                                    View Older Archives
+                                </button>
+                            </div>
+                        )}
                     </div>
-                ))}
+
+                    <div style={{ 
+                        marginTop: "2rem",
+                        padding: "1.75rem", 
+                        borderRadius: 32, 
+                        background: "linear-gradient(135deg, var(--primary-600), var(--primary-800))", 
+                        color: "#fff",
+                        position: "relative",
+                        overflow: "hidden"
+                    }}>
+                        <div style={{ position: "relative", zIndex: 1 }}>
+                            <h3 style={{ fontSize: "1.1rem", fontWeight: 800, marginBottom: "0.5rem" }}>Need Assistance?</h3>
+                            <p style={{ fontSize: "0.85rem", opacity: 0.9, lineHeight: 1.6, marginBottom: "1.25rem" }}>If you experience technical issues during an active exam window, reach out to support immediately.</p>
+                            <button className="btn btn-secondary" style={{ width: "100%", borderRadius: 12, fontWeight: 700 }}>Contact Helpdesk</button>
+                        </div>
+                        <AlertCircle size={80} style={{ position: "absolute", bottom: -20, right: -20, opacity: 0.1 }} />
+                    </div>
+                </div>
             </div>
+
+            <style jsx>{`
+                .exam-card-hover:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 12px 24px rgba(0,0,0,0.04);
+                    border-color: var(--primary-200) !important;
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.6; transform: scale(1.1); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+            `}</style>
         </div>
     );
 }
+

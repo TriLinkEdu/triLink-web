@@ -56,8 +56,9 @@ export default function ExamResult() {
         let options: string[] | undefined;
         if (q.optionsJson) { try { options = JSON.parse(q.optionsJson); } catch { /* ignore */ } }
         let type: QuestionType = "fillin";
-        if (q.type === "mcq") type = "mcq";
+        if (q.type === "mcq" || q.type === "choose") type = "mcq";
         else if (q.type === "truefalse") type = "truefalse";
+        else if (q.type === "fillin") type = "fillin";
         return {
             id: q.id,
             order: q.orderIndex + 1,

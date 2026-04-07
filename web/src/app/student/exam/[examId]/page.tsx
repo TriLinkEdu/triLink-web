@@ -41,10 +41,13 @@ function mapApiQuestions(raw: ExamQuestionForStudent[]): Question[] {
             if (q.optionsJson) {
                 try { options = JSON.parse(q.optionsJson); } catch { options = undefined; }
             }
-            let type: QuestionType = "fillin";
-            if (q.type === "mcq" && options && options.length > 0) type = "mcq";
-            else if (q.type === "truefalse") type = "truefalse";
-            return { id: q.id, type, text: q.stem, options, order: i + 1 };
+
+            let qType: "mcq" | "truefalse" | "fillin" = "mcq";
+            if (q.type === "mcq" || q.type === "choose") qType = "mcq";
+            else if (q.type === "truefalse") qType = "truefalse";
+            else if (q.type === "fillin") qType = "fillin";
+
+            return { id: q.id, type: qType, text: q.stem, options, order: i + 1 };
         });
 }
 
@@ -270,14 +273,15 @@ export default function ExamSession() {
     const timePercent = exam ? (timeLeft / (exam.duration * 60)) * 100 : 100;
     const isLowTime = timeLeft < 300;
 
-    // ── Loading / Error states ──
+    // ── Loading state ──
     if (loading) {
         return (
-            <div style={{ minHeight: "100vh", background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ textAlign: "center", color: "var(--gray-500)" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>Loading Exam…</div>
-                    <p style={{ fontSize: "0.9rem" }}>Please wait while we prepare your exam session.</p>
+            <div style={{ minHeight: "100vh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ textAlign: "center" }}>
+                    <div className="spinner" style={{ width: 40, height: 40, border: "4px solid var(--primary-100)", borderTopColor: "var(--primary-600)", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 1.5rem" }} />
+                    <p style={{ color: "var(--gray-500)", fontWeight: 600 }}>Initializing your exam session...</p>
                 </div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
         );
     }
