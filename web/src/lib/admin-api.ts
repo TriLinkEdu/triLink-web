@@ -318,6 +318,27 @@ export async function createClassOffering(body: {
   return adminJson<ClassOffering>("/api/class-offerings", { method: "POST", body: JSON.stringify(body) });
 }
 
+/**
+ * Bulk create class offerings for multiple section-subject combinations
+ */
+export async function bulkCreateClassOfferings(body: {
+  academicYearId: string;
+  gradeId: string;
+  sectionIds: string[];
+  subjectIds: string[];
+  teacherId: string;
+}): Promise<{
+  created: number;
+  skipped: number;
+  errors: Array<{ sectionId: string; subjectId: string; reason: string }>;
+  summary: string;
+}> {
+  return adminJson("/api/class-offerings/bulk", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function patchClassOffering(id: string, body: { teacherId?: string; name?: string | null }): Promise<ClassOffering> {
   return adminJson<ClassOffering>(`/api/class-offerings/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
@@ -1305,3 +1326,4 @@ export async function myChildren(): Promise<Array<{
 export async function getDirectFileUrl(fileId: string): Promise<{ url: string; filename: string; mime: string }> {
   return adminJson<{ url: string; filename: string; mime: string }>(`/api/files/${encodeURIComponent(fileId)}/url`, { method: "GET" });
 }
+
