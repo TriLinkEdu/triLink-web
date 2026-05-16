@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/ui";
 import { ClipboardList } from "lucide-react";
 import {
     bulkGradeEntries,
-    deleteGradeEntry,
     deleteGradeGroup,
     getActiveAcademicYear,
     getExamSummary,
@@ -243,17 +242,6 @@ export default function TeacherGrades() {
             await loadClassData(selectedClass, true);
         } catch (error) {
             showToast(error instanceof Error ? error.message : "Release failed", false);
-        }
-    };
-
-    const handleDeleteEntry = async (entryId: string, studentName: string) => {
-        if (!confirm(`Remove this grade for ${studentName}?`)) return;
-        try {
-            await deleteGradeEntry(entryId);
-            showToast("Grade removed");
-            await loadClassData(selectedClass, true);
-        } catch (error) {
-            showToast(error instanceof Error ? error.message : "Delete failed", false);
         }
     };
 
@@ -543,7 +531,7 @@ export default function TeacherGrades() {
                                                                 <td style={{ textAlign: "center" }}>{isEditing ? <input type="number" min={1} value={editMaxScore} onChange={(event) => setEditMaxScore(event.target.value)} style={{ width: 70, padding: "0.25rem 0.4rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.85rem", textAlign: "center" }} /> : <span style={{ color: "var(--gray-500)" }}>{entry.maxScore}</span>}</td>
                                                                 <td style={{ textAlign: "center" }}>{percent != null ? <span style={{ fontWeight: 600, color: scoreColor(entry.score, entry.maxScore) }}>{percent}%</span> : "—"}</td>
                                                                 <td style={{ fontSize: "0.82rem", color: "var(--gray-500)" }}>{entry.note || "—"}</td>
-                                                                <td>{isEditing ? <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button className="btn btn-primary btn-sm" onClick={() => void handleEditSave(entry.id)} disabled={editSaving} style={{ display: "flex", alignItems: "center", gap: 6 }}>{editSaving && <Spinner size={12} />}{editSaving ? "…" : "Save"}</button><button className="btn btn-secondary btn-sm" onClick={() => setEditingEntry(null)} disabled={editSaving}>Cancel</button></div> : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button className="btn btn-outline btn-sm" onClick={() => { setEditingEntry(entry.id); setEditScore(entry.score != null ? String(entry.score) : ""); setEditMaxScore(String(entry.maxScore)); }}>Edit</button><button className="btn btn-sm" style={{ background: "var(--danger-light)", color: "var(--danger)", border: "none", cursor: "pointer", borderRadius: 6, padding: "0.25rem 0.6rem", fontSize: "0.78rem", fontWeight: 600 }} onClick={() => void handleDeleteEntry(entry.id, [entry.firstName, entry.lastName].filter(Boolean).join(" ") || entry.studentEmail || entry.studentId.slice(0, 8))}>Delete</button></div>}</td>
+                                                                <td>{isEditing ? <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button className="btn btn-primary btn-sm" onClick={() => void handleEditSave(entry.id)} disabled={editSaving} style={{ display: "flex", alignItems: "center", gap: 6 }}>{editSaving && <Spinner size={12} />}{editSaving ? "…" : "Save"}</button><button className="btn btn-secondary btn-sm" onClick={() => setEditingEntry(null)} disabled={editSaving}>Cancel</button></div> : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><button className="btn btn-outline btn-sm" onClick={() => { setEditingEntry(entry.id); setEditScore(entry.score != null ? String(entry.score) : ""); setEditMaxScore(String(entry.maxScore)); }}>Edit</button></div>}</td>
                                                             </tr>
                                                         );
                                                     })}

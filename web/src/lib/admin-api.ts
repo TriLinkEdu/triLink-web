@@ -1261,10 +1261,6 @@ export async function releaseGrades(classOfferingId: string, title: string): Pro
   });
 }
 
-export async function deleteGradeEntry(id: string): Promise<{ ok: boolean }> {
-  return adminJson(`/api/grades/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
 export async function deleteGradeGroup(classOfferingId: string, title: string): Promise<{ ok: boolean; deleted: number }> {
   return adminJson("/api/grades/group", {
     method: "DELETE",
