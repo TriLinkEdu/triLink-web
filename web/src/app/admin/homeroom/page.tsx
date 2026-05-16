@@ -111,6 +111,15 @@ export default function AdminHomeroomPage() {
       showToast("Select teacher, grade, and section", false);
       return;
     }
+    const alreadyAssigned = assignments.find((a) => a.teacherId === form.teacherId);
+    if (alreadyAssigned) {
+      const t = teacherMap.get(alreadyAssigned.teacherId);
+      showToast(
+        `${t?.firstName ?? ""} ${t?.lastName ?? ""} is already assigned as homeroom teacher for Grade ${alreadyAssigned.gradeName ?? ""} Section ${alreadyAssigned.sectionName ?? ""}`,
+        false
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       await assignHomeroom({
@@ -346,11 +355,14 @@ export default function AdminHomeroomPage() {
             <Field label="Teacher">
               <NativeSelect value={form.teacherId} onChange={(v) => setForm((f) => ({ ...f, teacherId: v }))}>
                 <option value="">Select teacher…</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.firstName} {t.lastName}{t.subject ? " · " + t.subject : ""}
-                  </option>
-                ))}
+                {teachers.map((t) => {
+                  const existing = assignments.find((a) => a.teacherId === t.id);
+                  return (
+                    <option key={t.id} value={t.id} disabled={!!existing}>
+                      {t.firstName} {t.lastName}{t.subject ? " · " + t.subject : ""}{existing ? " (already assigned)" : ""}
+                    </option>
+                  );
+                })}
               </NativeSelect>
             </Field>
             <Field label="Grade">
