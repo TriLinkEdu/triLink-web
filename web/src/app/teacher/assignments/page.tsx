@@ -47,7 +47,7 @@ function AssignmentsSkeleton() {
 
 export default function TeacherAssignments() {
   useCurrentUser("teacher");
-  const { selectedTermId } = useTermStore();
+  const { selectedTermId, selectedTermName } = useTermStore();
   const [offerings, setOfferings] = useState<ClassOffering[]>([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -236,6 +236,12 @@ export default function TeacherAssignments() {
             <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
           </div>
           <div style={{ padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {!editing && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.8rem", fontWeight: 600, color: "var(--primary-600)", background: "var(--primary-50)", padding: "0.4rem 0.75rem", borderRadius: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Term: {selectedTermName ?? "All Terms"}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <div className="input-group" style={{ gridColumn: "1 / -1" }}>
                 <label>Title *</label>
