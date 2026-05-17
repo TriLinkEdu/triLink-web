@@ -89,7 +89,13 @@ export default function AdminSchoolSetup() {
     selectedSubjects: [] as string[],
   });
   const [loadingGradeCreate, setLoadingGradeCreate] = useState(false);
-  
+  const [loadingCreateYear, setLoadingCreateYear] = useState(false);
+  const [loadingSaveYear, setLoadingSaveYear] = useState(false);
+  const [loadingRollover, setLoadingRollover] = useState(false);
+  const [loadingAddTerm, setLoadingAddTerm] = useState(false);
+  const [loadingCreateSection, setLoadingCreateSection] = useState(false);
+  const [loadingCreateSubject, setLoadingCreateSubject] = useState(false);
+
   const [sNew, setSNew] = useState({ name: "" });
   const [subNew, setSubNew] = useState({ name: "", code: "" });
 
@@ -165,6 +171,7 @@ export default function AdminSchoolSetup() {
       showT("Label and both dates are required.");
       return;
     }
+    setLoadingCreateYear(true);
     try {
       await createAcademicYear({
         label: newYear.label.trim(),
@@ -177,11 +184,14 @@ export default function AdminSchoolSetup() {
       showT("Academic year created.");
     } catch (e) {
       showT(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setLoadingCreateYear(false);
     }
   };
 
   const handleSaveEditYear = async () => {
     if (!editYear) return;
+    setLoadingSaveYear(true);
     try {
       await patchAcademicYear(editYear.id, {
         label: editYear.label,
@@ -194,11 +204,14 @@ export default function AdminSchoolSetup() {
       showT("Year updated.");
     } catch (e) {
       showT(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setLoadingSaveYear(false);
     }
   };
 
   const handleRollover = async () => {
     if (!rolloverId || !rolloverLabel.trim()) return;
+    setLoadingRollover(true);
     try {
       const r = await rolloverAcademicYear(rolloverId, rolloverLabel.trim(), rolloverDry);
       if (rolloverDry) {
@@ -211,6 +224,8 @@ export default function AdminSchoolSetup() {
       }
     } catch (e) {
       showT(e instanceof Error ? e.message : "Rollover failed");
+    } finally {
+      setLoadingRollover(false);
     }
   };
 
@@ -219,6 +234,7 @@ export default function AdminSchoolSetup() {
       showT("Select a year and fill term name and dates.");
       return;
     }
+    setLoadingAddTerm(true);
     try {
       await addTerm(termsYearId, {
         name: termForm.name.trim(),
@@ -230,6 +246,8 @@ export default function AdminSchoolSetup() {
       showT("Term added.");
     } catch (e) {
       showT(e instanceof Error ? e.message : "Add term failed");
+    } finally {
+      setLoadingAddTerm(false);
     }
   };
 
@@ -416,10 +434,11 @@ export default function AdminSchoolSetup() {
         </h3>
         <div style={{ display: "grid", gap: "0.5rem", marginBottom: "1rem", maxWidth: 480 }}>
           <input
-            placeholder="Label (e.g. 2025/2026)"
+            placeholder="Label (e.g., 2024/2025)"
             value={newYear.label}
-            onChange={(e) => setNewYear((n) => ({ ...n, label: e.target.value }))}
+            onChange={(e) => setNewYear({ ...newYear, label: e.target.value })}
             style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }}
+            disabled={loadingCreateYear}
           />
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <label style={{ fontSize: "0.85rem" }}>
@@ -427,7 +446,8 @@ export default function AdminSchoolSetup() {
               <input
                 type="date"
                 value={newYear.startDate}
-                onChange={(e) => setNewYear((n) => ({ ...n, startDate: e.target.value }))}
+                onChange={(e) => setNewYear({ ...newYear, startDate: e.target.value })}
+                disabled={loadingCreateYear}
                 style={{ display: "block", marginTop: 4, padding: "0.35rem" }}
               />
             </label>
@@ -436,7 +456,8 @@ export default function AdminSchoolSetup() {
               <input
                 type="date"
                 value={newYear.endDate}
-                onChange={(e) => setNewYear((n) => ({ ...n, endDate: e.target.value }))}
+                onChange={(e) => setNewYear({ ...newYear, endDate: e.target.value })}
+                disabled={loadingCreateYear}
                 style={{ display: "block", marginTop: 4, padding: "0.35rem" }}
               />
             </label>
@@ -446,11 +467,12 @@ export default function AdminSchoolSetup() {
               type="checkbox"
               checked={newYear.isActive}
               onChange={(e) => setNewYear((n) => ({ ...n, isActive: e.target.checked }))}
+              disabled={loadingCreateYear}
             />
             Set as active year on create
           </label>
-          <button type="button" className="btn btn-primary" onClick={handleCreateYear}>
-            Create year
+          <button type="button" className="btn btn-primary" onClick={handleCreateYear} disabled={loadingCreateYear}>
+            {loadingCreateYear ? "Creating..." : "Create year"}
           </button>
         </div>
 
@@ -586,13 +608,14 @@ export default function AdminSchoolSetup() {
             value={termForm.name}
             onChange={(e) => setTermForm((t) => ({ ...t, name: e.target.value }))}
             style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }}
+            disabled={loadingAddTerm}
           />
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <input type="date" value={termForm.startDate} onChange={(e) => setTermForm((t) => ({ ...t, startDate: e.target.value }))} />
-            <input type="date" value={termForm.endDate} onChange={(e) => setTermForm((t) => ({ ...t, endDate: e.target.value }))} />
+            <input type="date" value={termForm.startDate} onChange={(e) => setTermForm((t) => ({ ...t, startDate: e.target.value }))} disabled={loadingAddTerm} />
+            <input type="date" value={termForm.endDate} onChange={(e) => setTermForm((t) => ({ ...t, endDate: e.target.value }))} disabled={loadingAddTerm} />
           </div>
-          <button type="button" className="btn btn-primary" onClick={handleAddTerm} disabled={!termsYearId}>
-            Add term
+          <button type="button" className="btn btn-primary" onClick={handleAddTerm} disabled={!termsYearId || loadingAddTerm}>
+            {loadingAddTerm ? "Adding..." : "Add term"}
           </button>
         </div>
         <div className="table-wrapper">
@@ -706,14 +729,15 @@ export default function AdminSchoolSetup() {
             value={sNew.name}
             onChange={(e) => setSNew({ name: e.target.value })}
             style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }}
-            disabled={loading}
+            disabled={loadingCreateSection}
           />
           <button
             type="button"
             className="btn btn-primary"
-            disabled={loading}
+            disabled={loadingCreateSection}
             onClick={async () => {
               if (!sNew.name.trim()) return;
+              setLoadingCreateSection(true);
               try {
                 await createSection({ name: sNew.name.trim() });
                 setSNew({ name: "" });
@@ -721,10 +745,12 @@ export default function AdminSchoolSetup() {
                 showT("Section created.");
               } catch (e) {
                 showT(e instanceof Error ? e.message : "Failed");
+              } finally {
+                setLoadingCreateSection(false);
               }
             }}
           >
-            {loading ? "Loading..." : "Add"}
+            {loadingCreateSection ? "Creating..." : "Add"}
           </button>
         </div>
         <div className="table-wrapper">
@@ -773,21 +799,22 @@ export default function AdminSchoolSetup() {
             value={subNew.name}
             onChange={(e) => setSubNew((u) => ({ ...u, name: e.target.value }))}
             style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }}
-            disabled={loading}
+            disabled={loadingCreateSubject}
           />
           <input
             placeholder="Code (optional)"
             value={subNew.code}
             onChange={(e) => setSubNew((u) => ({ ...u, code: e.target.value }))}
             style={{ padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }}
-            disabled={loading}
+            disabled={loadingCreateSubject}
           />
           <button
             type="button"
             className="btn btn-primary"
-            disabled={loading}
+            disabled={loadingCreateSubject}
             onClick={async () => {
               if (!subNew.name.trim()) return;
+              setLoadingCreateSubject(true);
               try {
                 await createSubject({ name: subNew.name.trim(), code: subNew.code.trim() || undefined });
                 setSubNew({ name: "", code: "" });
@@ -795,10 +822,12 @@ export default function AdminSchoolSetup() {
                 showT("Subject created.");
               } catch (e) {
                 showT(e instanceof Error ? e.message : "Failed");
+              } finally {
+                setLoadingCreateSubject(false);
               }
             }}
           >
-            {loading ? "Loading..." : "Add"}
+            {loadingCreateSubject ? "Creating..." : "Add"}
           </button>
         </div>
         <div className="table-wrapper">
@@ -861,6 +890,7 @@ export default function AdminSchoolSetup() {
                 value={editYear.label}
                 onChange={(e) => setEditYear((ey) => (ey ? { ...ey, label: e.target.value } : null))}
                 style={{ display: "block", width: "100%", marginTop: 4, padding: "0.5rem" }}
+                disabled={loadingSaveYear}
               />
             </label>
             <label style={{ display: "block", marginBottom: 8, fontSize: "0.85rem" }}>
@@ -870,6 +900,7 @@ export default function AdminSchoolSetup() {
                 value={toDateInput(editYear.startDate)}
                 onChange={(e) => setEditYear((ey) => (ey ? { ...ey, startDate: e.target.value } : null))}
                 style={{ display: "block", marginTop: 4 }}
+                disabled={loadingSaveYear}
               />
             </label>
             <label style={{ display: "block", marginBottom: 8, fontSize: "0.85rem" }}>
@@ -879,6 +910,7 @@ export default function AdminSchoolSetup() {
                 value={toDateInput(editYear.endDate)}
                 onChange={(e) => setEditYear((ey) => (ey ? { ...ey, endDate: e.target.value } : null))}
                 style={{ display: "block", marginTop: 4 }}
+                disabled={loadingSaveYear}
               />
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem", fontSize: "0.85rem" }}>
@@ -886,6 +918,7 @@ export default function AdminSchoolSetup() {
                 type="checkbox"
                 checked={!!editYear.isArchived}
                 onChange={(e) => setEditYear((ey) => (ey ? { ...ey, isArchived: e.target.checked } : null))}
+                disabled={loadingSaveYear}
               />
               Archived
             </label>
@@ -893,8 +926,8 @@ export default function AdminSchoolSetup() {
               <button type="button" className="btn btn-secondary" onClick={() => setEditYear(null)}>
                 Cancel
               </button>
-              <button type="button" className="btn btn-primary" onClick={handleSaveEditYear}>
-                Save
+              <button type="button" className="btn btn-primary" onClick={handleSaveEditYear} disabled={loadingSaveYear}>
+                {loadingSaveYear ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
@@ -929,18 +962,19 @@ export default function AdminSchoolSetup() {
                 value={rolloverLabel}
                 onChange={(e) => setRolloverLabel(e.target.value)}
                 style={{ display: "block", width: "100%", marginTop: 4, padding: "0.5rem" }}
+                disabled={loadingRollover}
               />
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem", fontSize: "0.85rem" }}>
-              <input type="checkbox" checked={rolloverDry} onChange={(e) => setRolloverDry(e.target.checked)} />
+              <input type="checkbox" checked={rolloverDry} onChange={(e) => setRolloverDry(e.target.checked)} disabled={loadingRollover} />
               Dry run only
             </label>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button type="button" className="btn btn-secondary" onClick={() => setRolloverId(null)}>
                 Cancel
               </button>
-              <button type="button" className="btn btn-primary" onClick={handleRollover}>
-                {rolloverDry ? "Run dry run" : "Rollover"}
+              <button type="button" className="btn btn-primary" onClick={handleRollover} disabled={loadingRollover}>
+                {loadingRollover ? "Processing..." : rolloverDry ? "Run dry run" : "Rollover"}
               </button>
             </div>
           </div>
