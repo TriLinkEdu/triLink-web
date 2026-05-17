@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link2, ShieldCheck, Sparkles, UserRound, Users } from "lucide-react";
 import { type ParentLink, type PublicUser, createParentLink, deleteParentLink, listParentLinks, listUsers, patchUser } from "@/lib/admin-api";
 import Select from "@/components/Select";
+import SearchableSelect from "@/components/SearchableSelect";
 import TablePagination from "@/components/TablePagination";
 import { PageHeader, PageHeaderSkeleton, StatGridSkeleton, TableSkeleton } from "@/components/ui";
 
@@ -354,26 +355,34 @@ export default function AdminParents() {
           Add parent–student link
         </h3>
         <div style={{ display: "grid", gap: "0.75rem", maxWidth: 480 }}>
-          <label>
-            Parent
-            <Select value={form.parentId} onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
-              {parents.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.firstName} {p.lastName} ({p.email})
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label>
-            Student
-            <Select value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.firstName} {s.lastName}
-                </option>
-              ))}
-            </Select>
-          </label>
+          <SearchableSelect
+            label="Parent"
+            value={form.parentId}
+            onChange={(value) => setForm((f) => ({ ...f, parentId: value }))}
+            options={parents.map((p) => ({
+              value: p.id,
+              label: `${p.firstName} ${p.lastName}`,
+              subtitle: p.email,
+            }))}
+            placeholder="Select a parent..."
+            searchPlaceholder="Search parents by name or email..."
+            disabled={loading || !parents.length}
+            alphabetize={true}
+          />
+          <SearchableSelect
+            label="Student"
+            value={form.studentId}
+            onChange={(value) => setForm((f) => ({ ...f, studentId: value }))}
+            options={students.map((s) => ({
+              value: s.id,
+              label: `${s.firstName} ${s.lastName}`,
+              subtitle: s.email || undefined,
+            }))}
+            placeholder="Select a student..."
+            searchPlaceholder="Search students by name..."
+            disabled={loading || !students.length}
+            alphabetize={true}
+          />
           <label>
             Relationship
             <Select value={form.relationship} onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none", cursor: "pointer", fontWeight: 500 }}>
