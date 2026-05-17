@@ -62,7 +62,7 @@ export default function Sidebar({ role, items, roleColor }: SidebarProps) {
                 <div className="sidebar-header">
                     <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none", color: "inherit" }} aria-label="Go to home page">
                         <div className="sidebar-logo" style={{ overflow: "hidden", borderRadius: "10px", padding: 0, background: "transparent" }}>
-                            <img src="https://avatars.githubusercontent.com/u/261413181?s=200&v=4" alt="TriLink" width={36} height={36} style={{ width: 36, height: 36, objectFit: "contain", display: "block" }} />
+                            <img src="/trilink-logo.png" alt="TriLink" width={40} height={40} style={{ width: 40, height: 40, objectFit: "contain", display: "block" }} />
                         </div>
                         <div>
                             <div className="sidebar-brand">Tri<span>Link</span></div>
