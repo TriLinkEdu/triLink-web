@@ -6,12 +6,12 @@ import { useAcademicYearStore } from "@/store/academicYearStore";
 import { clearAuth } from "@/lib/auth";
 import { ArrowRight, Search } from "lucide-react";
 import { getActiveAcademicYear, listAcademicYears } from "@/lib/admin-api";
-import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 import { useToastStore } from "@/store/toastStore";
 import RealtimeToast from "@/components/RealtimeToast";
-import Select from "@/components/Select";
+import { KitSelect } from "@/components/kit/local";
 import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 import { navSearchIndex, type NavRole } from "@/lib/role-nav";
+import { KitThemeToggle } from "@/components/kit/theme-toggle";
 
 interface HeaderProps {
     userName: string;
@@ -66,7 +66,7 @@ const ROLE_ROUTES: Record<string, Array<{ href: string; keywords: string[] }>> =
     ],
 };
 
-export default function Header({ userName, userRole, userInitials, userProfileHref, userProfileImageFileId, userId }: HeaderProps) {
+export default function Header({ userName, userRole, userInitials, userProfileHref, userProfileImageFileId, userId: _userId }: HeaderProps) {
     const router = useRouter();
     const pathname = usePathname();
     const [searchText, setSearchText] = useState("");
@@ -147,8 +147,9 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
         };
     }, [role, pathname]);
     
-    // Real-time notifications
-    const { toast, setToast } = useRealtimeNotifications(userId, userName);
+    // Realtime notifications are subscribed exactly once per portal — by the
+    // role's layout (admin/teacher/student/parent layout.tsx). The header only
+    // renders manual toasts pushed via the toast store.
     const { toast: manualToast, hideToast } = useToastStore();
 
     useEffect(() => {
@@ -361,7 +362,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                 {role === "admin" ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginRight: "1rem" }}>
                         <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 600 }}>Year:</span>
-                        <Select
+                        <KitSelect
                             value={
                                 adminYearLabels.includes(adminSelectedYear)
                                     ? adminSelectedYear
@@ -390,10 +391,18 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                                     </option>
                                 ))
                             )}
-                        </Select>
+                        </KitSelect>
                     </div>
                 ) : (
-                    <div style={{ marginRight: "0.5rem", padding: "0.25rem 0.6rem", background: "var(--primary-50)", color: "var(--primary-600)", borderRadius: "20px", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap", display: "var(--year-display, flex)" }}>
+                    <div
+                        className="hidden items-center gap-1.5 rounded-full border bg-[var(--color-surface-2)] px-2 py-px text-[11px] font-medium text-[var(--color-ink-2)] sm:inline-flex"
+                        style={{
+                            marginRight: "0.5rem",
+                            borderColor: "var(--color-hairline)",
+                            fontVariantNumeric: "tabular-nums",
+                        }}
+                    >
+                        <span aria-hidden className="size-[5px] rounded-full bg-[var(--color-ink-3)]" />
                         {portalYearLabel ?? currentSystemYear}
                     </div>
                 )}
@@ -430,15 +439,14 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                     </button>
                 )}
 
+                <KitThemeToggle />
+
                 {userBlock}
             </div>
 
-            <RealtimeToast 
-                toast={toast || manualToast} 
-                onClose={() => {
-                    if (toast) setToast(null);
-                    if (manualToast) hideToast();
-                }} 
+            <RealtimeToast
+                toast={manualToast}
+                onClose={() => hideToast()}
             />
         </header>
     );

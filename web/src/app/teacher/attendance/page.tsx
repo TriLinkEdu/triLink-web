@@ -16,6 +16,7 @@ import {
 } from "@/lib/admin-api";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 type AttendanceStatus = "present" | "absent" | "excused";
 type ExcuseEntry = { note: string; saved: boolean };
@@ -301,12 +302,11 @@ export default function TeacherAttendance() {
     if (err) {
         return (
             <div className="page-wrapper">
-                <div className="page-header">
-                    <div>
-                        <h1 className="page-title">Attendance</h1>
-                        <p className="page-subtitle">Error</p>
-                    </div>
-                </div>
+                <KitPageHead
+                    meta={<><span className="role-dot" /> Teaching <span className="dot-sep">·</span> Error</>}
+                    title="Attendance"
+                    sub="Could not load class data."
+                />
                 <div className="card" style={{ color: "var(--danger)", padding: "2rem" }}>{err}</div>
             </div>
         );
@@ -315,12 +315,11 @@ export default function TeacherAttendance() {
     if (offerings.length === 0) {
         return (
             <div className="page-wrapper">
-                <div className="page-header">
-                    <div>
-                        <h1 className="page-title">Attendance</h1>
-                        <p className="page-subtitle">{todayStr}</p>
-                    </div>
-                </div>
+                <KitPageHead
+                    meta={<><span className="role-dot" /> Teaching <span className="dot-sep">·</span> {todayStr}</>}
+                    title="Attendance"
+                    sub="Select an assigned class to begin."
+                />
                 <div className="card" style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--gray-400)" }}>
                     <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--gray-500)", marginBottom: "0.25rem" }}>No classes assigned</div>
                     <div style={{ fontSize: "0.85rem" }}>Ask an admin to assign you to class offerings for this academic year.</div>
@@ -416,32 +415,30 @@ export default function TeacherAttendance() {
                 </div>
             )}
 
-            {/* Page header */}
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                        Attendance
-                    </h1>
-                    <p className="page-subtitle">{todayStr}</p>
-                </div>
-                {students.length > 0 && (
-                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                        <button className="btn btn-secondary" onClick={markAll} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                            {allPresent ? (
-                                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>Mark All Absent</>
-                            ) : (
-                                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>Mark All Present</>
-                            )}
-                        </button>
-                        <button className="btn btn-primary" onClick={handleSubmit} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
-                            {hasSubmittedToday ? "Save Attendance Changes" : "Submit Attendance"}
-                        </button>
-                    </div>
-                )}
-            </div>
-
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Teaching
+                        <span className="dot-sep">·</span>
+                        {todayStr}
+                    </>
+                }
+                title="Attendance"
+                sub="Mark attendance for today's session."
+                actions={
+                    students.length > 0 ? (
+                        <>
+                            <button type="button" className="btn-kit btn-kit-secondary" onClick={markAll}>
+                                {allPresent ? "Mark all absent" : "Mark all present"}
+                            </button>
+                            <button type="button" className="btn-kit btn-kit-primary" onClick={handleSubmit}>
+                                {hasSubmittedToday ? "Save changes" : "Submit attendance"}
+                            </button>
+                        </>
+                    ) : null
+                }
+            />
             {/* Submitted banner */}
             {hasSubmittedToday && (
                 <div style={{ marginBottom: "1.25rem", padding: "0.875rem 1.25rem", borderRadius: 12, background: "var(--warning-light)", border: "1.5px solid var(--warning)", display: "flex", alignItems: "center", gap: "0.75rem" }}>

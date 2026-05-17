@@ -7,7 +7,6 @@ export default function TeacherLogin() {
             role="Teacher"
             rolePlural="Teachers"
             dashboardPath="/teacher/dashboard"
-            gradient="linear-gradient(135deg, #059669, #047857)"
             tagline="Empower your classroom"
         />
     );

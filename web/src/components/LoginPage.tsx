@@ -1,10 +1,12 @@
 "use client";
+
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, GraduationCap } from "lucide-react";
 import { refreshStoredProfile, setTokens, setStoredUser } from "@/lib/auth";
 import { apiPath, getApiBase } from "@/lib/api";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Label } from "@/components/shadcn";
 
 type PortalRole = "admin" | "teacher" | "student" | "parent";
 
@@ -12,12 +14,45 @@ interface LoginPageProps {
     role: string;
     rolePlural: string;
     dashboardPath: string;
+    /** @deprecated kept for compatibility — no longer rendered. The login
+     * screen is now a single centered card across all roles. */
     gradient?: string;
+    /** Optional one-line role tagline. Keep it under ~70 characters. */
     tagline?: string;
 }
 
-export default function LoginPage({ role, rolePlural, dashboardPath, gradient, tagline }: LoginPageProps) {
-    const canUseForgotPassword = role.toLowerCase() !== "admin";
+const OTHER_ROLES: Record<PortalRole, { label: string; href: string }[]> = {
+    admin: [
+        { label: "Teacher", href: "/teacher/login" },
+        { label: "Student", href: "/student/login" },
+        { label: "Parent", href: "/parent/login" },
+    ],
+    teacher: [
+        { label: "Admin", href: "/admin/login" },
+        { label: "Student", href: "/student/login" },
+        { label: "Parent", href: "/parent/login" },
+    ],
+    student: [
+        { label: "Admin", href: "/admin/login" },
+        { label: "Teacher", href: "/teacher/login" },
+        { label: "Parent", href: "/parent/login" },
+    ],
+    parent: [
+        { label: "Admin", href: "/admin/login" },
+        { label: "Teacher", href: "/teacher/login" },
+        { label: "Student", href: "/student/login" },
+    ],
+};
+
+export default function LoginPage({
+    role,
+    dashboardPath,
+    tagline,
+}: LoginPageProps) {
+    const forgotPasswordEnabled =
+        process.env.NEXT_PUBLIC_ENABLE_FORGOT_PASSWORD === "true";
+    const canUseForgotPassword =
+        forgotPasswordEnabled && role.toLowerCase() !== "admin";
     const normalizedRole = role.toLowerCase() as PortalRole;
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -31,38 +66,36 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
     const [resetting, setResetting] = useState(false);
     const router = useRouter();
 
-
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoginError("");
-
         if (!email || !password) {
-            setLoginError("Please enter your email and password.");
+            setLoginError("Enter your email and password to continue.");
             return;
         }
 
         setLoading(true);
-
         try {
             const apiBase = getApiBase();
             const loginPath = process.env.NEXT_PUBLIC_AUTH_LOGIN_PATH ?? apiPath.login;
-
             const res = await fetch(`${apiBase}${loginPath}`, {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: email.toLowerCase(), password, role: role.toLowerCase() }),
+                body: JSON.stringify({
+                    email: email.toLowerCase(),
+                    password,
+                    role: role.toLowerCase(),
+                }),
             });
-
             const data = await res.json().catch(() => ({}));
-
             if (!res.ok) {
-                throw new Error(data.message || "Invalid email or password.");
+                throw new Error(
+                    data.message ||
+                        "We couldn’t find an account with those details.",
+                );
             }
-
-            // Store JWT so authFetch can attach it to subsequent requests
-            setTokens(data.accessToken ?? "", data.refreshToken);
-
-            // Store user profile so layouts can show real name/initials
+            if (data.accessToken) setTokens(data.accessToken, data.refreshToken);
             if (data.user ?? data.id ?? data.firstName) {
                 const u = data.user ?? data;
                 setStoredUser({
@@ -77,18 +110,28 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                     department: u.department,
                     childName: u.childName,
                     relationship: u.relationship,
-                    profileImageFileId: u.profileImageFileId || data.profileImageFileId || data.profileImageId || data.avatarId,
+                    profileImageFileId:
+                        u.profileImageFileId ||
+                        data.profileImageFileId ||
+                        data.profileImageId ||
+                        data.avatarId,
                 });
             } else {
-                // Fallback: at minimum store email + role
-                setStoredUser({ firstName: "", lastName: "", email: email.toLowerCase(), role: role.toLowerCase() });
+                setStoredUser({
+                    firstName: "",
+                    lastName: "",
+                    email: email.toLowerCase(),
+                    role: role.toLowerCase(),
+                });
             }
-
             await refreshStoredProfile();
-
             router.push(dashboardPath);
         } catch (err) {
-            setLoginError(err instanceof Error ? err.message : "Login failed. Please try again.");
+            setLoginError(
+                err instanceof Error
+                    ? err.message
+                    : "Sign-in failed. Please try again.",
+            );
             setLoading(false);
         }
     };
@@ -97,14 +140,11 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
         e.preventDefault();
         setResetError("");
         setResetMessage("");
-        
         if (!forgotEmail) {
-            setResetError("Please enter your email address");
+            setResetError("Enter your email address.");
             return;
         }
-
         setResetting(true);
-
         try {
             const resetPayload = {
                 emailType: "reset-password",
@@ -112,218 +152,253 @@ export default function LoginPage({ role, rolePlural, dashboardPath, gradient, t
                 role: normalizedRole,
                 resetLink: `${window.location.origin}/reset-password?email=${encodeURIComponent(forgotEmail.toLowerCase())}&role=${normalizedRole}`,
             };
-
             const res = await fetch("/api/send-email", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(resetPayload),
             });
-
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || "Failed to send reset email");
+                throw new Error(data.error || "We couldn’t send the reset email.");
             }
-
-            setResetMessage(`Password reset instructions have been sent to ${forgotEmail}`);
+            setResetMessage(
+                `Reset instructions sent to ${forgotEmail}.`,
+            );
             setForgotEmail("");
-            
             setTimeout(() => {
                 setShowForgotPassword(false);
                 setResetMessage("");
             }, 3000);
         } catch (err) {
-            setResetError(err instanceof Error ? err.message : "An error occurred");
+            setResetError(
+                err instanceof Error ? err.message : "Something went wrong.",
+            );
         } finally {
             setResetting(false);
         }
     };
 
-    return (
-        <div className="login-page">
-            <div className="login-left">
-                <div className="login-card">
-                    <div className="login-logo-wrapper">
-                        <div className="login-logo">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-                                <path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div className="login-heading">
-                        <h1>Welcome to TriLink</h1>
-                        <p>{tagline || "Learn smarter, grow faster"}</p>
-                    </div>
+    const otherRoles = OTHER_ROLES[normalizedRole] ?? [];
+    const roleTitle = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
 
+    const roleClassMap: Record<PortalRole, string> = {
+        student: "bg-[var(--color-role-student)]",
+        teacher: "bg-[var(--color-role-teacher)]",
+        admin: "bg-[var(--color-role-admin)]",
+        parent: "bg-[var(--color-role-parent)]",
+    };
+
+    return (
+        <main className="flex min-h-screen w-full items-center justify-center bg-[var(--color-bg)] px-4 py-10">
+            <div className="w-full max-w-[400px]">
+                <div className="mb-7 flex flex-col items-center text-center">
+                    <Link
+                        href="/"
+                        aria-label="Back to portal selector"
+                        className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-[12px] text-white no-underline transition-transform hover:-translate-y-px ${
+                            roleClassMap[normalizedRole] ??
+                            "bg-[var(--color-ink)]"
+                        }`}
+                    >
+                        <GraduationCap size={22} strokeWidth={1.6} />
+                    </Link>
+                    <p className="m-0 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-ink-3)]">
+                        <span
+                            className={`inline-block h-1.5 w-1.5 rounded-full ${
+                                roleClassMap[normalizedRole] ?? "bg-[var(--color-ink)]"
+                            }`}
+                            aria-hidden
+                        />
+                        {roleTitle} portal
+                    </p>
+                    <h1 className="m-0 mt-2 font-display text-[28px] font-medium leading-[1.1] tracking-[-0.025em] text-[var(--color-ink)]">
+                        Sign in to TriLink
+                        <span
+                            style={{
+                                fontFamily: "var(--font-serif)",
+                                fontStyle: "italic",
+                                color: "var(--brand)",
+                            }}
+                        >
+                            .
+                        </span>
+                    </h1>
+                    <p className="mt-1.5 max-w-[320px] text-[13px] leading-[1.5] text-[var(--color-ink-2)]">
+                        {tagline ||
+                            `Use your school-issued ${roleTitle.toLowerCase()} email and password to continue.`}
+                    </p>
+                </div>
+
+                <div className="rounded-[12px] border border-[var(--color-hairline)] bg-[var(--color-surface)] p-6 sm:p-7">
                     {!showForgotPassword || !canUseForgotPassword ? (
-                        <>
-                            <form className="login-form" onSubmit={handleLogin} noValidate>
+                        <form onSubmit={handleLogin} noValidate className="space-y-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="login-email" className="text-xs font-medium">
+                                    Email
+                                </Label>
                                 <Input
                                     id="login-email"
-                                    label="Email"
                                     type="email"
                                     autoComplete="email"
-                                    placeholder={`${role.toLowerCase()}@school.edu`}
-                                    leftIcon={<Mail size={16} />}
+                                    placeholder="name@school.edu"
                                     value={email}
                                     onChange={(e) => {
                                         setEmail(e.target.value);
                                         if (loginError) setLoginError("");
                                     }}
                                     disabled={loading}
+                                    leadingIcon={<Mail />}
+                                    invalid={!!loginError && !email}
                                 />
+                            </div>
 
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="login-password" className="text-xs font-medium">
+                                        Password
+                                    </Label>
+                                    {canUseForgotPassword ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowForgotPassword(true)}
+                                            className="text-xs text-[var(--color-fg-muted)] underline-offset-2 hover:text-[var(--color-fg)] hover:underline"
+                                        >
+                                            Forgot?
+                                        </button>
+                                    ) : null}
+                                </div>
                                 <Input
                                     id="login-password"
-                                    label="Password"
                                     type={showPwd ? "text" : "password"}
                                     autoComplete="current-password"
                                     placeholder="Enter your password"
-                                    leftIcon={<Lock size={16} />}
-                                    rightAddon={
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPwd((v) => !v)}
-                                            disabled={loading}
-                                            aria-label={showPwd ? "Hide password" : "Show password"}
-                                            style={{ background: "none", border: "none", padding: "0 4px", color: "var(--gray-400)", cursor: "pointer", display: "inline-flex" }}
-                                        >
-                                            {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    }
                                     value={password}
                                     onChange={(e) => {
                                         setPassword(e.target.value);
                                         if (loginError) setLoginError("");
                                     }}
                                     disabled={loading}
-                                />
-
-                                {canUseForgotPassword && (
-                                    <div className="login-forgot">
+                                    leadingIcon={<Lock />}
+                                    invalid={!!loginError && !password}
+                                    trailingSlot={
                                         <button
                                             type="button"
-                                            onClick={() => setShowForgotPassword(true)}
-                                            style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.875rem" }}
+                                            onClick={() => setShowPwd((v) => !v)}
+                                            disabled={loading}
+                                            aria-label={
+                                                showPwd ? "Hide password" : "Show password"
+                                            }
+                                            className="rounded p-1 text-[var(--color-fg-subtle)] hover:text-[var(--color-fg)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)]"
                                         >
-                                            Forgot password?
+                                            {showPwd ? (
+                                                <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                                <Eye className="h-4 w-4" />
+                                            )}
                                         </button>
-                                    </div>
-                                )}
-
-                                {loginError && (
-                                    <div role="alert" style={{
-                                        padding: "0.75rem 1rem",
-                                        marginBottom: "0.75rem",
-                                        background: "#fef2f2",
-                                        border: "1px solid #fecaca",
-                                        borderRadius: "8px",
-                                        color: "#991b1b",
-                                        fontSize: "0.875rem",
-                                        fontWeight: 500,
-                                    }}>
-                                        {loginError}
-                                    </div>
-                                )}
-
-                                <Button type="submit" loading={loading} fullWidth size="lg">
-                                    {loading ? "Logging in…" : "Log in"}
-                                </Button>
-                            </form>
-
-                        </>
-                    ) : (
-                        <>
-                            <div style={{ marginBottom: "1rem", padding: "0.75rem 0.875rem", background: "#eff6ff", borderRadius: "8px", borderLeft: "3px solid #3b82f6" }}>
-                                <p style={{ margin: 0, fontSize: "0.875rem", color: "#1e40af" }}>
-                                    Enter your email and we&apos;ll send you a link to reset your password.
-                                </p>
+                                    }
+                                />
                             </div>
 
-                            <form className="login-form" onSubmit={handleForgotPassword}>
-                                <div className="input-group">
-                                    <label htmlFor="forgot-email">Email Address</label>
-                                    <div className="input-field">
-                                        <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <rect width="20" height="16" x="2" y="4" rx="2" />
-                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                        </svg>
-                                        <input
-                                            id="forgot-email"
-                                            type="email"
-                                            placeholder="your@email.com"
-                                            value={forgotEmail}
-                                            onChange={(e) => setForgotEmail(e.target.value)}
-                                            disabled={resetting}
-                                        />
-                                    </div>
-                                </div>
-
-                                {resetError && (
-                                    <div role="alert" style={{ padding: "0.75rem 0.875rem", marginBottom: "0.75rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#991b1b", fontSize: "0.875rem" }}>
-                                        {resetError}
-                                    </div>
-                                )}
-
-                                {resetMessage && (
-                                    <div role="status" style={{ padding: "0.75rem 0.875rem", marginBottom: "0.75rem", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", color: "#166534", fontSize: "0.875rem" }}>
-                                        {resetMessage}
-                                    </div>
-                                )}
-
-                                <button type="submit" className="login-btn" disabled={resetting} style={{ marginBottom: "0.75rem" }}>
-                                    {resetting ? (
-                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" style={{ animation: "spin 1s linear infinite" }}>
-                                                <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" fill="none" />
-                                                <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
-                                            </svg>
-                                            Sending...
-                                        </span>
-                                    ) : "SEND RESET LINK"}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowForgotPassword(false);
-                                        setForgotEmail("");
-                                        setResetError("");
-                                        setResetMessage("");
-                                    }}
-                                    style={{
-                                        width: "100%",
-                                        padding: "0.75rem 1rem",
-                                        background: "var(--gray-100, #f3f4f6)",
-                                        border: "1px solid var(--gray-200, #e5e7eb)",
-                                        borderRadius: "8px",
-                                        cursor: "pointer",
-                                        fontWeight: 600,
-                                        color: "var(--gray-700, #374151)",
-                                    }}
+                            {loginError ? (
+                                <div
+                                    role="alert"
+                                    className="rounded-[7px] border bg-[var(--color-danger-soft)] px-3 py-2 text-[12.5px] leading-[1.4] text-[var(--color-danger)]"
+                                    style={{ borderColor: "rgba(196,53,84,0.18)" }}
                                 >
-                                    Back to Login
-                                </button>
-                            </form>
-                        </>
+                                    {loginError}
+                                </div>
+                            ) : null}
+
+                            <Button
+                                type="submit"
+                                size="md"
+                                variant="primary"
+                                className="w-full"
+                                loading={loading}
+                            >
+                                Sign in
+                            </Button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleForgotPassword} className="space-y-4">
+                            <div className="rounded-[7px] border border-[var(--color-hairline)] bg-[var(--color-surface-2)] px-3 py-2 text-[12.5px] leading-[1.45] text-[var(--color-ink-2)]">
+                                Enter your email and we&rsquo;ll send you a reset link.
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="forgot-email" className="text-xs font-medium">
+                                    Email
+                                </Label>
+                                <Input
+                                    id="forgot-email"
+                                    type="email"
+                                    placeholder="name@school.edu"
+                                    value={forgotEmail}
+                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                    disabled={resetting}
+                                    leadingIcon={<Mail />}
+                                />
+                            </div>
+                            {resetError ? (
+                                <div
+                                    role="alert"
+                                    className="rounded-[7px] border bg-[var(--color-danger-soft)] px-3 py-2 text-[12.5px] leading-[1.4] text-[var(--color-danger)]"
+                                    style={{ borderColor: "rgba(196,53,84,0.18)" }}
+                                >
+                                    {resetError}
+                                </div>
+                            ) : null}
+                            {resetMessage ? (
+                                <div
+                                    role="status"
+                                    className="rounded-[7px] border bg-[var(--color-success-soft)] px-3 py-2 text-[12.5px] leading-[1.4] text-[var(--color-success)]"
+                                    style={{ borderColor: "rgba(13,138,95,0.18)" }}
+                                >
+                                    {resetMessage}
+                                </div>
+                            ) : null}
+                            <Button type="submit" size="md" variant="primary" className="w-full" loading={resetting}>
+                                Send reset link
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                    setShowForgotPassword(false);
+                                    setForgotEmail("");
+                                    setResetError("");
+                                    setResetMessage("");
+                                }}
+                            >
+                                Back to sign in
+                            </Button>
+                        </form>
                     )}
                 </div>
-            </div>
 
-            <div className="login-right" style={gradient ? { background: gradient } : {}}>
-                <div className="login-right-content">
-                    <h2>{role} Portal</h2>
-                    <p>
-                        {role === "Student"
-                            ? "Access your exams, view grades, and stay connected with your learning journey."
-                            : role === "Teacher"
-                                ? "Manage classes, create assessments, and track student progress with powerful tools."
-                                : role === "Admin"
-                                    ? "Oversee school operations, manage registrations, and monitor performance analytics."
-                                    : "Stay connected with your child's education, view attendance, and communicate with teachers."}
-                    </p>
-                </div>
+                {otherRoles.length > 0 ? (
+                    <div className="mt-6 text-center text-[12px] text-[var(--color-ink-3)]">
+                        Not a {roleTitle.toLowerCase()}?{" "}
+                        {otherRoles.map((r, i) => (
+                            <span key={r.href}>
+                                <Link
+                                    href={r.href}
+                                    className="font-medium text-[var(--color-ink-2)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline"
+                                >
+                                    Sign in as {r.label.toLowerCase()}
+                                </Link>
+                                {i < otherRoles.length - 1 ? (
+                                    <span className="mx-1.5 text-[var(--color-ink-4)]" aria-hidden>
+                                        ·
+                                    </span>
+                                ) : null}
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
             </div>
-        </div>
+        </main>
     );
 }

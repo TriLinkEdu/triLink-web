@@ -1,7 +1,5 @@
-"use client";
+import { ChatKitPage } from "@/components/kit/chat-kit";
 
-import RestChat from "@/components/RestChat";
-
-export default function ParentChat() {
-  return <RestChat />;
+export default function ParentChatPage() {
+    return <ChatKitPage role="parent" />;
 }

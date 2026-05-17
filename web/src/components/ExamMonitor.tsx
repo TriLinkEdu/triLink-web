@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { 
-    getExamStudentRoster, 
-    controlExamAttempt, 
+import {
+    getExamStudentRoster,
+    controlExamAttempt,
     type ExamRosterStudent,
     type Exam
 } from "@/lib/admin-api";
 import { chatRealtime } from "@/lib/chat-realtime";
+import { useConfirm } from "@/hooks/useConfirm";
 
 interface ExamMonitorProps {
     exam: Exam;
@@ -14,6 +15,7 @@ interface ExamMonitorProps {
 }
 
 export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
+    const { confirm: confirmDialog, element: confirmEl } = useConfirm();
     const [students, setStudents] = useState<ExamRosterStudent[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
 
     useEffect(() => {
         fetchRoster();
-        const interval = setInterval(fetchRoster, 10000); // Polling fallback if realtime lags
+        const interval = setInterval(fetchRoster, 10000);
 
         const unsubStatus = chatRealtime.on("status", (status) => {
             setRtStatus(status);
@@ -70,7 +72,7 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
             }));
             const who = studentsRef.current.find((s) => s.studentId === payload.studentId);
             const name = resolveStudentName(who);
-            const reason = payload.reason ? ` - ${payload.reason}` : "";
+            const reason = payload.reason ? ` — ${payload.reason}` : "";
             pushActivity(`Violation: ${name} (${payload.violationCount})${reason}`);
         });
 
@@ -95,12 +97,12 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
             const label = payload.kind.replace(/_/g, " ");
             const who = studentsRef.current.find((s) => s.studentId === payload.studentId);
             const name = resolveStudentName(who);
-            const reason = payload.reason ? ` - ${payload.reason}` : "";
+            const reason = payload.reason ? ` — ${payload.reason}` : "";
             pushActivity(`${label.toUpperCase()}: ${name}${reason}`);
         });
 
         const unsubMessage = chatRealtime.on("message:new", () => {
-            // New chat messages might mean students are talking, but we focus on proctoring here.
+            // proctoring focus
         });
 
         return () => {
@@ -110,6 +112,7 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
             unsubActivity();
             unsubMessage();
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [exam.id]);
 
     const handleControl = async (attemptId: string, action: "force_submit" | "warn" | "allow_rejoin") => {
@@ -117,13 +120,9 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
         setActionError(null);
         try {
             await controlExamAttempt(attemptId, action, action === "warn" ? warnMsg : undefined);
-            if (action === "warn") {
-                setShowWarnModal(null);
-            }
-            if (action === "allow_rejoin") {
-                pushActivity("Teacher allowed student rejoin.");
-            }
-            fetchRoster(); // Refresh status
+            if (action === "warn") setShowWarnModal(null);
+            if (action === "allow_rejoin") pushActivity("Teacher allowed student rejoin.");
+            fetchRoster();
         } catch (err) {
             setActionError(err instanceof Error ? err.message : "Control action failed");
         }
@@ -134,79 +133,192 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
     const activeStudents = students.filter((s) => s.status === "in_progress");
 
     return (
-        <div style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", 
-            backdropFilter: "blur(4px)", display: "flex", alignItems: "center", 
-            justifyContent: "center", zIndex: 1000, padding: "2rem"
-        }}>
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(15,16,18,0.42)",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                padding: 24,
+            }}
+        >
             {actionError && (
-                <div role="alert" style={{
-                    position: "fixed",
-                    top: "1.25rem",
-                    right: "1.25rem",
-                    zIndex: 1200,
-                    maxWidth: 360,
-                    borderRadius: 16,
-                    background: "#fff",
-                    color: "var(--danger)",
-                    border: "1px solid var(--danger-light)",
-                    boxShadow: "0 24px 70px rgba(15, 23, 42, 0.18)",
-                    padding: "0.85rem 1rem",
-                    fontSize: "0.86rem",
-                    fontWeight: 700,
-                }}>
+                <div
+                    role="alert"
+                    style={{
+                        position: "fixed",
+                        top: 20,
+                        right: 20,
+                        zIndex: 1200,
+                        maxWidth: 340,
+                        borderRadius: 10,
+                        background: "var(--color-surface)",
+                        color: "var(--color-danger)",
+                        border: "1px solid rgba(196,53,84,0.22)",
+                        boxShadow: "0 12px 40px rgba(15,16,18,0.14)",
+                        padding: "10px 14px",
+                        fontSize: 12.5,
+                        fontWeight: 500,
+                    }}
+                >
                     {actionError}
                 </div>
             )}
-            <div style={{
-                background: "#fff", borderRadius: "24px", width: "100%", 
-                maxWidth: "1000px", height: "85vh", display: "flex", 
-                flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-                overflow: "hidden"
-            }}>
+            <div
+                className="k-card"
+                style={{
+                    width: "100%",
+                    maxWidth: 1040,
+                    height: "85vh",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    padding: 0,
+                }}
+            >
                 {/* Header */}
-                <div style={{
-                    padding: "1.5rem 2rem", borderBottom: "1px solid var(--gray-100)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: "linear-gradient(to right, #fff, var(--gray-50))"
-                }}>
-                    <div>
-                        <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--primary-600)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.25rem" }}>Live Proctoring</div>
-                        <h2 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)" }}>{exam.title}</h2>
+                <div
+                    style={{
+                        padding: "16px 22px",
+                        borderBottom: "1px solid var(--color-hairline)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        background: "var(--color-surface)",
+                    }}
+                >
+                    <div style={{ minWidth: 0 }}>
+                        <div
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: "var(--ink-3)",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                marginBottom: 2,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: "50%",
+                                    background:
+                                        rtStatus === "open"
+                                            ? "var(--color-success)"
+                                            : "var(--color-warning)",
+                                    display: "inline-block",
+                                }}
+                            />
+                            Live proctoring
+                        </div>
+                        <h2
+                            style={{
+                                fontSize: 18,
+                                fontWeight: 500,
+                                letterSpacing: "-0.018em",
+                                color: "var(--ink)",
+                                margin: 0,
+                            }}
+                        >
+                            {exam.title}
+                        </h2>
                     </div>
-                    <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
-                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: rtStatus === "open" ? "var(--success)" : "var(--warning)", textTransform: "uppercase" }}>
-                            {rtStatus === "open" ? "Realtime Connected" : `Realtime ${rtStatus}`}
-                        </div>
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
                         <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase" }}>Active Students</div>
-                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--success)" }}>{inProgressCount} <span style={{ fontSize: "0.85rem", color: "var(--gray-300)" }}>/ {students.length}</span></div>
+                            <div
+                                style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 500,
+                                    color: "var(--ink-3)",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                }}
+                            >
+                                Active students
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: "var(--ink)",
+                                    fontVariantNumeric: "tabular-nums",
+                                    letterSpacing: "-0.012em",
+                                }}
+                            >
+                                {inProgressCount}
+                                <span style={{ fontSize: 12, color: "var(--ink-3)" }}> / {students.length}</span>
+                            </div>
                         </div>
-                        <button onClick={onClose} style={{
-                            width: 40, height: 40, borderRadius: "12px", border: "1px solid var(--gray-200)",
-                            background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
-                        }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray-600)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close monitor"
+                            style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                border: "1px solid var(--color-hairline)",
+                                background: "var(--color-surface)",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--ink-2)",
+                            }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                         </button>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "2rem" }}>
+                <div style={{ flex: 1, overflowY: "auto", padding: 22, background: "var(--color-bg)" }}>
                     {loading ? (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--gray-400)" }}>Loading proctoring data...</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--ink-3)", fontSize: 13 }}>
+                            Loading proctoring data…
+                        </div>
                     ) : error ? (
-                        <div style={{ color: "var(--danger)", textAlign: "center", padding: "2rem" }}>{error}</div>
+                        <div style={{ color: "var(--color-danger)", textAlign: "center", padding: 32, fontSize: 13 }}>{error}</div>
                     ) : (
-                        <div style={{ display: "grid", gap: "1rem" }}>
-                            <div style={{ border: "1.5px solid var(--gray-100)", borderRadius: 14, background: "#fff", padding: "0.85rem 1rem" }}>
-                                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--gray-500)", textTransform: "uppercase", marginBottom: "0.45rem" }}>Active Students</div>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                        <div style={{ display: "grid", gap: 14 }}>
+                            <div className="k-card" style={{ padding: "12px 14px" }}>
+                                <div
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: 500,
+                                        color: "var(--ink-3)",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.04em",
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    Active students
+                                </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                                     {activeStudents.length === 0 ? (
-                                        <span style={{ fontSize: "0.8rem", color: "var(--gray-400)" }}>No active students yet.</span>
+                                        <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>No active students yet.</span>
                                     ) : (
                                         activeStudents.map((s) => (
-                                            <span key={s.studentId} style={{ padding: "0.35rem 0.65rem", borderRadius: 999, background: "var(--success-50)", color: "var(--success-600)", fontSize: "0.76rem", fontWeight: 700 }}>
+                                            <span
+                                                key={s.studentId}
+                                                className="k-pill"
+                                                style={{
+                                                    background: "var(--color-success-soft)",
+                                                    color: "var(--color-success)",
+                                                    border: "1px solid rgba(13,138,95,0.22)",
+                                                    fontSize: 11,
+                                                }}
+                                            >
                                                 {resolveStudentName(s)}
                                             </span>
                                         ))
@@ -214,175 +326,320 @@ export default function ExamMonitor({ exam, onClose }: ExamMonitorProps) {
                                 </div>
                             </div>
 
-                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.5rem", alignItems: "start" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
-                            {students.map(s => (
-                                <div key={s.studentId} style={{
-                                    border: "1.5px solid var(--gray-100)", borderRadius: "20px", 
-                                    padding: "1.25rem", background: s.status === 'in_progress' ? "#fff" : "var(--gray-50)",
-                                    transition: "all 0.2s ease",
-                                    boxShadow: s.status === 'in_progress' ? "0 4px 6px -1px rgba(0,0,0,0.05)" : "none",
-                                    opacity: s.status === 'not_started' ? 0.6 : 1
-                                }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem", alignItems: "flex-start" }}>
-                                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                                            <div style={{ 
-                                                width: 44, height: 44, borderRadius: "12px", 
-                                                background: s.status === 'submitted' ? "var(--success-50)" : "var(--primary-50)",
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                fontSize: "0.9rem", fontWeight: 700, color: s.status === 'submitted' ? "var(--success-600)" : "var(--primary-600)"
-                                            }}>
-                                                {(s.firstName?.[0] || "") + (s.lastName?.[0] || "")}
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--gray-900)" }}>{s.firstName} {s.lastName}</div>
-                                                <div style={{ 
-                                                    fontSize: "0.75rem", fontWeight: 600, 
-                                                    color: s.status === 'in_progress' ? "var(--primary-600)" : s.status === 'submitted' ? "var(--success-600)" : "var(--gray-400)"
-                                                }}>
-                                                    {s.status === 'in_progress' ? "● Live / Working" : s.status === 'submitted' ? "✓ Complete" : "○ Idle"}
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, alignItems: "start" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                                    {students.map((s) => {
+                                        const active = s.status === "in_progress";
+                                        const submitted = s.status === "submitted";
+                                        return (
+                                            <div
+                                                key={s.studentId}
+                                                className="k-card"
+                                                style={{
+                                                    padding: 14,
+                                                    background: submitted ? "var(--color-surface-2)" : "var(--color-surface)",
+                                                    opacity: s.status === "not_started" ? 0.6 : 1,
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        marginBottom: 10,
+                                                        alignItems: "flex-start",
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+                                                        <div
+                                                            style={{
+                                                                width: 34,
+                                                                height: 34,
+                                                                borderRadius: 8,
+                                                                background: submitted ? "var(--color-success-soft)" : "var(--color-surface-2)",
+                                                                color: submitted ? "var(--color-success)" : "var(--ink-2)",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                fontSize: 11,
+                                                                fontWeight: 500,
+                                                                border: "1px solid var(--color-hairline)",
+                                                            }}
+                                                        >
+                                                            {(s.firstName?.[0] || "") + (s.lastName?.[0] || "")}
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: 13.5,
+                                                                    fontWeight: 500,
+                                                                    color: "var(--ink)",
+                                                                    letterSpacing: "-0.012em",
+                                                                    whiteSpace: "nowrap",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                }}
+                                                            >
+                                                                {s.firstName} {s.lastName}
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    display: "inline-flex",
+                                                                    alignItems: "center",
+                                                                    gap: 5,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 500,
+                                                                    color: active ? "var(--color-success)" : submitted ? "var(--ink-2)" : "var(--ink-3)",
+                                                                    textTransform: "uppercase",
+                                                                    letterSpacing: "0.04em",
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    style={{
+                                                                        width: 6,
+                                                                        height: 6,
+                                                                        borderRadius: "50%",
+                                                                        background: active ? "var(--color-success)" : submitted ? "var(--ink-2)" : "var(--ink-4)",
+                                                                        display: "inline-block",
+                                                                    }}
+                                                                />
+                                                                {active ? "Live" : submitted ? "Complete" : "Idle"}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {(s.violationCount > 0 || s.isLocked) && (
+                                                        <span
+                                                            className="k-pill"
+                                                            style={{
+                                                                background: "var(--color-danger-soft)",
+                                                                color: "var(--color-danger)",
+                                                                border: "1px solid rgba(196,53,84,0.22)",
+                                                                fontSize: 10.5,
+                                                            }}
+                                                        >
+                                                            {s.isLocked ? "Locked" : `${s.violationCount} ${s.violationCount === 1 ? "violation" : "violations"}`}
+                                                        </span>
+                                                    )}
                                                 </div>
+
+                                                {s.isLocked && (
+                                                    <div
+                                                        style={{
+                                                            marginBottom: 10,
+                                                            fontSize: 12,
+                                                            color: "var(--color-danger)",
+                                                            fontWeight: 400,
+                                                            lineHeight: 1.45,
+                                                        }}
+                                                    >
+                                                        Locked: {s.lockReason || "Student left protected mode"}
+                                                    </div>
+                                                )}
+
+                                                {active && s.attemptId && (
+                                                    <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowWarnModal({ attemptId: s.attemptId!, studentName: `${s.firstName} ${s.lastName}` })}
+                                                            className="btn-kit btn-kit-warning"
+                                                            style={{ flex: 1, justifyContent: "center" }}
+                                                        >
+                                                            Warn
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                const ok = await confirmDialog({
+                                                                    title: "Force submit exam?",
+                                                                    message: `This will submit the in-progress attempt for ${s.firstName} ${s.lastName}. They will not be able to continue.`,
+                                                                    confirmLabel: "Force submit",
+                                                                    destructive: true,
+                                                                });
+                                                                if (ok) {
+                                                                    handleControl(s.attemptId!, "force_submit");
+                                                                }
+                                                            }}
+                                                            className="btn-kit btn-kit-danger"
+                                                            style={{ flex: 1, justifyContent: "center" }}
+                                                        >
+                                                            Force submit
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {s.attemptId && s.isLocked && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleControl(s.attemptId!, "allow_rejoin")}
+                                                        className="btn-kit btn-kit-primary"
+                                                        style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+                                                    >
+                                                        Allow rejoin
+                                                    </button>
+                                                )}
+
+                                                {submitted && (
+                                                    <div
+                                                        style={{
+                                                            background: "var(--color-surface-2)",
+                                                            border: "1px solid var(--color-hairline)",
+                                                            borderRadius: 8,
+                                                            padding: 8,
+                                                            textAlign: "center",
+                                                            fontSize: 12,
+                                                            color: "var(--ink-2)",
+                                                            marginTop: 12,
+                                                        }}
+                                                    >
+                                                        Score: <span style={{ color: "var(--ink)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{s.score != null ? `${s.score} / ${exam.maxPoints}` : "Pending"}</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                        {(s.violationCount > 0 || s.isLocked) && (
-                                            <div style={{ 
-                                                background: "var(--danger-light)", color: "var(--danger)", 
-                                                padding: "0.25rem 0.6rem", borderRadius: "8px", 
-                                                fontSize: "0.7rem", fontWeight: 800, animation: "pulse 2s infinite"
-                                            }}>
-                                                {s.isLocked ? "Locked" : `${s.violationCount} ${s.violationCount === 1 ? 'Violation' : 'Violations'}`}
-                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="k-card" style={{ padding: 14 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            fontWeight: 500,
+                                            color: "var(--ink-3)",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.04em",
+                                            marginBottom: 10,
+                                        }}
+                                    >
+                                        Live activity
+                                    </div>
+                                    <div style={{ display: "grid", gap: 6, maxHeight: "58vh", overflowY: "auto" }}>
+                                        {activity.length === 0 ? (
+                                            <div style={{ fontSize: 12.5, color: "var(--ink-3)" }}>Waiting for activity…</div>
+                                        ) : (
+                                            activity.map((a) => (
+                                                <div
+                                                    key={a.id}
+                                                    style={{
+                                                        border: "1px solid var(--color-hairline)",
+                                                        borderRadius: 8,
+                                                        padding: "8px 10px",
+                                                        background: "var(--color-surface)",
+                                                    }}
+                                                >
+                                                    <div style={{ fontSize: 12.5, color: "var(--ink)", fontWeight: 400, lineHeight: 1.4 }}>{a.text}</div>
+                                                    <div style={{ fontSize: 10.5, color: "var(--ink-3)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{a.at}</div>
+                                                </div>
+                                            ))
                                         )}
                                     </div>
-
-                                    {s.isLocked && (
-                                        <div style={{ marginBottom: "0.8rem", fontSize: "0.78rem", color: "var(--danger)", fontWeight: 600 }}>
-                                            Locked: {s.lockReason || "Student left protected mode"}
-                                        </div>
-                                    )}
-
-                                    {s.status === "in_progress" && s.attemptId && (
-                                        <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-                                            <button 
-                                                onClick={() => setShowWarnModal({ attemptId: s.attemptId!, studentName: `${s.firstName} ${s.lastName}` })}
-                                                style={{ 
-                                                    flex: 1, padding: "0.6rem", borderRadius: "10px", 
-                                                    background: "var(--warning-light)", color: "#b45309",
-                                                    border: "none", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer"
-                                                }}
-                                            >
-                                                Warn
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    if (confirm(`Force submit exam for ${s.firstName} ${s.lastName}?`)) {
-                                                        handleControl(s.attemptId!, "force_submit");
-                                                    }
-                                                }}
-                                                style={{ 
-                                                    flex: 1, padding: "0.6rem", borderRadius: "10px", 
-                                                    background: "var(--danger-light)", color: "var(--danger)",
-                                                    border: "none", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer"
-                                                }}
-                                            >
-                                                Force Submit
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {s.attemptId && s.isLocked && (
-                                        <button
-                                            onClick={() => handleControl(s.attemptId!, "allow_rejoin")}
-                                            style={{
-                                                width: "100%", marginTop: "0.6rem", padding: "0.6rem", borderRadius: "10px",
-                                                background: "var(--primary-500)", color: "#fff", border: "none", cursor: "pointer",
-                                                fontSize: "0.8rem", fontWeight: 700
-                                            }}
-                                        >
-                                            Allow Rejoin
-                                        </button>
-                                    )}
-
-                                    {s.status === "submitted" && (
-                                        <div style={{ 
-                                            background: "var(--gray-100)", borderRadius: "10px", 
-                                            padding: "0.6rem", textAlign: "center", fontSize: "0.8rem", 
-                                            color: "var(--gray-500)", fontWeight: 600, marginTop: "1rem"
-                                        }}>
-                                            Score: {s.score != null ? `${s.score} / ${exam.maxPoints}` : "Pending"}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                            </div>
-
-                            <div style={{ border: "1.5px solid var(--gray-100)", borderRadius: 16, background: "#fff", padding: "1rem" }}>
-                                <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--gray-800)", marginBottom: "0.75rem" }}>Live Activity</div>
-                                <div style={{ display: "grid", gap: "0.55rem", maxHeight: "58vh", overflowY: "auto" }}>
-                                    {activity.length === 0 ? (
-                                        <div style={{ fontSize: "0.8rem", color: "var(--gray-400)" }}>Waiting for activity...</div>
-                                    ) : (
-                                        activity.map((a) => (
-                                            <div key={a.id} style={{ border: "1px solid var(--gray-100)", borderRadius: 10, padding: "0.55rem 0.6rem" }}>
-                                                <div style={{ fontSize: "0.78rem", color: "var(--gray-700)", fontWeight: 600 }}>{a.text}</div>
-                                                <div style={{ fontSize: "0.68rem", color: "var(--gray-400)", marginTop: 2 }}>{a.at}</div>
-                                            </div>
-                                        ))
-                                    )}
                                 </div>
                             </div>
-                        </div>
                         </div>
                     )}
                 </div>
 
                 {/* Footer Stats */}
-                <div style={{ 
-                    padding: "1rem 2rem", background: "var(--gray-50)", 
-                    borderTop: "1px solid var(--gray-100)", display: "flex", gap: "2rem"
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}>
-                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--success)" }} />
-                        <span style={{ color: "var(--gray-500)" }}>Submitted: <strong>{submittedCount}</strong></span>
+                <div
+                    style={{
+                        padding: "10px 22px",
+                        background: "var(--color-surface)",
+                        borderTop: "1px solid var(--color-hairline)",
+                        display: "flex",
+                        gap: 18,
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-success)" }} />
+                        <span style={{ color: "var(--ink-2)" }}>
+                            Submitted: <span style={{ color: "var(--ink)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{submittedCount}</span>
+                        </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}>
-                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--primary-500)" }} />
-                        <span style={{ color: "var(--gray-500)" }}>In Progress: <strong>{inProgressCount}</strong></span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--ink)" }} />
+                        <span style={{ color: "var(--ink-2)" }}>
+                            In progress: <span style={{ color: "var(--ink)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{inProgressCount}</span>
+                        </span>
                     </div>
                 </div>
             </div>
 
             {/* Warning Modal */}
             {showWarnModal && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)" }}>
-                    <div style={{ background: "#fff", borderRadius: "20px", padding: "2rem", width: "100%", maxWidth: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)" }}>
-                        <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: "0.5rem" }}>Warn student</h3>
-                        <p style={{ fontSize: "0.85rem", color: "var(--gray-500)", marginBottom: "1.5rem" }}>Sending a warning to <strong>{showWarnModal.studentName}</strong></p>
-                        <textarea 
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 1100,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "rgba(15,16,18,0.42)",
+                        backdropFilter: "blur(2px)",
+                        WebkitBackdropFilter: "blur(2px)",
+                        padding: 16,
+                    }}
+                >
+                    <div className="k-card" style={{ padding: 22, width: "100%", maxWidth: 420 }}>
+                        <h3
+                            style={{
+                                fontSize: 16,
+                                fontWeight: 500,
+                                letterSpacing: "-0.014em",
+                                color: "var(--ink)",
+                                marginBottom: 4,
+                            }}
+                        >
+                            Warn student
+                        </h3>
+                        <p
+                            style={{
+                                fontSize: 12.5,
+                                color: "var(--ink-2)",
+                                marginBottom: 14,
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            Sending a warning to <span style={{ color: "var(--ink)", fontWeight: 500 }}>{showWarnModal.studentName}</span>
+                        </p>
+                        <textarea
                             value={warnMsg}
                             onChange={(e) => setWarnMsg(e.target.value)}
-                            style={{ 
-                                width: "100%", height: "100px", borderRadius: "12px", 
-                                border: "1.5px solid var(--gray-200)", padding: "1rem",
-                                fontSize: "0.9rem", outline: "none", marginBottom: "1.5rem",
-                                resize: "none"
+                            style={{
+                                width: "100%",
+                                height: 100,
+                                borderRadius: 8,
+                                border: "1px solid var(--color-hairline)",
+                                background: "var(--color-surface)",
+                                padding: 12,
+                                fontSize: 13,
+                                outline: "none",
+                                marginBottom: 14,
+                                resize: "none",
+                                color: "var(--ink)",
+                                fontFamily: "inherit",
                             }}
                         />
-                        <div style={{ display: "flex", gap: "0.75rem" }}>
-                            <button onClick={() => setShowWarnModal(null)} style={{ flex: 1, padding: "0.75rem", borderRadius: "12px", border: "none", background: "var(--gray-100)", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
-                            <button onClick={() => handleControl(showWarnModal.attemptId, "warn")} style={{ flex: 1, padding: "0.75rem", borderRadius: "12px", border: "none", background: "var(--warning)", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Send Warning</button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowWarnModal(null)}
+                                className="btn-kit btn-kit-ghost"
+                                style={{ flex: 1, justifyContent: "center" }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleControl(showWarnModal.attemptId, "warn")}
+                                className="btn-kit btn-kit-warning"
+                                style={{ flex: 1, justifyContent: "center" }}
+                            >
+                                Send warning
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-                @keyframes pulse {
-                    0% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.7; transform: scale(1.02); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-            `}</style>
+            {confirmEl}
         </div>
     );
 }

@@ -1,7 +1,5 @@
-"use client";
+import { ChatKitPage } from "@/components/kit/chat-kit";
 
-import RestChat from "@/components/RestChat";
-
-export default function StudentChat() {
-  return <RestChat />;
+export default function StudentChatPage() {
+    return <ChatKitPage role="student" />;
 }

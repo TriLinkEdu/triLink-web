@@ -1,12 +1,33 @@
 "use client";
+/* eslint-disable react/forbid-dom-props -- kit ports preserve inline styles verbatim. */
+
+/**
+ * Student · Exam result — reskinned to match the TRILINK kit's
+ * `<ExamResults/>` (`surfaces.jsx` lines 496-595): score-reveal hero,
+ * 4-tile stat grid, question-by-question review row table. We keep all
+ * the real backend wiring (`getAttemptResult`) and CSV export from the
+ * previous implementation; only the visual layer changes.
+ */
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getAttemptResult, type AttemptResult } from "@/lib/admin-api";
 import { toLetterGrade } from "@/lib/grading";
+import { Icon, ProgressRing, StatGrid, StatTile } from "@/components/kit";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
 
-export default function ExamResult() {
+type ReviewQuestion = {
+    id: string;
+    order: number;
+    type: QuestionType;
+    text: string;
+    options?: string[];
+    correctAnswer: string;
+    studentAnswer: string;
+    points: number;
+};
+
+export default function ExamResultPage() {
     const router = useRouter();
     const params = useParams<{ examId: string }>();
     const attemptId = params?.examId ?? "";
@@ -35,7 +56,7 @@ export default function ExamResult() {
 
     if (loading) {
         return (
-            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gray-500)" }}>
+            <div className="kit-page" data-role="student" style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)" }}>
                 Loading result…
             </div>
         );
@@ -44,24 +65,26 @@ export default function ExamResult() {
     if (loadErr || !data) {
         const pending = /release|released|not available|not found|pending/i.test(loadErr || "");
         return (
-            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem" }}>
-                <div style={{ maxWidth: 520, textAlign: "center", background: "#fff", border: "1px solid var(--gray-200)", borderRadius: 18, padding: "2rem" }}>
-                    <h2 style={{ margin: 0, fontSize: "1.25rem", color: "var(--gray-900)" }}>{pending ? "Result pending release" : "Could not load result"}</h2>
-                    <p style={{ color: pending ? "var(--gray-600)" : "var(--danger)", fontWeight: pending ? 500 : 600, lineHeight: 1.6 }}>
+            <div className="kit-page" data-role="student">
+                <button type="button" onClick={() => router.push("/student/dashboard")} className="btn-kit btn-kit-ghost" style={{ marginBottom: 14, paddingLeft: 0 }}>
+                    <Icon name="chev" size={11} className="-rotate-180" /> Back to dashboard
+                </button>
+                <div className="k-card" style={{ padding: "32px 28px", textAlign: "center" }}>
+                    <Icon name={pending ? "clock" : "alertTri"} size={28} />
+                    <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 8 }}>
+                        {pending ? "Result pending release" : "Could not load result"}
+                    </div>
+                    <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 6, lineHeight: 1.55, maxWidth: 480, marginInline: "auto" }}>
                         {pending
                             ? "Your attempt has been submitted, but the teacher has not released the result yet. Check back after grading is complete."
                             : loadErr || "Result not available yet."}
                     </p>
                 </div>
-                <button onClick={() => router.push("/student/dashboard")} style={{ padding: "0.6rem 1.5rem", borderRadius: 10, background: "var(--primary-500)", color: "#fff", border: "none", fontWeight: 600, cursor: "pointer" }}>Back to Dashboard</button>
             </div>
         );
     }
 
-    const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-
-    // Build question review data
-    const questions = (data.questions || []).map((q, i) => {
+    const questions: ReviewQuestion[] = (data.questions || []).map((q, _i) => {
         let options: string[] | undefined;
         if (q.optionsJson) { try { options = JSON.parse(q.optionsJson); } catch { /* ignore */ } }
         let type: QuestionType = "fillin";
@@ -82,142 +105,142 @@ export default function ExamResult() {
 
     const scoreVal = data.score ?? 0;
     const maxPoints = data.maxPoints || 100;
-    const scorePercent = Math.round((scoreVal / maxPoints) * 100);
-    const correct = questions.filter(q => q.studentAnswer && q.correctAnswer && q.studentAnswer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
-    const unanswered = questions.filter(q => !q.studentAnswer).length;
+    const pct = Math.round((scoreVal / maxPoints) * 100);
+    const correct = questions.filter((q) => q.studentAnswer && q.correctAnswer && q.studentAnswer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()).length;
+    const unanswered = questions.filter((q) => !q.studentAnswer).length;
     const wrong = questions.length - correct - unanswered;
     const submittedAtLabel = new Date(data.submittedAt).toLocaleString();
-    const releasedAtLabel = data.releasedAt ? new Date(data.releasedAt).toLocaleString() : "Pending";
     const tabViolations = data.violations?.length ?? 0;
-
-    const gradeLetter = toLetterGrade(scorePercent);
-    const gradeColor = gradeLetter.startsWith("A")
-        ? "var(--success)"
-        : gradeLetter.startsWith("B")
-            ? "var(--primary-600)"
-            : gradeLetter.startsWith("C")
-                ? "var(--warning)"
-                : gradeLetter.startsWith("D")
-                    ? "#f97316"
-                    : "var(--danger)";
+    const grade = toLetterGrade(pct);
+    const successTone = pct >= 70 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)";
 
     return (
-        <div>
-            {/* Header */}
-            <div style={{ marginBottom: "1.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
-                    <button onClick={() => router.push("/student/dashboard")} style={{
-                        display: "flex", alignItems: "center", gap: "0.4rem",
-                        background: "none", border: "none", color: "var(--primary-500)",
-                        fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
-                    }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg> Back to Dashboard</button>
-                    <button onClick={() => downloadResultCsv(data, questions, scorePercent, gradeLetter)} style={{ padding: "0.55rem 1rem", borderRadius: 10, background: "#fff", color: "var(--primary-600)", border: "1px solid var(--primary-200)", fontWeight: 700, cursor: "pointer" }}>Download CSV</button>
-                </div>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)", display: "flex", alignItems: "center", gap: "0.5rem" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg> Exam Result</h1>
-                <p style={{ fontSize: "0.875rem", color: "var(--gray-500)", marginTop: "0.25rem" }}>{data.examTitle}</p>
-                <p style={{ fontSize: "0.8rem", color: "var(--gray-400)", marginTop: "0.4rem", lineHeight: 1.5 }}>
-                    Submitted: {submittedAtLabel} · Released: {releasedAtLabel}
-                </p>
-            </div>
+        <div className="kit-page" data-role="student">
+            <button type="button" onClick={() => router.push("/student/dashboard")} className="btn-kit btn-kit-ghost" style={{ marginBottom: 14, paddingLeft: 0 }}>
+                <Icon name="chev" size={11} className="-rotate-180" /> Back
+            </button>
 
-            {/* Score Overview */}
-            <div className="result-overview">
-                <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
-                    <svg width="120" height="120" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--gray-100)" strokeWidth="8" />
-                        <circle cx="60" cy="60" r="52" fill="none" stroke={gradeColor} strokeWidth="8"
-                            strokeDasharray={`${(scorePercent / 100) * 327} 327`}
-                            strokeLinecap="round" transform="rotate(-90 60 60)" style={{ transition: "stroke-dasharray 1s ease" }} />
-                    </svg>
-                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ fontSize: "2rem", fontWeight: 900, color: gradeColor }}>{scorePercent}%</span>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--gray-500)" }}>Grade {gradeLetter}</span>
-                    </div>
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <h2 style={{ fontSize: "1.15rem", fontWeight: 700, marginBottom: "0.75rem" }}>{data.examTitle}</h2>
-                    <div className="result-stats-grid">
-                        <div style={{ background: "var(--success-light)", borderRadius: 12, padding: "0.75rem 1rem" }}>
-                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--success)" }}>{correct}</div>
-                            <div style={{ fontSize: "0.75rem", color: "#065f46" }}>Correct</div>
-                        </div>
-                        <div style={{ background: "var(--danger-light)", borderRadius: 12, padding: "0.75rem 1rem" }}>
-                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--danger)" }}>{wrong}</div>
-                            <div style={{ fontSize: "0.75rem", color: "#991b1b" }}>Wrong</div>
-                        </div>
-                        <div style={{ background: "var(--gray-100)", borderRadius: 12, padding: "0.75rem 1rem" }}>
-                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--gray-600)" }}>{unanswered}</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--gray-500)" }}>Unanswered</div>
-                        </div>
-                        <div style={{ background: "var(--primary-50)", borderRadius: 12, padding: "0.75rem 1rem" }}>
-                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--primary-600)" }}>{scoreVal}/{maxPoints}</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--primary-500)" }}>Score</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Violation Warning */}
-            {tabViolations > 0 && (
-                <div style={{ background: "var(--danger-light)", border: "1.5px solid var(--danger)", borderRadius: 12, padding: "0.875rem 1.25rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#991b1b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+            {/* Score hero */}
+            <div className="k-card" style={{ marginBottom: 14, padding: "30px 28px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 30, flexWrap: "wrap" }}>
                     <div>
-                        <div style={{ fontWeight: 700, color: "#991b1b", fontSize: "0.9rem" }}>Integrity Violations Recorded</div>
-                        <div style={{ fontSize: "0.8rem", color: "#991b1b" }}>{tabViolations} tab-switch or focus-loss event(s) were detected during the exam.</div>
+                        <div style={{
+                            fontSize: 11.5, color: "var(--ink-3)", textTransform: "uppercase",
+                            letterSpacing: "0.06em", fontWeight: 500, marginBottom: 8,
+                        }}>
+                            Your result
+                        </div>
+                        <h1 style={{
+                            fontSize: 30, fontWeight: 500, letterSpacing: "-0.03em",
+                            margin: 0, lineHeight: 1.1,
+                        }}>
+                            You scored{" "}
+                            <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", color: successTone }}>
+                                {pct}%
+                            </span>
+                        </h1>
+                        <div style={{ fontSize: 14, color: "var(--ink-2)", marginTop: 8 }}>
+                            {data.examTitle} · {scoreVal} of {maxPoints} points
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
+                            <button type="button" className="btn-kit btn-kit-primary"><Icon name="paper" /> Review answers</button>
+                            <button type="button" className="btn-kit btn-kit-ai"><Icon name="sparkles" /> Practice your misses</button>
+                            <button
+                                type="button"
+                                className="btn-kit btn-kit-secondary"
+                                onClick={() => downloadResultCsv(data, questions, pct, grade)}
+                            >
+                                <Icon name="download" /> Download CSV
+                            </button>
+                        </div>
+                    </div>
+                    <ProgressRing value={pct} size={120} label={grade} tone="auto" />
+                </div>
+            </div>
+
+            <StatGrid cols={4} style={{ marginBottom: 14 }}>
+                <StatTile icon="check"    label="Correct"    value={`${correct}`} note={`${pct}% accuracy`} />
+                <StatTile icon="alertTri" label="Wrong"      value={`${wrong}`}   note="see review below" />
+                <StatTile icon="minus"    label="Unanswered" value={`${unanswered}`} note={unanswered === 0 ? "every question attempted" : "skipped questions"} />
+                <StatTile icon="shield"   label="Integrity"  value={`${tabViolations}`} note={tabViolations === 0 ? "no violations" : "tab-switch events"} />
+            </StatGrid>
+
+            {tabViolations > 0 ? (
+                <div className="k-card" style={{
+                    marginBottom: 14,
+                    background: "var(--danger-soft)",
+                    borderColor: "rgba(196,53,84,0.20)",
+                    padding: "14px 16px",
+                    display: "flex", alignItems: "center", gap: 12,
+                }}>
+                    <Icon name="shield" size={18} className="text-[var(--danger)]" />
+                    <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)" }}>
+                            Integrity violations recorded
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 2 }}>
+                            {tabViolations} tab-switch or focus-loss event(s) were detected during the exam.
+                        </div>
                     </div>
                 </div>
-            )}
+            ) : null}
 
-            {/* Question Review */}
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }}>Question Review</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "2rem" }}>
-                {questions.map(q => {
-                    const isCorrect = !!q.studentAnswer && !!q.correctAnswer && q.studentAnswer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
-                    const isUnanswered = !q.studentAnswer;
-                    return (
-                        <div key={q.id} style={{
-                            background: "#fff", borderRadius: 16, padding: "1.25rem",
-                            border: `1.5px solid ${isCorrect ? "var(--success)" : isUnanswered ? "var(--gray-200)" : "var(--danger)"}`,
-                        }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <span style={{ width: 28, height: 28, borderRadius: 8, background: isCorrect ? "var(--success)" : isUnanswered ? "var(--gray-400)" : "var(--danger)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.75rem" }}>{q.order}</span>
-                                    <span style={{
-                                        padding: "0.2rem 0.5rem", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600,
-                                        background: q.type === "mcq" ? "var(--primary-50)" : q.type === "truefalse" ? "var(--purple-light)" : "var(--warning-light)",
-                                        color: q.type === "mcq" ? "var(--primary-600)" : q.type === "truefalse" ? "#5b21b6" : "#92400e",
-                                    }}>
-                                        {q.type === "mcq" ? "MCQ" : q.type === "truefalse" ? "T/F" : "Fill"}
-                                    </span>
+            <div className="k-card">
+                <div className="k-card__head">
+                    <div>
+                        <div className="k-card__title">Question-by-question review</div>
+                        <div className="k-card__sub">{questions.length} questions · submitted {submittedAtLabel}</div>
+                    </div>
+                </div>
+                <div>
+                    {questions.map((q, i) => {
+                        const isCorrect = !!q.studentAnswer && !!q.correctAnswer
+                            && q.studentAnswer.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+                        const isUnanswered = !q.studentAnswer;
+                        return (
+                            <div
+                                key={q.id}
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "32px 60px 1fr auto auto 30px",
+                                    gap: 14,
+                                    alignItems: "center",
+                                    padding: "12px 16px",
+                                    borderBottom: i < questions.length - 1 ? "1px solid var(--hairline)" : "0",
+                                }}
+                            >
+                                <div style={{
+                                    width: 22, height: 22, borderRadius: 6,
+                                    background: isCorrect ? "var(--success-soft)" : isUnanswered ? "var(--surface-2)" : "var(--danger-soft)",
+                                    color: isCorrect ? "var(--success)" : isUnanswered ? "var(--ink-3)" : "var(--danger)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                    <Icon name={isCorrect ? "check" : isUnanswered ? "minus" : "asterisk"} size={12} />
                                 </div>
-                                <span style={{ fontSize: "0.8rem", fontWeight: 700, color: isCorrect ? "var(--success)" : isUnanswered ? "var(--gray-500)" : "var(--danger)", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                                    {isCorrect ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Correct</> : isUnanswered ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg> Skipped</> : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg> Wrong</>}
+                                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-3)" }}>
+                                    Q{String(q.order).padStart(2, "0")}
                                 </span>
-                            </div>
-                            <p style={{ fontSize: "0.9rem", fontWeight: 500, marginBottom: "0.75rem", lineHeight: 1.5 }}>{q.text}</p>
-                            <div className="result-answer-row">
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--gray-400)", marginBottom: "0.25rem", textTransform: "uppercase" }}>Your Answer</div>
-                                    <div style={{ padding: "0.5rem 0.75rem", borderRadius: 8,
-                                        background: isCorrect ? "var(--success-light)" : isUnanswered ? "var(--gray-50)" : "var(--danger-light)",
-                                        fontWeight: isUnanswered ? 400 : 600,
-                                        color: isCorrect ? "#065f46" : isUnanswered ? "var(--gray-400)" : "#991b1b",
-                                        fontStyle: isUnanswered ? "italic" : "normal",
-                                    }}>
-                                        {q.studentAnswer || (q.type === "fillin" ? "Left blank" : "Not answered")}
-                                    </div>
-                                </div>
-                                {!isCorrect && q.correctAnswer && (
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--gray-400)", marginBottom: "0.25rem", textTransform: "uppercase" }}>Correct Answer</div>
-                                        <div style={{ padding: "0.5rem 0.75rem", borderRadius: 8, background: "var(--success-light)", fontWeight: 600, color: "#065f46" }}>{q.correctAnswer}</div>
-                                    </div>
+                                <span style={{ fontSize: 13, color: "var(--ink)", letterSpacing: "-0.005em" }}>
+                                    {q.text}
+                                </span>
+                                <span style={{
+                                    fontFamily: "var(--font-mono)", fontSize: 11.5,
+                                    color: isCorrect ? "var(--ink-2)" : isUnanswered ? "var(--ink-4)" : "var(--danger)",
+                                }}>
+                                    {q.studentAnswer || (q.type === "fillin" ? "Left blank" : "—")}
+                                </span>
+                                {!isCorrect && q.correctAnswer ? (
+                                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--success)" }}>
+                                        → {q.correctAnswer}
+                                    </span>
+                                ) : (
+                                    <span />
                                 )}
+                                <Icon name="chev" size={11} className="text-[var(--ink-4)]" />
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -230,11 +253,11 @@ function csvCell(value: unknown) {
 
 function downloadResultCsv(
     data: AttemptResult,
-    questions: Array<{ order: number; text: string; studentAnswer: string; correctAnswer: string; points: number }>,
+    questions: ReviewQuestion[],
     scorePercent: number,
     gradeLetter: string,
 ) {
-    const rows = [
+    const rows: Array<Array<string | number>> = [
         ["Exam", data.examTitle],
         ["Attempt ID", data.attemptId],
         ["Score", `${data.score ?? 0}/${data.maxPoints}`],

@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarCheck2, CalendarDays, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
-import Select from "@/components/Select";
+import {
+  Icon,
+  KField,
+  KitErrorBanner,
+  KitInput,
+  KitSegmented,
+  KitSelect,
+  PageHead as KitPageHead,
+  StatGrid as KitStatGrid,
+  StatTile as KitStatTile,
+} from "@/components/kit";
 import {
   type AttendanceMark,
   type AttendanceSession,
@@ -20,30 +29,35 @@ import {
   listUsers,
   putSessionMarks,
 } from "@/lib/admin-api";
-
-const STATUSES = ["present", "absent", "excused"];
+import { KitSkeleton } from "@/components/kit/local";
 
 function AttendanceSkeleton() {
   return (
-    <div className="page-wrapper">
-      <div className="attendance-hero admin-dash-skeleton-block">
-        <div style={{ width: "100%", maxWidth: 500 }}>
-          <div className="admin-skeleton shimmer" style={{ width: 150, height: 12, marginBottom: 12 }} />
-          <div className="admin-skeleton shimmer" style={{ width: "82%", height: 34, marginBottom: 10 }} />
-          <div className="admin-skeleton shimmer" style={{ width: "65%", height: 14 }} />
-        </div>
+    <div className="kit-page" data-role="admin">
+      <style>{`@keyframes kit-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+      <div style={{ marginBottom: 18 }}>
+        <KitSkeleton width={140} height={11} style={{ marginBottom: 10 }} />
+        <KitSkeleton width="60%" height={26} style={{ marginBottom: 8 }} />
+        <KitSkeleton width="40%" height={13} />
       </div>
-      <div className="attendance-summary-grid">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
         {Array.from({ length: 4 }).map((_, i) => (
-          <div className="card attendance-summary-card admin-dash-skeleton-block" key={i}>
-            <div className="admin-skeleton shimmer" style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 10 }} />
-            <div className="admin-skeleton shimmer" style={{ width: "55%", height: 12, marginBottom: 8 }} />
-            <div className="admin-skeleton shimmer" style={{ width: "35%", height: 22 }} />
+          <div className="k-card" key={i} style={{ padding: 14 }}>
+            <KitSkeleton width={22} height={22} radius={5} style={{ marginBottom: 10 }} />
+            <KitSkeleton width="60%" height={10} style={{ marginBottom: 6 }} />
+            <KitSkeleton width="38%" height={18} />
           </div>
         ))}
       </div>
-      <div className="card admin-dash-skeleton-block">
-        <div className="admin-skeleton shimmer" style={{ width: "100%", height: 270, borderRadius: 12 }} />
+      <div className="k-card" style={{ padding: 16 }}>
+        <KitSkeleton width="100%" height={240} radius={8} />
       </div>
     </div>
   );
@@ -179,10 +193,16 @@ export default function AdminAttendance() {
 
   const saveMarks = async () => {
     if (!sessionId || !enrolled.length) return;
-    const payload = enrolled.map((e) => ({
-      studentId: e.studentId,
-      status: markForStudent(e.studentId) || "absent",
-    }));
+    // Only persist students who have an actual mark; treat "unmarked" as absent
+    // server-side so the existing backend schema (which has no "unmarked"
+    // status) keeps working without a migration.
+    const payload = enrolled.map((e) => {
+      const local = markForStudent(e.studentId);
+      return {
+        studentId: e.studentId,
+        status: local && local !== "unmarked" ? local : "absent",
+      };
+    });
     try {
       await putSessionMarks(sessionId, payload);
       setMarks(await getSessionMarks(sessionId));
@@ -208,168 +228,225 @@ export default function AdminAttendance() {
     return <AttendanceSkeleton />;
   }
 
+  const STATUS_OPTIONS = [
+    { value: "unmarked", label: "Unmarked" },
+    { value: "present", label: "Present" },
+    { value: "late", label: "Late" },
+    { value: "absent", label: "Absent" },
+    { value: "excused", label: "Excused" },
+  ] as const;
+
   return (
-    <div className="page-wrapper">
-      <div className="attendance-hero">
-        <div>
-          <p className="attendance-kicker">
-            <Sparkles size={14} />
-            Daily Tracking
-          </p>
-          <h1 className="attendance-title">Attendance</h1>
-          <p className="attendance-subtitle">Take attendance by class and date with fast status updates</p>
-        </div>
-      </div>
-      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
+    <div className="kit-page" data-role="admin">
+      <KitPageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Daily tracking
+            <span className="dot-sep">·</span>
+            {activeYearLabel}
+          </>
+        }
+        title="Attendance"
+        sub="Take attendance by class and date with fast status updates."
+      />
+      {err && <KitErrorBanner message={err} />}
 
-      <div className="attendance-summary-grid">
-        <div className="card attendance-summary-card">
-          <div className="attendance-summary-icon blue">
-            <CalendarDays size={18} />
-          </div>
-          <div className="attendance-summary-label">Academic year</div>
-          <div className="attendance-summary-value attendance-summary-small">{activeYearLabel}</div>
-          <div className="attendance-summary-note">Selected scope</div>
-        </div>
-        <div className="card attendance-summary-card">
-          <div className="attendance-summary-icon teal">
-            <ClipboardCheck size={18} />
-          </div>
-          <div className="attendance-summary-label">Sessions</div>
-          <div className="attendance-summary-value">{sessions.length}</div>
-          <div className="attendance-summary-note">For selected class</div>
-        </div>
-        <div className="card attendance-summary-card">
-          <div className="attendance-summary-icon orange">
-            <Users size={18} />
-          </div>
-          <div className="attendance-summary-label">Enrolled students</div>
-          <div className="attendance-summary-value">{enrolled.length}</div>
-          <div className="attendance-summary-note">Class roster size</div>
-        </div>
-        <div className="card attendance-summary-card">
-          <div className="attendance-summary-icon purple">
-            <CalendarCheck2 size={18} />
-          </div>
-          <div className="attendance-summary-label">Present rate</div>
-          <div className="attendance-summary-value">{presentRate}%</div>
-          <div className="attendance-summary-note">Current session snapshot</div>
-        </div>
-      </div>
+      <KitStatGrid cols={4} className="!mb-[14px]">
+        <KitStatTile icon="cal" label="Academic year" value={activeYearLabel || "—"} note="selected scope" />
+        <KitStatTile icon="check" label="Sessions" value={String(sessions.length)} note="for selected class" />
+        <KitStatTile icon="users" label="Enrolled" value={String(enrolled.length)} note="class roster" />
+        <KitStatTile icon="sparkles" label="Present rate" value={`${presentRate}%`} note="current session" />
+      </KitStatGrid>
 
-      <div className="card attendance-panel" style={{ marginBottom: "1rem", display: "grid", gap: "0.75rem", maxWidth: 520 }}>
-        <label>
-          Academic year
-          <Select
-            value={yearId}
-            onChange={(e) => {
-              const v = e.target.value;
-              setYearId(v);
-              loadOfferings(v);
-              setClassId("");
-            }}
-            style={{ display: "block", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", width: "100%", outline: "none", cursor: "pointer", fontWeight: 500 }}
-          >
-            {years.length === 0 && <option value="">No years</option>}
-            {years.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.label}
-                {y.isActive ? " ★" : ""}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label>
-          Class offering
-          <Select value={classId} onChange={(e) => setClassId(e.target.value)} style={{ display: "block", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "10px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", width: "100%", outline: "none", cursor: "pointer", fontWeight: 500 }}>
-            <option value="">Select…</option>
-            {offerings.map((o) => {
-              const title =
-                o.displayName?.trim() ||
-                o.name?.trim() ||
-                [o.gradeName, o.sectionName].filter(Boolean).join(" ") ||
-                "Class";
-              return (
-                <option key={o.id} value={o.id}>
-                  {title}
+      {/* Scope picker */}
+      <div className="k-card" style={{ marginBottom: 14 }}>
+        <div className="k-card__head">
+          <div className="k-card__title">Scope</div>
+          <div className="k-card__sub">Pick a year and class to load its sessions and roster.</div>
+        </div>
+        <div
+          className="k-card__body"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+            gap: 10,
+            maxWidth: 560,
+          }}
+        >
+          <KField label="Academic year">
+            <KitSelect
+              value={yearId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setYearId(v);
+                loadOfferings(v);
+                setClassId("");
+              }}
+            >
+              {years.length === 0 && <option value="">No years</option>}
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.label}
+                  {y.isActive ? " · active" : ""}
                 </option>
-              );
-            })}
-          </Select>
-        </label>
+              ))}
+            </KitSelect>
+          </KField>
+          <KField label="Class offering">
+            <KitSelect value={classId} onChange={(e) => setClassId(e.target.value)}>
+              <option value="">Select…</option>
+              {offerings.map((o) => {
+                const title =
+                  o.displayName?.trim() ||
+                  o.name?.trim() ||
+                  [o.gradeName, o.sectionName].filter(Boolean).join(" ") ||
+                  "Class";
+                return (
+                  <option key={o.id} value={o.id}>
+                    {title}
+                  </option>
+                );
+              })}
+            </KitSelect>
+          </KField>
+        </div>
       </div>
 
       {report && (
-        <div className="card attendance-panel" style={{ marginBottom: "1rem" }}>
-          <div className="attendance-panel-head">
-            <h3 className="card-title attendance-section-title">Class report</h3>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => classId && loadClassData(classId)}>
-              <RefreshCcw size={13} />
-              Refresh
+        <div className="k-card" style={{ marginBottom: 14 }}>
+          <div
+            className="k-card__head"
+            style={{ alignItems: "center" }}
+          >
+            <div>
+              <div className="k-card__title">Class report</div>
+              <div className="k-card__sub">
+                {report.sessions.length} session{report.sessions.length === 1 ? "" : "s"} recorded.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-kit btn-kit-ghost"
+              onClick={() => classId && loadClassData(classId)}
+            >
+              <Icon name="refresh" /> Refresh
             </button>
           </div>
-          <p style={{ fontSize: "0.85rem", color: "var(--gray-600)" }}>{report.sessions.length} session(s)</p>
         </div>
       )}
 
       {classId && (
-        <div className="card attendance-panel">
-          <h3 className="card-title attendance-section-title" style={{ marginBottom: "0.75rem" }}>
-            Sessions & marks
-          </h3>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
-            <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-            <button type="button" className="btn btn-primary" onClick={createSession}>
-              Create session
-            </button>
+        <div className="k-card">
+          <div className="k-card__head">
+            <div className="k-card__title">Sessions &amp; marks</div>
+            <div className="k-card__sub">Create a session and mark each student.</div>
           </div>
-          <Select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={{ padding: "0.5rem", minWidth: 280, marginBottom: "1rem" }}>
-            {sessions.length === 0 && <option value="">No sessions</option>}
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.date}
-              </option>
-            ))}
-          </Select>
-
-          {sessionId && enrolled.length > 0 && (
-            <>
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {enrolled.map((e) => {
-                      const st = studentMap.get(e.studentId);
-                      const cur = markForStudent(e.studentId) || "absent";
-                      return (
-                        <tr key={e.studentId}>
-                          <td>{st ? `${st.firstName} ${st.lastName}` : e.studentId}</td>
-                          <td>
-                            <Select value={cur} onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)} style={{ padding: "0.35rem" }}>
-                              {STATUSES.map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
-                            </Select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <button type="button" className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={saveMarks}>
-                Save marks
+          <div className="k-card__body" style={{ display: "grid", gap: 14 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) auto",
+                gap: 10,
+                alignItems: "end",
+              }}
+            >
+              <KField label="New session date">
+                <KitInput
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                />
+              </KField>
+              <KField label="Existing session">
+                <KitSelect
+                  value={sessionId}
+                  onChange={(e) => setSessionId(e.target.value)}
+                >
+                  {sessions.length === 0 && <option value="">No sessions</option>}
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.date}
+                    </option>
+                  ))}
+                </KitSelect>
+              </KField>
+              <button
+                type="button"
+                className="btn-kit btn-kit-primary"
+                onClick={createSession}
+                disabled={!newDate}
+                style={{ height: 32 }}
+              >
+                <Icon name="plus" /> Create session
               </button>
-            </>
-          )}
-          {sessionId && enrolled.length === 0 && <p style={{ color: "var(--gray-500)" }}>No enrollments in this class — add students from the class detail page.</p>}
+            </div>
+
+            {sessionId && enrolled.length > 0 && (
+              <>
+                <div className="k-card" style={{ padding: 0, overflow: "hidden" }}>
+                  <table className="gtable">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th style={{ width: "50%" }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enrolled.map((e) => {
+                        const st = studentMap.get(e.studentId);
+                        const cur = (markForStudent(e.studentId) || "unmarked") as
+                          | "unmarked"
+                          | "present"
+                          | "late"
+                          | "absent"
+                          | "excused";
+                        return (
+                          <tr key={e.studentId}>
+                            <td style={{ fontWeight: 500, color: "var(--ink)" }}>
+                              {st ? `${st.firstName} ${st.lastName}` : e.studentId}
+                            </td>
+                            <td>
+                              <KitSegmented
+                                options={STATUS_OPTIONS}
+                                value={cur}
+                                onChange={(v) => updateLocalMark(e.studentId, v)}
+                                size="sm"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    className="btn-kit btn-kit-primary"
+                    onClick={saveMarks}
+                  >
+                    <Icon name="check" /> Save marks
+                  </button>
+                </div>
+              </>
+            )}
+            {sessionId && enrolled.length === 0 && (
+              <div
+                style={{
+                  padding: "20px 16px",
+                  textAlign: "center",
+                  border: "1px dashed var(--color-hairline)",
+                  borderRadius: 8,
+                  background: "var(--color-surface-2)",
+                  fontSize: 12.5,
+                  color: "var(--ink-3)",
+                }}
+              >
+                No enrollments in this class — add students from the class detail page.
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

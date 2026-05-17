@@ -17,10 +17,13 @@ import {
     Card,
     CardHeader,
     CardSection,
-    PageHeader,
-    StatTile,
     Tabs,
 } from "@/components/ui";
+import {
+    PageHead as KitPageHead,
+    StatGrid as KitStatGrid,
+    StatTile as KitStatTile,
+} from "@/components/kit";
 
 interface ChildGrade {
     subject: string;
@@ -51,14 +54,21 @@ export default function ParentGradesPage() {
     }, []);
 
     return (
-        <div className="ui-page">
-            <PageHeader
+        <div className="kit-page" data-role="parent">
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Academic record
+                        <span className="dot-sep">·</span>
+                        {term}
+                    </>
+                }
                 title="Grades"
-                description="How your child is doing across each subject."
-                icon={<BarChart3 size={22} />}
+                sub="How your child is doing across each subject."
             />
 
-            <div style={{ marginTop: "1rem" }}>
+            <div style={{ marginBottom: 14 }}>
                 <Tabs
                     value={term}
                     onChange={setTerm}
@@ -66,11 +76,11 @@ export default function ParentGradesPage() {
                 />
             </div>
 
-            <div className="ui-grid ui-grid-3" style={{ marginTop: "1rem" }}>
-                <StatTile label="Average" value={`${summary.avg}%`} icon={<GraduationCap size={16} />} tone="primary" />
-                <StatTile label="Above class average" value={`${summary.aboveClass} / ${summary.total}`} icon={<TrendingUp size={16} />} tone="success" />
-                <StatTile label="Subjects watched" value={summary.total} icon={<BarChart3 size={16} />} tone="info" />
-            </div>
+            <KitStatGrid cols={3} className="!mb-[14px]">
+                <KitStatTile icon="cap" label="Average" value={`${summary.avg}%`} note={`${TERMS.length} terms tracked`} />
+                <KitStatTile icon="arrowUp" label="Above class avg" value={`${summary.aboveClass}/${summary.total}`} note="subjects" />
+                <KitStatTile icon="chart" label="Subjects watched" value={String(summary.total)} note="this term" />
+            </KitStatGrid>
 
             <div style={{ marginTop: "1.25rem" }}>
                 <Card>

@@ -20,6 +20,25 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "warn",
       "react/no-unescaped-entities": "warn",
       "prefer-const": "warn",
+      /**
+       * Inline `style={{ }}` is the root cause of the design-system drift
+       * documented in the UI audit (1,980 inline-style sites). New code must
+       * use the shadcn primitives + Tailwind tokens. Warning level keeps
+       * legacy surfaces visible without blocking the build during the
+       * incremental migration.
+       */
+      "react/forbid-dom-props": [
+        "warn",
+        {
+          forbid: [
+            {
+              propName: "style",
+              message:
+                "Inline `style` is banned in new code. Use the shadcn primitives or Tailwind utilities. See the UI audit for the migration plan.",
+            },
+          ],
+        },
+      ],
     },
   },
 ]);

@@ -1,6 +1,7 @@
 "use client";
-import { Component, ReactNode } from "react";
+import { Component, ReactNode, ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { reportError } from "@/lib/error-reporting";
 
 interface Props {
     children: ReactNode;
@@ -12,21 +13,23 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-    state: State = { hasError: false };
+    override state: State = { hasError: false };
 
     static getDerivedStateFromError(): State {
         return { hasError: true };
     }
 
-    componentDidCatch() {
-        /* swallow — production should wire this into a real reporter (Sentry, etc.) */
+    override componentDidCatch(error: Error, info: ErrorInfo) {
+        // Forward to whatever reporter is wired in lib/error-reporting (Sentry today,
+        // a no-op shim in environments where SENTRY_DSN is unset).
+        reportError(error, { component: "ErrorBoundary", componentStack: info.componentStack ?? undefined });
     }
 
     private reset = () => {
         this.setState({ hasError: false });
     };
 
-    render() {
+    override render() {
         if (this.state.hasError) {
             return (
                 this.props.fallback ?? (

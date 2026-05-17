@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin-api";
 import { getStoredUser } from "@/lib/auth";
 import { toLetterGrade } from "@/lib/grading";
+import { PageHead, StatGrid, StatTile } from "@/components/kit";
 
 // Unified row shown in the table
 type GradeRow = {
@@ -196,26 +197,26 @@ export default function StudentGradesPage() {
   }
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)" }}>My Grades</h1>
-      <p style={{ marginTop: "0.35rem", color: "var(--gray-500)", fontSize: "0.9rem" }}>
-        Released results from your teacher — exams, assignments, quizzes, and more.
-      </p>
+    <div className="kit-page" data-role="student">
+      <PageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Academic record
+            <span className="dot-sep">·</span>
+            {summary.count} released
+          </>
+        }
+        title="My grades"
+        sub="Released results from your teacher — exams, assignments, quizzes, and more."
+      />
 
-      {/* Summary cards */}
-      <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        {[
-          { label: "Released Results", value: summary.count },
-          { label: "Average", value: summary.count > 0 ? `${summary.avg}%` : "—", color: summary.count > 0 ? scoreColor(summary.avg) : undefined },
-          { label: "Highest", value: summary.count > 0 ? `${summary.highest}%` : "—", color: summary.count > 0 ? scoreColor(summary.highest) : undefined },
-          { label: "Lowest", value: summary.count > 0 ? `${summary.lowest}%` : "—", color: summary.count > 0 ? scoreColor(summary.lowest) : undefined },
-        ].map(card => (
-          <div key={card.label} style={{ background: "#fff", border: "1px solid var(--gray-200)", borderRadius: 10, padding: "0.75rem 1rem", minWidth: 100 }}>
-            <div style={{ fontSize: "0.72rem", color: "var(--gray-500)", marginBottom: "0.2rem" }}>{card.label}</div>
-            <div style={{ fontWeight: 800, fontSize: "1.1rem", color: card.color ?? "var(--gray-900)" }}>{card.value}</div>
-          </div>
-        ))}
-      </div>
+      <StatGrid cols={4} className="!mb-[14px]">
+        <StatTile icon="check" label="Released" value={String(summary.count)} note="all subjects" />
+        <StatTile icon="sparkles" label="Average" value={summary.count > 0 ? `${summary.avg}%` : "—"} note="weighted mean" />
+        <StatTile icon="arrowUp" label="Highest" value={summary.count > 0 ? `${summary.highest}%` : "—"} note="best result" />
+        <StatTile icon="arrowDown" label="Lowest" value={summary.count > 0 ? `${summary.lowest}%` : "—"} note="needs review" />
+      </StatGrid>
 
       {rows.length === 0 ? (
         <div style={{ background: "#fff", border: "1.5px dashed var(--gray-200)", borderRadius: 12, padding: "3rem", textAlign: "center", color: "var(--gray-400)" }}>

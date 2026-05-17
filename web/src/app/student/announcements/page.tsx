@@ -1,6 +1,7 @@
 "use client";
-import { StudentAnnouncementsPage } from "@/components/PortalMvpPages";
 
-export default function Page() {
-    return <StudentAnnouncementsPage />;
+import { AnnouncementsKitPage } from "@/components/kit";
+
+export default function StudentAnnouncementsPage() {
+    return <AnnouncementsKitPage role="student" />;
 }

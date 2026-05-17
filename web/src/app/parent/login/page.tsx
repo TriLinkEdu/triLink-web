@@ -7,7 +7,6 @@ export default function ParentLogin() {
       role="Parent"
       rolePlural="Parents"
       dashboardPath="/parent/dashboard"
-      gradient="linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #4c1d95 100%)"
       tagline="Stay connected with your child's learning"
     />
   );

@@ -7,6 +7,7 @@ import {
     type ChildUpcomingExam,
     type ChildUpcomingAssignment,
 } from "@/lib/admin-api";
+import { PageHead } from "@/components/kit";
 
 function examStatusBadge(status: ChildUpcomingExam["status"]) {
     const map: Record<string, { label: string; cls: string }> = {
@@ -75,16 +76,21 @@ export default function ParentChildrenPage() {
     const selectedChild = children.find(c => c.studentId === selected);
 
     return (
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "2rem 1.5rem" }}>
+        <div className="kit-page" data-role="parent">
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-            <div style={{ marginBottom: "1.5rem" }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)", marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    My Children
-                </h1>
-                <p style={{ color: "var(--gray-500)", fontSize: "0.9rem" }}>Upcoming exams and assignments for your children</p>
-            </div>
+            <PageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Family
+                        <span className="dot-sep">·</span>
+                        {children.length} child{children.length === 1 ? "" : "ren"} linked
+                    </>
+                }
+                title="My children"
+                sub="Upcoming exams and assignments for your children."
+            />
 
             {loading ? (
                 <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>

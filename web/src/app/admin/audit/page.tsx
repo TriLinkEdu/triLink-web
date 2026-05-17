@@ -2,8 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { listAuditLogs, listUsers, type PublicUser } from "@/lib/admin-api";
-import Select from "@/components/Select";
 import TablePagination from "@/components/TablePagination";
+import {
+  Icon,
+  KitEmpty,
+  KitErrorBanner,
+  KitInput,
+  KitLoadingBlock,
+  PageHead,
+  Pill,
+  StatGrid,
+  StatTile,
+  type PillKind,
+} from "@/components/kit";
 
 type Row = {
   id: string;
@@ -97,107 +108,129 @@ export default function AdminAuditPage() {
   const endIdx = Math.min(startIdx + rowsPerPage, total);
   const visibleRows = filteredRows.slice(startIdx, endIdx);
 
+  const signIns = rows.filter((r) => r.action === "user.login").length;
+  const registrations = rows.filter((r) => r.action === "user.register").length;
+  const passwordChanges = rows.filter((r) => r.action === "user.password_change").length;
+
   return (
-    <div className="page-wrapper">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Activity log</h1>
-          <p className="page-subtitle">Important account and security events across your school</p>
-        </div>
-      </div>
+    <div className="kit-page" data-role="admin">
+      <PageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Security
+            <span className="dot-sep">·</span>
+            Read-only · last {rows.length} events
+          </>
+        }
+        title="Audit log"
+        sub="Sign-ins, registrations, and password changes across the school."
+      />
 
-      <div className="card" style={{ marginBottom: "1.5rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: "12px", display: "flex", gap: "1.25rem", alignItems: "flex-start", padding: "1.5rem" }}>
-        <div style={{ padding: "0.65rem", background: "white", borderRadius: "50%", color: "var(--primary-600)", display: "flex", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 16v-4"></path>
-            <path d="M12 8h.01"></path>
-          </svg>
-        </div>
-        <div>
-          <h3 style={{ margin: "0 0 0.35rem 0", fontSize: "1.05rem", color: "var(--primary-800)", fontWeight: 700 }}>About Activity Logs</h3>
-          <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.6, color: "var(--primary-700)", opacity: 0.9 }}>
-            This log helps you review crucial security events—such as sign-ins, new user registrations, and password updates.
-            Routine browsing is not recorded here. Logouts are handled locally by the browser and will not appear. Older entries automatically roll off to keep the log relevant and performant.
-          </p>
-        </div>
-      </div>
+      <StatGrid cols={4} className="!mb-[14px]">
+        <StatTile icon="history" label="Total events" value={String(rows.length)} note="last 150" />
+        <StatTile icon="lock" label="Sign-ins" value={String(signIns)} note="admin portal" />
+        <StatTile icon="users" label="Registrations" value={String(registrations)} note="new users" />
+        <StatTile icon="shield" label="Password changes" value={String(passwordChanges)} note="security updates" />
+      </StatGrid>
 
-      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
-      <div className="card">
-        <div style={{ padding: "1rem", borderBottom: "1px solid var(--gray-200)" }}>
-          <input
-            type="text"
-            placeholder="Filter logs..."
-            value={filterText}
-            onChange={(e) => {
-              setFilterText(e.target.value);
-              setPage(0);
-            }}
-            style={{
-        width: "100%",
-        maxWidth: "340px",
-        padding: "0.65rem 1rem",
-        borderRadius: "12px",
-        border: "1px solid var(--gray-200)",
-        fontSize: "0.9rem",
-        outline: "none",
-        background: "var(--gray-50)",
-        transition: "all 0.2s"
-    }}
-          />
+      {err && <KitErrorBanner message={err} />}
+
+      <div className="k-card">
+        <div className="k-card__head" style={{ alignItems: "center" }}>
+          <div>
+            <div className="k-card__title">Activity</div>
+            <div className="k-card__sub">
+              Showing {total === 0 ? 0 : startIdx + 1}–{endIdx} of {total}
+            </div>
+          </div>
+          <div style={{ position: "relative", width: 260 }}>
+            <Icon
+              name="search"
+              size={13}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ink-3)]"
+            />
+            <KitInput
+              type="text"
+              placeholder="Filter by name, action, time…"
+              value={filterText}
+              onChange={(e) => {
+                setFilterText(e.target.value);
+                setPage(0);
+              }}
+              style={{ paddingLeft: 28 }}
+            />
+          </div>
         </div>
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Who</th>
-                <th>What</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
+
+        {isLoading ? (
+          <KitLoadingBlock label="Loading activity logs…" />
+        ) : visibleRows.length === 0 ? (
+          <div style={{ padding: 16 }}>
+            <KitEmpty
+              title={filterText ? "No activity matches your filter." : "No activity recorded."}
+              sub={
+                filterText
+                  ? "Try a different search term."
+                  : "Sign-ins, registrations, and password changes will appear here as they happen."
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <table className="gtable">
+              <thead>
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "5rem 2rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                      <div style={{ width: "36px", height: "36px", border: "3px solid var(--gray-200)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-                      <div style={{ color: "var(--gray-500)", fontWeight: 500 }}>Loading activity logs...</div>
-                    </div>
-                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-                  </td>
+                  <th style={{ width: 180 }}>When</th>
+                  <th style={{ width: 200 }}>Who</th>
+                  <th style={{ width: 200 }}>What</th>
+                  <th>Details</th>
                 </tr>
-              ) : visibleRows.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ color: "var(--gray-500)", textAlign: "center", padding: "4rem 2rem" }}>
-                    No activity found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                visibleRows.map((r) => {
+              </thead>
+              <tbody>
+                {visibleRows.map((r) => {
                   const who = nameById.get(r.actorId) ?? "Staff member";
                   return (
                     <tr key={r.id}>
-                      <td style={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}>{new Date(r.createdAt).toLocaleString()}</td>
-                      <td style={{ fontWeight: 600 }}>{who}</td>
-                      <td>{describeAction(r.action)}</td>
-                      <td style={{ fontSize: "0.9rem", color: "var(--gray-700)" }}>{describeDetails(r)}</td>
+                      <td
+                        style={{
+                          fontSize: 12,
+                          color: "var(--ink-2)",
+                          whiteSpace: "nowrap",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {new Date(r.createdAt).toLocaleString()}
+                      </td>
+                      <td style={{ fontWeight: 500, color: "var(--ink)" }}>{who}</td>
+                      <td>
+                        <Pill kind={actionKind(r.action)}>{describeAction(r.action)}</Pill>
+                      </td>
+                      <td style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                        {describeDetails(r)}
+                      </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <TablePagination
-          total={total}
-          page={currentPage}
-          rowsPerPage={rowsPerPage}
-          onPageChange={setPage}
-          onRowsPerPageChange={setRowsPerPage}
-        />
+                })}
+              </tbody>
+            </table>
+            <TablePagination
+              total={total}
+              page={currentPage}
+              rowsPerPage={rowsPerPage}
+              onPageChange={setPage}
+              onRowsPerPageChange={setRowsPerPage}
+            />
+          </>
+        )}
       </div>
     </div>
   );
+}
+
+function actionKind(action: string): PillKind {
+  if (action === "user.login") return "active";
+  if (action === "user.register") return "brand";
+  if (action === "user.password_change") return "pending";
+  return "neutral";
 }

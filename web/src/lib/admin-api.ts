@@ -1550,3 +1550,152 @@ export async function myChildren(): Promise<Array<{
 export async function getDirectFileUrl(fileId: string): Promise<{ url: string; filename: string; mime: string }> {
   return adminJson<{ url: string; filename: string; mime: string }>(`/api/files/${encodeURIComponent(fileId)}/url`, { method: "GET" });
 }
+
+// ── Chat extras (Socket.IO companions) ─────────────────────────────────────────
+
+export async function editMessage(messageId: string, text: string): Promise<ChatMessage> {
+  return adminJson<ChatMessage>(`/api/messages/${encodeURIComponent(messageId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function deleteMessage(messageId: string): Promise<void> {
+  await adminFetch(`/api/messages/${encodeURIComponent(messageId)}`, { method: "DELETE" });
+}
+
+export async function addMessageReaction(messageId: string, emoji: string): Promise<unknown> {
+  return adminJson(`/api/messages/${encodeURIComponent(messageId)}/reactions`, {
+    method: "POST",
+    body: JSON.stringify({ emoji }),
+  });
+}
+
+export async function blockConversation(conversationId: string): Promise<unknown> {
+  return adminJson(`/api/conversations/${encodeURIComponent(conversationId)}/block`, {
+    method: "POST",
+  });
+}
+
+export async function unblockConversation(conversationId: string): Promise<unknown> {
+  return adminJson(`/api/conversations/${encodeURIComponent(conversationId)}/block`, {
+    method: "DELETE",
+  });
+}
+
+export async function searchChatUsers(q: string, role?: string): Promise<PublicUser[]> {
+  const p = new URLSearchParams();
+  if (q) p.set("q", q);
+  if (role) p.set("role", role);
+  return adminJson<PublicUser[]>(`/api/users/search?${p.toString()}`, { method: "GET" });
+}
+
+export async function initiateConversation(body: {
+  recipientId?: string;
+  recipientIds?: string[];
+  type?: "direct" | "group";
+  title?: string;
+}): Promise<Conversation> {
+  return adminJson<Conversation>(`/api/conversations/initiate`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function chatWsInfo(): Promise<{ url: string; namespace?: string; token?: string }> {
+  return adminJson(`/api/chat/ws-info`, { method: "GET" });
+}
+
+export async function uploadChatFile(conversationId: string, file: File): Promise<{ id: string; url?: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("conversationId", conversationId);
+  return adminJson(`/api/chat/files/upload`, { method: "POST", body: fd });
+}
+
+// ── Topics CRUD (admin) ────────────────────────────────────────────────────────
+
+export async function createTopic(body: {
+  subjectId: string;
+  name: string;
+  description?: string;
+  orderIndex?: number;
+}): Promise<TopicRecord> {
+  return adminJson<TopicRecord>(`/api/topics`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateTopic(
+  id: string,
+  body: { name?: string; description?: string; orderIndex?: number },
+): Promise<TopicRecord> {
+  return adminJson<TopicRecord>(`/api/topics/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteTopic(id: string): Promise<void> {
+  await adminFetch(`/api/topics/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function listTopicsBySubject(subjectId: string): Promise<TopicRecord[]> {
+  return adminJson<TopicRecord[]>(`/api/topics?subjectId=${encodeURIComponent(subjectId)}`, {
+    method: "GET",
+  });
+}
+
+// ── Curriculum CRUD (admin) ───────────────────────────────────────────────────
+// Admin-facing curriculum mirrors the subjects API (no separate `/curriculum/*`
+// admin endpoints exist on the backend). Reuse the existing subject CRUD.
+
+export async function listAllCurriculumSubjects(): Promise<CurriculumSubject[]> {
+  const subjects = await listSubjects();
+  return subjects.map((s) => ({ id: s.id, name: s.name, code: s.code ?? null }));
+}
+
+// ── Global search ─────────────────────────────────────────────────────────────
+
+export type SearchResultGroup = {
+  type: "user" | "announcement" | "exam" | "class" | "subject" | string;
+  items: Array<{ id: string; title: string; subtitle?: string; href?: string }>;
+};
+
+export async function searchAll(q: string): Promise<SearchResultGroup[] | Record<string, unknown>> {
+  return adminJson(`/api/search?q=${encodeURIComponent(q)}`, { method: "GET" });
+}
+
+// ── AI helpers ────────────────────────────────────────────────────────────────
+
+export async function aiGenerateLesson(body: {
+  subjectId?: string;
+  topicId?: string;
+  topic?: string;
+  level?: string;
+  notes?: string;
+}): Promise<{ content: string }> {
+  return adminJson(`/api/ai/content/generate-lesson`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function aiGenerateQuestions(body: {
+  topicId?: string;
+  topic?: string;
+  count?: number;
+  difficulty?: string;
+}): Promise<unknown> {
+  return adminJson(`/api/ai/content/generate-questions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function aiRecommendations(body: { studentId?: string; subjectId?: string }): Promise<unknown> {
+  return adminJson(`/api/ai/recommendations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function aiWeeklySummary(): Promise<unknown> {
+  return adminJson(`/api/ai/weekly-summary`, { method: "GET" });
+}
+

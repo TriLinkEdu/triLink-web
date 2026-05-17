@@ -164,6 +164,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
       const res = await fetch(`${apiBase}${refreshPath}`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
       });
@@ -201,16 +202,24 @@ export async function authFetch(
 ): Promise<Response> {
   const token = getAccessToken();
   const headers = new Headers(init.headers ?? {});
+  // Bearer header for backward compatibility (mobile + transition window).
+  // The backend also accepts the access token from the trilink_access cookie.
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  let response = await fetch(input, { ...init, headers });
+  // credentials: 'include' makes the browser send the httpOnly cookies issued
+  // by /auth/login. The backend now reads from either source.
+  let response = await fetch(input, {
+    credentials: "include",
+    ...init,
+    headers,
+  });
 
   // 401 → refresh access token and retry once
   if (response.status === 401) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers.set("Authorization", `Bearer ${newToken}`);
-      response = await fetch(input, { ...init, headers });
+      response = await fetch(input, { credentials: "include", ...init, headers });
     } else if (typeof window !== "undefined") {
       const path = window.location.pathname;
       const role = path.split("/").filter(Boolean)[0] ?? "admin";
@@ -226,7 +235,7 @@ export async function authFetch(
   const isIdempotent = method === "GET" || method === "HEAD" || method === "OPTIONS";
   if (isIdempotent && response.status >= 500 && response.status < 600) {
     await new Promise(r => setTimeout(r, 350));
-    response = await fetch(input, { ...init, headers });
+    response = await fetch(input, { credentials: "include", ...init, headers });
   }
 
   return response;

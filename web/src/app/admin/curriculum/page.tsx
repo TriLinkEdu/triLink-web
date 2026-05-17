@@ -1,233 +1,640 @@
 "use client";
+/* eslint-disable react/forbid-dom-props -- kit ports preserve inline styles verbatim. */
+
 /**
- * Admin → Curriculum
- *
- * Mock data is rendered today. To wire the real backend, replace the
- * `MOCK_SUBJECTS` constant with `authFetch(`${getApiBase()}/api/curriculum/subjects?gradeId=...`)`.
+ * Admin · Curriculum — subjects + topics tree wired to the real backend.
+ * Uses `listSubjects`, `createSubject`, `patchSubject`, `deleteSubject` for
+ * subjects, and `listTopicsBySubject`, `createTopic`, `updateTopic`,
+ * `deleteTopic` for the per-subject topic tree.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Icon, PageHead, Pill, StatGrid, StatTile } from "@/components/kit";
 import {
-    BookOpen,
-    ChevronRight,
-    Plus,
-    Search,
-} from "lucide-react";
+    KField,
+    KitInput,
+    KitTextarea,
+    KitDialog,
+    KitErrorBanner,
+    KitEmpty,
+    KitLoadingBlock,
+    KitToast,
+    KitSpinner,
+} from "@/components/kit/local";
 import {
-    Badge,
-    Button,
-    Card,
-    CardHeader,
-    CardSection,
-    EmptyState,
-    Input,
-    PageHeader,
-    StatTile,
-    Tabs,
-} from "@/components/ui";
+    listSubjects,
+    createSubject,
+    patchSubject,
+    deleteSubject,
+    listTopicsBySubject,
+    createTopic,
+    updateTopic,
+    deleteTopic,
+    type Subject,
+    type TopicRecord,
+} from "@/lib/admin-api";
+import { useConfirm } from "@/hooks/useConfirm";
 
-interface Topic {
-    id: string;
-    title: string;
-    weeks: number;
-    status: "ready" | "draft";
+type ToastState = { msg: string; tone?: "success" | "danger" | "warning" } | null;
+
+function topicLabel(t: TopicRecord): string {
+    return t.title ?? t.name ?? "Untitled topic";
 }
-
-interface Subject {
-    id: string;
-    name: string;
-    code: string;
-    grade: string;
-    department: string;
-    topics: Topic[];
-}
-
-const MOCK_SUBJECTS: Subject[] = [
-    {
-        id: "s1",
-        name: "Mathematics",
-        code: "MATH",
-        grade: "Grade 11",
-        department: "Mathematics",
-        topics: [
-            { id: "t1", title: "Quadratic equations", weeks: 3, status: "ready" },
-            { id: "t2", title: "Functions & graphs", weeks: 4, status: "ready" },
-            { id: "t3", title: "Trigonometry — basics", weeks: 5, status: "ready" },
-            { id: "t4", title: "Trigonometry — applications", weeks: 4, status: "draft" },
-        ],
-    },
-    {
-        id: "s2",
-        name: "Biology",
-        code: "BIO",
-        grade: "Grade 11",
-        department: "Science",
-        topics: [
-            { id: "t5", title: "Cell biology", weeks: 4, status: "ready" },
-            { id: "t6", title: "Genetics intro", weeks: 5, status: "ready" },
-            { id: "t7", title: "Photosynthesis", weeks: 3, status: "draft" },
-        ],
-    },
-    {
-        id: "s3",
-        name: "English",
-        code: "ENG",
-        grade: "Grade 11",
-        department: "Languages",
-        topics: [
-            { id: "t8", title: "Essay structure", weeks: 2, status: "ready" },
-            { id: "t9", title: "World literature survey", weeks: 6, status: "ready" },
-        ],
-    },
-];
-
-const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
 export default function AdminCurriculumPage() {
-    const [grade, setGrade] = useState("Grade 11");
-    const [query, setQuery] = useState("");
-    const [selectedId, setSelectedId] = useState<string | null>(MOCK_SUBJECTS[0]?.id ?? null);
+    const { confirm, element: confirmEl } = useConfirm();
+    const [subjects, setSubjects] = useState<Subject[] | null>(null);
+    const [topicsBySubject, setTopicsBySubject] = useState<Record<string, TopicRecord[]>>({});
+    const [loadingTopicsFor, setLoadingTopicsFor] = useState<Set<string>>(new Set());
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const [err, setErr] = useState<string | null>(null);
+    const [toast, setToast] = useState<ToastState>(null);
 
-    const subjectsForGrade = useMemo(
-        () => MOCK_SUBJECTS.filter(s => s.grade === grade),
-        [grade],
+    const [newSubjectOpen, setNewSubjectOpen] = useState(false);
+    const [editSubject, setEditSubject] = useState<Subject | null>(null);
+    const [newTopicSubjectId, setNewTopicSubjectId] = useState<string | null>(null);
+    const [editTopic, setEditTopic] = useState<{ subjectId: string; topic: TopicRecord } | null>(null);
+
+    const showToast = useCallback((msg: string, tone: ToastState extends infer T ? (T extends null ? never : "success" | "danger" | "warning") : never = "success" as never) => {
+        setToast({ msg, tone });
+        window.setTimeout(() => setToast(null), 2400);
+    }, []);
+
+    const loadSubjects = useCallback(async () => {
+        try {
+            const list = await listSubjects();
+            setSubjects(list);
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Failed to load subjects");
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadSubjects();
+    }, [loadSubjects]);
+
+    const loadTopics = useCallback(
+        async (subjectId: string) => {
+            setLoadingTopicsFor((s) => {
+                const next = new Set(s);
+                next.add(subjectId);
+                return next;
+            });
+            try {
+                const t = await listTopicsBySubject(subjectId);
+                setTopicsBySubject((m) => ({ ...m, [subjectId]: t }));
+            } catch (e) {
+                showToast(e instanceof Error ? e.message : "Failed to load topics", "danger" as never);
+            } finally {
+                setLoadingTopicsFor((s) => {
+                    const next = new Set(s);
+                    next.delete(subjectId);
+                    return next;
+                });
+            }
+        },
+        [showToast],
     );
 
-    const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q) return subjectsForGrade;
-        return subjectsForGrade.filter(s =>
-            s.name.toLowerCase().includes(q) ||
-            s.code.toLowerCase().includes(q) ||
-            s.department.toLowerCase().includes(q),
+    const toggleSubject = useCallback(
+        (id: string) => {
+            setExpanded((e) => ({ ...e, [id]: !e[id] }));
+            if (!topicsBySubject[id]) void loadTopics(id);
+        },
+        [topicsBySubject, loadTopics],
+    );
+
+    const stats = useMemo(() => {
+        const subjCount = subjects?.length ?? 0;
+        let topicsCount = 0;
+        for (const arr of Object.values(topicsBySubject)) topicsCount += arr.length;
+        return {
+            subjects: subjCount,
+            topics: topicsCount,
+            loaded: Object.keys(topicsBySubject).length,
+            uncharted: Math.max(0, subjCount - Object.keys(topicsBySubject).length),
+        };
+    }, [subjects, topicsBySubject]);
+
+    if (err) {
+        return (
+            <div className="kit-page" data-role="admin">
+                <KitErrorBanner message={err} />
+            </div>
         );
-    }, [subjectsForGrade, query]);
-
-    const selected = useMemo(
-        () => filtered.find(s => s.id === selectedId) ?? filtered[0] ?? null,
-        [filtered, selectedId],
-    );
-
-    const totals = useMemo(() => {
-        const subjects = subjectsForGrade.length;
-        const topics = subjectsForGrade.reduce((acc, s) => acc + s.topics.length, 0);
-        const ready = subjectsForGrade.reduce((acc, s) => acc + s.topics.filter(t => t.status === "ready").length, 0);
-        return { subjects, topics, ready };
-    }, [subjectsForGrade]);
+    }
 
     return (
-        <div className="ui-page">
-            <PageHeader
-                title="Curriculum"
-                description="Subjects and topics taught at the school, organised by grade."
-                icon={<BookOpen size={22} />}
-                action={<Button leftIcon={<Plus size={16} />}>Add subject</Button>}
-            />
-
-            <div style={{ marginTop: "1rem" }}>
-                <Tabs
-                    value={grade}
-                    onChange={setGrade}
-                    tabs={GRADES.map(g => ({ id: g, label: g }))}
-                />
-            </div>
-
-            <div className="ui-grid ui-grid-3" style={{ marginTop: "1rem" }}>
-                <StatTile label="Subjects" value={totals.subjects} icon={<BookOpen size={16} />} tone="primary" />
-                <StatTile label="Topics" value={totals.topics} icon={<BookOpen size={16} />} tone="info" />
-                <StatTile label="Ready to teach" value={`${totals.ready}/${totals.topics}`} icon={<BookOpen size={16} />} tone="success" />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: "1rem", marginTop: "1.25rem" }}>
-                <Card>
-                    <CardHeader title="Subjects" subtitle={grade} />
-                    <CardSection>
-                        <Input
-                            placeholder="Search subjects…"
-                            leftIcon={<Search size={16} />}
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                        />
-                    </CardSection>
-                    {filtered.length === 0 ? (
-                        <CardSection>
-                            <EmptyState
-                                icon={<BookOpen size={28} />}
-                                title="No subjects"
-                                description={query ? `Nothing matches "${query}".` : `${grade} has no subjects defined yet.`}
-                                compact
-                            />
-                        </CardSection>
-                    ) : filtered.map(s => (
-                        <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => setSelectedId(s.id)}
-                            className="ui-card-section"
+        <div className="kit-page" data-role="admin">
+            <PageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Institution · Curriculum
+                        <span className="dot-sep">·</span>
+                        {stats.subjects} subject{stats.subjects === 1 ? "" : "s"} ·{" "}
+                        {stats.topics} topic{stats.topics === 1 ? "" : "s"}
+                    </>
+                }
+                title={
+                    <>
+                        Curriculum
+                        <span
                             style={{
-                                width: "100%",
-                                textAlign: "left",
-                                background: s.id === selected?.id ? "var(--role-accent-50)" : "transparent",
-                                border: "0",
-                                borderTop: "1px solid var(--gray-100)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.75rem",
+                                fontFamily: "var(--font-serif)",
+                                fontStyle: "italic",
+                                color: "var(--brand)",
                             }}
                         >
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, color: "var(--gray-900)" }}>{s.name}</div>
-                                <div style={{ fontSize: "0.8125rem", color: "var(--gray-500)" }}>{s.code} · {s.department}</div>
-                            </div>
-                            <Badge tone="neutral">{s.topics.length} topics</Badge>
-                            <ChevronRight size={16} style={{ color: "var(--gray-400)" }} />
-                        </button>
-                    ))}
-                </Card>
+                            .
+                        </span>
+                    </>
+                }
+                sub="Maintain subjects and the topic tree under each subject."
+                actions={
+                    <button
+                        type="button"
+                        className="btn-kit btn-kit-primary"
+                        onClick={() => setNewSubjectOpen(true)}
+                    >
+                        <Icon name="plus" /> New subject
+                    </button>
+                }
+            />
 
-                {selected ? <SubjectDetail subject={selected} /> : (
-                    <Card padded>
-                        <EmptyState
-                            icon={<BookOpen size={28} />}
-                            title="Pick a subject"
-                            description="Select a subject from the list to see its topics."
-                        />
-                    </Card>
+            <StatGrid cols={4} className="!mb-[14px]">
+                <StatTile
+                    icon="book"
+                    label="Subjects"
+                    value={String(stats.subjects)}
+                    note="in the catalog"
+                />
+                <StatTile
+                    icon="layers"
+                    label="Topics"
+                    value={String(stats.topics)}
+                    note={stats.loaded ? `across ${stats.loaded} loaded` : "expand to load"}
+                />
+                <StatTile
+                    icon="check"
+                    label="Loaded"
+                    value={String(stats.loaded)}
+                    note="subjects expanded"
+                />
+                <StatTile
+                    icon="alertTri"
+                    label="Unloaded"
+                    value={String(stats.uncharted)}
+                    note="click to expand"
+                />
+            </StatGrid>
+
+            <div className="k-card">
+                <div className="k-card__head">
+                    <div>
+                        <div className="k-card__title">Topic tree</div>
+                        <div className="k-card__sub">Click a subject to expand its topics</div>
+                    </div>
+                </div>
+
+                {subjects == null ? (
+                    <KitLoadingBlock label="Loading subjects…" />
+                ) : subjects.length === 0 ? (
+                    <KitEmpty
+                        icon={<Icon name="book" size={20} />}
+                        title="No subjects yet"
+                        sub="Add your first subject to start building the curriculum tree."
+                    />
+                ) : (
+                    <div>
+                        {subjects.map((s) => {
+                            const isOpen = !!expanded[s.id];
+                            const isLoading = loadingTopicsFor.has(s.id);
+                            const topics = topicsBySubject[s.id] ?? [];
+                            return (
+                                <div key={s.id}>
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => toggleSubject(s.id)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                toggleSubject(s.id);
+                                            }
+                                        }}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 10,
+                                            padding: "10px 14px",
+                                            borderBottom: "1px solid var(--color-hairline)",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <Icon
+                                            name="chev"
+                                            size={11}
+                                            className={isOpen ? "rotate-90" : ""}
+                                        />
+                                        <Icon name="book" size={14} />
+                                        <span
+                                            style={{
+                                                fontSize: 13.5,
+                                                fontWeight: 500,
+                                                color: "var(--ink)",
+                                                flex: 1,
+                                            }}
+                                        >
+                                            {s.name}
+                                        </span>
+                                        {s.code ? <Pill kind="neutral">{s.code}</Pill> : null}
+                                        <span
+                                            style={{
+                                                fontFamily: "var(--font-mono)",
+                                                fontSize: 11,
+                                                color: "var(--ink-3)",
+                                            }}
+                                        >
+                                            {topics.length} {topics.length === 1 ? "topic" : "topics"}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-kit btn-kit-ghost"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setNewTopicSubjectId(s.id);
+                                            }}
+                                            title="Add topic"
+                                            aria-label="Add topic"
+                                        >
+                                            <Icon name="plus" size={12} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-kit btn-kit-ghost"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditSubject(s);
+                                            }}
+                                            title="Edit subject"
+                                            aria-label="Edit subject"
+                                        >
+                                            <Icon name="edit" size={12} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-kit btn-kit-danger-soft"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const ok = await confirm({
+                                                    title: "Delete subject?",
+                                                    message: (
+                                                        <>
+                                                            Delete subject <b>{s.name}</b>? This will remove all topics under it. This cannot be undone.
+                                                        </>
+                                                    ),
+                                                    confirmLabel: "Delete",
+                                                    destructive: true,
+                                                });
+                                                if (!ok) return;
+                                                try {
+                                                    await deleteSubject(s.id);
+                                                    showToast("Subject deleted");
+                                                    void loadSubjects();
+                                                } catch (err2) {
+                                                    showToast(
+                                                        err2 instanceof Error
+                                                            ? err2.message
+                                                            : "Failed to delete subject",
+                                                        "danger" as never,
+                                                    );
+                                                }
+                                            }}
+                                            title="Delete subject"
+                                            aria-label="Delete subject"
+                                            style={{ height: 26, padding: "0 8px" }}
+                                        >
+                                            <Icon name="trash" size={12} />
+                                        </button>
+                                    </div>
+
+                                    {isOpen && (
+                                        <div>
+                                            {isLoading ? (
+                                                <div
+                                                    style={{
+                                                        padding: "10px 14px 10px 44px",
+                                                        fontSize: 12,
+                                                        color: "var(--color-ink-mute)",
+                                                        borderBottom: "1px solid var(--color-hairline)",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                    }}
+                                                >
+                                                    <KitSpinner size={12} /> Loading topics…
+                                                </div>
+                                            ) : topics.length === 0 ? (
+                                                <div
+                                                    style={{
+                                                        padding: "10px 14px 10px 44px",
+                                                        fontSize: 12,
+                                                        color: "var(--color-ink-mute)",
+                                                        borderBottom: "1px solid var(--color-hairline)",
+                                                    }}
+                                                >
+                                                    No topics yet. Use the + button on this subject to add one.
+                                                </div>
+                                            ) : (
+                                                topics.map((t) => (
+                                                    <div
+                                                        key={t.id}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: 10,
+                                                            padding: "9px 14px 9px 44px",
+                                                            borderBottom: "1px solid var(--color-hairline)",
+                                                        }}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                width: 5,
+                                                                height: 5,
+                                                                borderRadius: "50%",
+                                                                background: "var(--ink-4)",
+                                                            }}
+                                                        />
+                                                        <span
+                                                            style={{
+                                                                fontSize: 13,
+                                                                color: "var(--ink)",
+                                                                flex: 1,
+                                                            }}
+                                                        >
+                                                            {topicLabel(t)}
+                                                        </span>
+                                                        {t.description ? (
+                                                            <span
+                                                                style={{
+                                                                    fontSize: 11.5,
+                                                                    color: "var(--ink-3)",
+                                                                    maxWidth: 260,
+                                                                    whiteSpace: "nowrap",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                }}
+                                                            >
+                                                                {t.description}
+                                                            </span>
+                                                        ) : null}
+                                                        <button
+                                                            type="button"
+                                                            className="btn-kit btn-kit-ghost"
+                                                            onClick={() =>
+                                                                setEditTopic({ subjectId: s.id, topic: t })
+                                                            }
+                                                            aria-label="Edit topic"
+                                                            title="Edit topic"
+                                                        >
+                                                            <Icon name="edit" size={12} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-kit btn-kit-danger-soft"
+                                                            onClick={async () => {
+                                                                const ok = await confirm({
+                                                                    title: "Delete topic?",
+                                                                    message: (
+                                                                        <>
+                                                                            Delete topic <b>{topicLabel(t)}</b>? This cannot be undone.
+                                                                        </>
+                                                                    ),
+                                                                    confirmLabel: "Delete",
+                                                                    destructive: true,
+                                                                });
+                                                                if (!ok) return;
+                                                                try {
+                                                                    await deleteTopic(t.id);
+                                                                    showToast("Topic deleted");
+                                                                    void loadTopics(s.id);
+                                                                } catch (err2) {
+                                                                    showToast(
+                                                                        err2 instanceof Error
+                                                                            ? err2.message
+                                                                            : "Failed to delete",
+                                                                        "danger" as never,
+                                                                    );
+                                                                }
+                                                            }}
+                                                            aria-label="Delete topic"
+                                                            title="Delete topic"
+                                                            style={{ height: 26, padding: "0 8px" }}
+                                                        >
+                                                            <Icon name="trash" size={12} />
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
             </div>
+
+            {newSubjectOpen && (
+                <SubjectDialog
+                    title="New subject"
+                    onClose={() => setNewSubjectOpen(false)}
+                    onSubmit={async (name, code) => {
+                        await createSubject({ name, code: code || undefined });
+                        showToast("Subject created");
+                        await loadSubjects();
+                        setNewSubjectOpen(false);
+                    }}
+                />
+            )}
+
+            {editSubject && (
+                <SubjectDialog
+                    title="Edit subject"
+                    initialName={editSubject.name}
+                    initialCode={editSubject.code ?? ""}
+                    onClose={() => setEditSubject(null)}
+                    onSubmit={async (name, code) => {
+                        await patchSubject(editSubject.id, {
+                            name,
+                            code: code ? code : null,
+                        });
+                        showToast("Subject updated");
+                        await loadSubjects();
+                        setEditSubject(null);
+                    }}
+                />
+            )}
+
+            {newTopicSubjectId && (
+                <TopicDialog
+                    title="New topic"
+                    onClose={() => setNewTopicSubjectId(null)}
+                    onSubmit={async (name, description) => {
+                        await createTopic({
+                            subjectId: newTopicSubjectId,
+                            name,
+                            description: description || undefined,
+                        });
+                        showToast("Topic created");
+                        await loadTopics(newTopicSubjectId);
+                        setNewTopicSubjectId(null);
+                    }}
+                />
+            )}
+
+            {editTopic && (
+                <TopicDialog
+                    title="Edit topic"
+                    initialName={topicLabel(editTopic.topic)}
+                    initialDescription={editTopic.topic.description ?? ""}
+                    onClose={() => setEditTopic(null)}
+                    onSubmit={async (name, description) => {
+                        await updateTopic(editTopic.topic.id, {
+                            name,
+                            description: description || undefined,
+                        });
+                        showToast("Topic updated");
+                        await loadTopics(editTopic.subjectId);
+                        setEditTopic(null);
+                    }}
+                />
+            )}
+
+            {toast && <KitToast message={toast.msg} tone={toast.tone} />}
+            {confirmEl}
         </div>
     );
 }
 
-function SubjectDetail({ subject }: { subject: Subject }) {
+function SubjectDialog({
+    title,
+    initialName = "",
+    initialCode = "",
+    onClose,
+    onSubmit,
+}: {
+    title: string;
+    initialName?: string;
+    initialCode?: string;
+    onClose: () => void;
+    onSubmit: (name: string, code: string) => Promise<void>;
+}) {
+    const [name, setName] = useState(initialName);
+    const [code, setCode] = useState(initialCode);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     return (
-        <Card>
-            <CardHeader
-                title={subject.name}
-                subtitle={`${subject.code} · ${subject.grade} · ${subject.department}`}
-                action={<Button size="sm" variant="outline" leftIcon={<Plus size={14} />}>Topic</Button>}
-            />
-            {subject.topics.length === 0 ? (
-                <CardSection>
-                    <EmptyState
-                        icon={<BookOpen size={28} />}
-                        title="No topics yet"
-                        description="Add the first topic to start mapping this subject."
-                        compact
-                    />
-                </CardSection>
-            ) : subject.topics.map(t => (
-                <CardSection key={t.id}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-                        <div style={{ flex: 1, minWidth: 220 }}>
-                            <div style={{ fontWeight: 600, color: "var(--gray-900)" }}>{t.title}</div>
-                            <div style={{ fontSize: "0.8125rem", color: "var(--gray-500)" }}>{t.weeks} weeks</div>
-                        </div>
-                        <Badge tone={t.status === "ready" ? "success" : "warning"}>{t.status}</Badge>
-                        <Button variant="ghost" size="sm">Edit</Button>
-                    </div>
-                </CardSection>
-            ))}
-        </Card>
+        <KitDialog
+            title={title}
+            onClose={onClose}
+            footer={
+                <>
+                    <button type="button" className="btn-kit btn-kit-ghost" onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-kit btn-kit-primary"
+                        disabled={busy || !name.trim()}
+                        onClick={async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                                await onSubmit(name.trim(), code.trim());
+                            } catch (e) {
+                                setError(e instanceof Error ? e.message : "Save failed");
+                            } finally {
+                                setBusy(false);
+                            }
+                        }}
+                    >
+                        {busy ? <KitSpinner size={12} /> : "Save"}
+                    </button>
+                </>
+            }
+        >
+            {error && <KitErrorBanner message={error} />}
+            <KField label="Subject name" required>
+                <KitInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </KField>
+            <KField label="Subject code" hint="Short identifier shown alongside the subject (optional)">
+                <KitInput value={code} onChange={(e) => setCode(e.target.value)} />
+            </KField>
+        </KitDialog>
+    );
+}
+
+function TopicDialog({
+    title,
+    initialName = "",
+    initialDescription = "",
+    onClose,
+    onSubmit,
+}: {
+    title: string;
+    initialName?: string;
+    initialDescription?: string;
+    onClose: () => void;
+    onSubmit: (name: string, description: string) => Promise<void>;
+}) {
+    const [name, setName] = useState(initialName);
+    const [description, setDescription] = useState(initialDescription);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    return (
+        <KitDialog
+            title={title}
+            onClose={onClose}
+            footer={
+                <>
+                    <button type="button" className="btn-kit btn-kit-ghost" onClick={onClose}>
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-kit btn-kit-primary"
+                        disabled={busy || !name.trim()}
+                        onClick={async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                                await onSubmit(name.trim(), description.trim());
+                            } catch (e) {
+                                setError(e instanceof Error ? e.message : "Save failed");
+                            } finally {
+                                setBusy(false);
+                            }
+                        }}
+                    >
+                        {busy ? <KitSpinner size={12} /> : "Save"}
+                    </button>
+                </>
+            }
+        >
+            {error && <KitErrorBanner message={error} />}
+            <KField label="Topic name" required>
+                <KitInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </KField>
+            <KField label="Description" hint="Optional · shown below the topic name in the tree">
+                <KitTextarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                />
+            </KField>
+        </KitDialog>
     );
 }

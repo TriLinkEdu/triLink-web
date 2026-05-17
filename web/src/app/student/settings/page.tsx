@@ -1,6 +1,7 @@
 "use client";
-import SettingsPage from "@/components/SettingsPage";
 
-export default function StudentSettings() {
-    return <SettingsPage />;
+import { SettingsKitPage } from "@/components/kit";
+
+export default function StudentSettingsPage() {
+    return <SettingsKitPage role="student" />;
 }

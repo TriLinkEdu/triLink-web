@@ -6,6 +6,7 @@ import {
     submitFeedback,
     type TeacherFeedbackItem,
 } from "@/lib/admin-api";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 const CATEGORY_LABELS: Record<string, string> = {
     teacher: "About Me",
@@ -81,15 +82,18 @@ export default function TeacherFeedbackPage() {
                 </div>
             )}
 
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        Feedback
-                    </h1>
-                    <p className="page-subtitle">View feedback from students and submit feedback to school admin</p>
-                </div>
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Communication
+                        <span className="dot-sep">·</span>
+                        {received.length} received · {sent.length} sent
+                    </>
+                }
+                title="Feedback"
+                sub="View feedback from students and submit feedback to school admin."
+            />
 
             {/* Tabs */}
             <div className="tabs" style={{ marginBottom: "1.5rem" }}>

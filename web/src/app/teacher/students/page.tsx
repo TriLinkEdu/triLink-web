@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Select from "@/components/Select";
 import {
     getActiveAcademicYear,
     listMyClassOfferings,
@@ -18,6 +17,7 @@ import {
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { filterOfferingsBySubject } from "@/lib/teacher-utils";
 import { cachedFetch } from "@/lib/cache";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 type StudentRow = {
     id: string;
@@ -199,12 +199,18 @@ export default function TeacherStudents() {
 
     return (
         <div className="page-wrapper">
-            <div className="page-header" style={{ marginBottom: "0.75rem" }}>
-                <div>
-                    <h1 className="page-title">Students</h1>
-                    <p className="page-subtitle">Student analytics per class</p>
-                </div>
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Teaching
+                        <span className="dot-sep">·</span>
+                        {offerings.length} class{offerings.length === 1 ? "" : "es"}
+                    </>
+                }
+                title="Students"
+                sub="Roster, performance, and per-class analytics."
+            />
 
             {/* Class Tabs (Buttons instead of dropdown) */}
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>

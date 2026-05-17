@@ -12,6 +12,7 @@ import {
     markAllNotificationsRead,
     type BackendNotification,
 } from "@/lib/admin-api";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 // ─── category meta ────────────────────────────────────────────────────────────
 type Category = "message" | "calendar" | "announcement" | "exam" | "other";
@@ -139,36 +140,34 @@ export default function TeacherNotifications() {
 
     return (
         <div className="page-wrapper">
-            {/* ── header ── */}
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Notifications</h1>
-                    <p className="page-subtitle">
-                        {loading && <span className="admin-loading-shimmer" style={{ display: "inline-block", width: 100, height: 16, borderRadius: 4 }} />}
-                        {!loading && (totalUnread > 0 ? `${totalUnread} unread notification${totalUnread !== 1 ? "s" : ""}` : "All caught up!")}
-                    </p>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                    {totalUnread > 0 && (
-                        <button
-                            className="btn btn-secondary"
-                            style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: 6 }}
-                            onClick={() => void handleMarkAll()}
-                        >
-                            <CheckCheck size={14} strokeWidth={2} />
-                            Mark all as read
-                        </button>
-                    )}
-                    <Link
-                        href="/teacher/calendar"
-                        className="btn btn-outline"
-                        style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                        <Calendar size={14} strokeWidth={2} />
-                        View Calendar
-                    </Link>
-                </div>
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Inbox
+                        <span className="dot-sep">·</span>
+                        {loading ? "loading…" : totalUnread > 0 ? `${totalUnread} unread` : "all caught up"}
+                    </>
+                }
+                title="Notifications"
+                sub="School announcements, schedule updates, and reminders."
+                actions={
+                    <>
+                        {totalUnread > 0 && (
+                            <button
+                                type="button"
+                                className="btn-kit btn-kit-secondary"
+                                onClick={() => void handleMarkAll()}
+                            >
+                                <CheckCheck size={13} /> Mark all read
+                            </button>
+                        )}
+                        <Link href="/teacher/calendar" className="btn-kit btn-kit-ghost">
+                            <Calendar size={13} /> Calendar
+                        </Link>
+                    </>
+                }
+            />
 
             {err && <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)" }}>{err}</div>}
 

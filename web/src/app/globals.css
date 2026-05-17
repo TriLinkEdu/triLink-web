@@ -1,7 +1,167 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@500;600;700;800&display=swap');
+/* ============================================================
+   TriLink design system — adapted from the Premium EdTech kit.
+   Direction: Linear-influenced. Single font (Inter) + Instrument
+   Serif italics for display moments, single iris brand accent,
+   hairline borders, no soft shadow stacks, restrained color.
+
+   Token names are dual-aliased: legacy `--color-*` names keep
+   the existing component library working while `--bg / --ink /
+   --hairline / --brand` mirror the kit verbatim for new code.
+   ============================================================ */
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme {
+  /* ---------------- Kit-native names (canonical) ---------------- */
+
+  /* Surfaces */
+  --color-bg:        #fbfbfa; /* warm off-white app */
+  --color-surface:   #ffffff; /* cards */
+  --color-surface-2: #f6f6f3; /* nested surface */
+  --color-surface-3: #efefea; /* chips / keyboard */
+
+  /* Borders — translucent so they read on any surface */
+  --color-hairline:   rgba(15, 16, 18, 0.07);
+  --color-hairline-2: rgba(15, 16, 18, 0.12);
+  --color-hairline-3: rgba(15, 16, 18, 0.20);
+
+  /* Ink — four-step text hierarchy */
+  --color-ink:   #0e0e10;
+  --color-ink-2: #5b5d63;
+  --color-ink-3: #8a8c92;
+  --color-ink-4: #b6b7bc;
+
+  /* Brand — iris (used sparingly: focused state, AI accents, single CTA) */
+  --color-brand:       #5b5bd6;
+  --color-brand-ink:   #4544c4;
+  --color-brand-soft:  #eeeefe;
+  --color-brand-faint: #f6f6ff;
+
+  /* Per-role tint — drives logo square + one chip + page meta dot only */
+  --color-role-student: #5b5bd6;
+  --color-role-teacher: #1a7f5f;
+  --color-role-admin:   #7c3aed;
+  --color-role-parent:  #c46b4a;
+
+  /* Semantic — desaturated, only for state */
+  --color-success:      #0d8a5f;
+  --color-success-soft: #e3f3ec;
+  --color-warning:      #b07000;
+  --color-warning-soft: #fbeed1;
+  --color-danger:       #c43554;
+  --color-danger-soft:  #fbe9ee;
+
+  /* ---------------- Legacy aliases (keep existing components working) -- */
+
+  /* Tailwind v4 paints `bg-[var(--color-primary-600)]` everywhere; map the
+     scale onto iris so primary CTAs use the brand color and shadcn
+     primitives keep functioning. */
+  --color-primary-50:  #f6f6ff;
+  --color-primary-100: #eeeefe;
+  --color-primary-200: #d8d8fa;
+  --color-primary-300: #b4b4f1;
+  --color-primary-400: #8888e3;
+  --color-primary-500: #6e6edd;
+  --color-primary-600: #5b5bd6; /* canonical brand */
+  --color-primary-700: #4544c4;
+  --color-primary-800: #3d3cad;
+  --color-primary-900: #2f2e88;
+
+  /* Foreground / surface aliases — point at kit names */
+  --color-bg-elev:   var(--color-surface);
+  --color-fg:        var(--color-ink);
+  --color-fg-muted:  var(--color-ink-2);
+  --color-fg-subtle: var(--color-ink-3);
+  --color-muted:     var(--color-surface-2);
+  --color-muted-fg:  var(--color-ink-2);
+  --color-border:        var(--color-hairline);
+  --color-border-strong: var(--color-hairline-2);
+  --color-input:         var(--color-hairline);
+  --color-ring:          var(--color-brand);
+
+  --color-card:    var(--color-surface);
+  --color-card-fg: var(--color-ink);
+
+  --color-danger-fg:  #ffffff;
+  --color-success-fg: #ffffff;
+  --color-warning-fg: #ffffff;
+  --color-info:       #0284c7;
+
+  /* ---------------- Radii (kit uses 6–12 px almost exclusively) -------- */
+  --radius-sm:   5px;
+  --radius-md:   7px;
+  --radius-lg:  10px;
+  --radius-xl:  12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* ---------------- Type scale (compact, Linear-grade) ----------------- */
+  /* Base = 13 px (kit) instead of 16; UI density is its own statement. */
+  --text-display-2xl: 56px; /* portal welcome */
+  --text-display-xl:  40px;
+  --text-display-lg:  32px;
+  --text-3xl: 22px;  /* page H1 */
+  --text-2xl: 18px;  /* card title */
+  --text-xl:  16px;
+  --text-lg:  14px;
+  --text-base:13px;  /* body / table / button */
+  --text-sm:  12.5px;
+  --text-xs:  11.5px;
+  --text-2xs: 10.5px;
+
+  /* ---------------- Spacing (kit uses tighter density) ----------------- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  14px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------------- Shadows ------------------------------------------- */
+  /* Kit uses one popover shadow + the rest is hairline-only. */
+  --shadow-xs: 0 0 0 0 transparent;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 8px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 1px 1px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.06), 0 16px 32px rgb(0 0 0 / 0.08);
+  --shadow-focus: 0 0 0 3px rgb(91 91 214 / 0.18);
+  --shadow-focus-ink: 0 0 0 3px rgb(15 16 18 / 0.05);
+
+  /* ---------------- Fonts ------------------------------------------- */
+  --font-sans:    var(--font-inter, "Inter"), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-inter, "Inter"), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif:   var(--font-instrument-serif, "Instrument Serif"), "Iowan Old Style", "Times New Roman", serif;
+  --font-mono:    var(--font-jetbrains-mono, "JetBrains Mono"), ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+}
+
+/* Dark theme: monochrome near-black, kept for the proctor surface and
+   the "dark" toggle. Hairlines become rgba on white. */
+.dark {
+  --color-bg:        #0a0a0c;
+  --color-surface:   #111114;
+  --color-surface-2: #18181b;
+  --color-surface-3: #1f1f23;
+
+  --color-hairline:   rgb(255 255 255 / 0.06);
+  --color-hairline-2: rgb(255 255 255 / 0.12);
+  --color-hairline-3: rgb(255 255 255 / 0.20);
+
+  --color-ink:   #fafafa;
+  --color-ink-2: #b9b9bd;
+  --color-ink-3: #8c8c92;
+  --color-ink-4: #4a4a4e;
+
+  --color-success-soft: rgb(13 138 95 / 0.16);
+  --color-warning-soft: rgb(176 112 0 / 0.16);
+  --color-danger-soft:  rgb(196 53 84 / 0.16);
+}
 
 :root {
-  --font-display: 'Sora', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Sora', var(--font-inter, 'Inter'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* Primary Blue Palette - from login inspiration */
   --primary-50: #eff6ff;
   --primary-100: #dbeafe;
@@ -71,24 +231,45 @@
   --z-toast: 1080;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 html {
-  font-size: 16px;
+  font-size: 16px; /* rem base; UI tokens are px so this is for marketing-rare rem usage */
   scroll-behavior: smooth;
+  /* Inter feature flags from the kit: cv11 single-storey 'g', ss03 punctuation,
+     ss01 alt characters, tnum off by default (turn on per-surface). */
+  font-feature-settings: "cv11", "ss03", "ss01", "tnum" 0;
+  letter-spacing: -0.006em;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--gray-800);
-  background: var(--gray-50);
-  line-height: 1.6;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  font-size: 13px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+h1 { letter-spacing: -0.025em; }
+h2 { letter-spacing: -0.022em; }
+h3 { letter-spacing: -0.018em; }
+h4 { letter-spacing: -0.012em; }
+
+/* Italic display moments use Instrument Serif (e.g. "TriLink." on the
+   portal welcome, the "Today" callout on a learning path). */
+.serif-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.025em;
 }
 
 a {
@@ -104,7 +285,30 @@ button {
   background: none;
 }
 
-input, textarea { font-family: inherit; outline: none; border: none; } select { font-family: inherit; outline: none; border: 1px solid var(--primary-200); border-radius: 20px !important; background-color: var(--primary-50) !important; color: var(--primary-800) !important; padding: 0.6rem 1rem !important; cursor: pointer; } @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+input, textarea { font-family: inherit; border: none; }
+input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary-500, #3b82f6);
+  outline-offset: 1px;
+}
+select {
+  font-family: inherit;
+  border: 1px solid var(--primary-200);
+  border-radius: 20px !important;
+  background-color: var(--primary-50) !important;
+  color: var(--primary-800) !important;
+  padding: 0.6rem 1rem !important;
+  cursor: pointer;
+}
+select:focus-visible {
+  outline: 2px solid var(--primary-500, #3b82f6);
+  outline-offset: 1px;
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--primary-500, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 img {
   max-width: 100%;
@@ -5849,4 +6053,2861 @@ table tbody tr:hover {
     font-size: 1.55rem;
     line-height: 1.15;
   }
+}
+
+/* Plan D: responsive dashboard grids */
+@media (max-width: 960px) {
+  .teacher-dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Plan D: skip-link visibility (was easy to miss) */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10000;
+  background: var(--primary-700, #1d4ed8);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 0 8px 0;
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 0;
+  outline: none;
+}
+
+/* ============================================================
+   PREMIUM KIT OVERRIDES — appended after legacy CSS so the cascade
+   takes precedence. This block bridges the legacy chrome onto the
+   "TRILINK — Premium EdTech Platform" kit visuals. The legacy CSS
+   above will be deleted as each surface migrates to the new
+   primitives in src/components/kit/.
+   ============================================================ */
+
+/* ---- App shell: flat, warm off-white, hairline-bordered ---- */
+body { background: var(--color-bg); color: var(--color-ink); }
+
+.main-content {
+  background: var(--color-bg) !important;
+  margin-left: 224px;
+  min-height: 100vh;
+}
+
+/* ---- Sidebar (legacy markup): re-skin to match kit's 224 px shell --- */
+.sidebar {
+  width: 224px !important;
+  background: var(--color-bg) !important;
+  border-right: 1px solid var(--color-hairline) !important;
+  box-shadow: none !important;
+}
+.sidebar-header {
+  background: var(--color-bg) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  padding: 14px 14px 12px !important;
+}
+.sidebar-logo {
+  width: 26px !important;
+  height: 26px !important;
+  background: var(--color-ink) !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+.sidebar.role-student .sidebar-logo,
+.sidebar[data-role="student"] .sidebar-logo { background: var(--color-role-student) !important; }
+.sidebar.role-teacher .sidebar-logo,
+.sidebar[data-role="teacher"] .sidebar-logo { background: var(--color-role-teacher) !important; }
+.sidebar.role-admin .sidebar-logo,
+.sidebar[data-role="admin"] .sidebar-logo { background: var(--color-role-admin) !important; }
+.sidebar.role-parent .sidebar-logo,
+.sidebar[data-role="parent"] .sidebar-logo { background: var(--color-role-parent) !important; }
+
+.sidebar-brand {
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.012em !important;
+  color: var(--color-ink) !important;
+}
+.sidebar-brand span { color: var(--color-ink) !important; }
+.sidebar-portal-label {
+  color: var(--color-ink-3) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+.sidebar-section {
+  color: var(--color-ink-3);
+  font-weight: 500;
+  letter-spacing: 0;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  padding: 14px 8px 4px !important;
+}
+
+.nav-item {
+  color: var(--color-ink-2);
+  font-weight: 400;
+  font-size: 13px;
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  gap: 8px !important;
+}
+.nav-item svg { stroke-width: 1.5; width: 15px; height: 15px; }
+.nav-item:hover {
+  background: rgba(15,16,18,0.04) !important;
+  color: var(--color-ink) !important;
+}
+.nav-item:hover svg { color: var(--color-ink-2); }
+.nav-item.active {
+  background: rgba(15,16,18,0.05) !important;
+  color: var(--color-ink) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+.nav-item.active svg { color: var(--color-ink) !important; }
+.nav-item.active::before { display: none !important; }
+.nav-icon { color: var(--color-ink-3) !important; }
+.nav-badge {
+  background: var(--color-danger-soft) !important;
+  color: var(--color-danger) !important;
+  font-weight: 500 !important;
+  font-size: 10.5px !important;
+  padding: 0 5px !important;
+  border-radius: 999px !important;
+  margin-left: auto;
+}
+
+/* Top header — kit spec: 48 px, blurred warm off-white, single hairline */
+.top-header {
+  height: 48px !important;
+  padding: 0 24px !important;
+  background: rgba(251, 251, 250, 0.85) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+}
+
+/* Legacy primary button — flat ink, no brand tinted shadow */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-success {
+  height: 28px;
+  padding: 0 11px !important;
+  border-radius: 7px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary {
+  background: var(--color-ink) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.btn-primary:hover { background: #1f1f22 !important; transform: none !important; }
+.btn-secondary {
+  background: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-hairline) !important;
+}
+.btn-secondary:hover { background: var(--color-surface-2) !important; }
+.btn-danger {
+  background: var(--color-danger) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.btn-success {
+  background: var(--color-success) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Cards: white surface, hairline border, ~12 px radius, no drop shadow */
+.card,
+.stat-card,
+.admin-dash-bottom-card,
+.admin-dash-stat-card {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+.card:hover { transform: none !important; box-shadow: none !important; border-color: var(--color-hairline-2) !important; }
+
+/* Dashboard hero panels: kit replaces gaudy heroes with a phead (page
+   heading + hairline divider). Strip background + border + radius so
+   the bare phead-like layout shows through. */
+.admin-dash-hero,
+.teacher-dashboard-hero,
+.student-dashboard-hero,
+.parent-dashboard-hero {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  border-radius: 0 !important;
+  padding: 0 0 20px !important;
+  margin-bottom: 20px !important;
+  box-shadow: none !important;
+}
+
+/* Pill chips — neutral surface, hairline border, no brand fill */
+.admin-dash-pill,
+.admin-dash-chip {
+  background: var(--color-surface-2) !important;
+  border: 1px solid var(--color-hairline) !important;
+  color: var(--color-ink-2) !important;
+  border-radius: 999px !important;
+  padding: 1px 7px 1px 6px !important;
+  font-weight: 500 !important;
+  font-size: 11px !important;
+}
+
+/* Inputs / Select — kit field style: 7 px radius, hairline border, ink focus */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  color: var(--color-ink) !important;
+  border-radius: 7px !important;
+  padding: 7px 10px !important;
+  font-size: 13px !important;
+  line-height: 1.4;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  border-color: var(--color-hairline-3) !important;
+  box-shadow: var(--shadow-focus-ink) !important;
+}
+input::placeholder, textarea::placeholder { color: var(--color-ink-4); }
+/* Re-enable native checkbox/radio rendering */
+input[type="checkbox"], input[type="radio"] {
+  appearance: auto;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* Scrollbar: minimal kit spec — 8 px, transparent track, fade thumb on hover */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
+*:hover::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); }
+
+/* Selection */
+::selection { background: rgba(91,91,214,0.18); color: var(--color-ink); }
+
+/* Focus ring — keyboard-only, iris */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-brand) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
+
+/* Skip-link polish */
+.skip-link { background: var(--color-ink); color: var(--color-bg); border-radius: 6px; }
+
+/* Page heading default */
+.page-header h1, .admin-dash-title, .teacher-dashboard-title {
+  font-family: var(--font-display);
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.022em !important;
+  color: var(--color-ink) !important;
+  line-height: 1.1;
+}
+
+/* Drop the brand-tinted "Live"/"Synced" footer artifacts in legacy markup */
+.sidebar-role-chip { display: none !important; }
+/* Status card remains visible — re-skinned below */
+.sidebar-status-card {
+  background: transparent !important;
+  border-top: 1px solid var(--color-hairline) !important;
+  border-radius: 0 !important;
+  padding: 10px 8px !important;
+  margin-top: 0 !important;
+}
+.sidebar-status-card > div:first-child {
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--color-ink) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.sidebar-status-dot {
+  width: 5px !important; height: 5px !important;
+  background: var(--color-success) !important;
+  border-radius: 999px !important;
+  display: inline-block !important;
+}
+.sidebar-status-card small {
+  font-size: 11px !important;
+  color: var(--color-ink-3) !important;
+}
+
+/* Dashboard skeleton: shimmer using new tokens */
+.admin-skeleton, .admin-loading-shimmer { background: var(--color-surface-2) !important; }
+
+/* App-shell loading skeleton — used on cold-load of every authenticated
+   layout before client hydrates. Reskin to match kit (warm off-white,
+   hairline borders, no pastel gradients). */
+.admin-shell-loading,
+.admin-shell-loading-main {
+  background: var(--color-bg) !important;
+}
+.admin-shell-loading-side {
+  width: 224px !important;
+  border-right: 1px solid var(--color-hairline) !important;
+  background: var(--color-bg) !important;
+  padding: 14px 8px !important;
+}
+.admin-shell-loading-brand,
+.admin-shell-loading-item,
+.admin-shell-loading-footer,
+.admin-shell-loading-hero,
+.admin-shell-loading-card,
+.admin-shell-loading-search,
+.admin-shell-loading-chip,
+.admin-shell-loading-icon,
+.admin-shell-loading-user {
+  border-radius: 7px !important;
+  background: var(--color-surface-2) !important;
+}
+.admin-shell-loading-head {
+  height: 48px !important;
+  padding: 0 24px !important;
+  background: var(--color-bg) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+}
+.admin-shell-loading-content {
+  padding: 22px 28px !important;
+}
+.admin-shell-loading-hero {
+  height: 80px !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+}
+
+/* Skeleton primitive shimmer (used by <Skeleton/>). */
+@keyframes trilink-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.trilink-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--color-fg) 4%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: trilink-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trilink-skeleton { animation: none; }
+}
+
+/* Display font helper utility */
+.font-display { font-family: var(--font-display); }
+
+/* Sidebar portal label refinement: legacy used `--text-faint` (undefined). */
+.sidebar-portal-label {
+  color: var(--color-fg-subtle) !important;
+  font-size: var(--text-2xs) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: capitalize;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   TRILINK kit — verbatim CSS (final layer, highest priority).
+
+   Adapted from `TRILINK — Premium EdTech Platform/styles.css`.
+   Re-aliases the kit's unprefixed tokens (`--bg`, `--ink`, etc.)
+   to our Tailwind-v4 `--color-*` tokens so every class name
+   from the kit's JSX works 1:1 in trilink-web.
+   ============================================================ */
+:root {
+  /* Tokens — alias kit's unprefixed names to our `--color-*` scale */
+  --bg:           var(--color-bg);
+  --surface:      var(--color-surface);
+  --surface-2:    var(--color-surface-2);
+  --surface-3:    var(--color-surface-3);
+  --hairline:     var(--color-hairline);
+  --hairline-2:   var(--color-hairline-2);
+  --hairline-3:   var(--color-hairline-3);
+  --ink:          var(--color-ink);
+  --ink-2:        var(--color-ink-2);
+  --ink-3:        var(--color-ink-3);
+  --ink-4:        var(--color-ink-4);
+  --brand:        var(--color-brand);
+  --brand-ink:    var(--color-brand-ink);
+  --brand-soft:   var(--color-brand-soft);
+  --brand-faint:  var(--color-brand-faint);
+  --role-student: var(--color-role-student);
+  --role-teacher: var(--color-role-teacher);
+  --role-admin:   var(--color-role-admin);
+  --role-parent:  var(--color-role-parent);
+  --success:      var(--color-success);
+  --success-soft: var(--color-success-soft);
+  --success-light: var(--color-success-soft);
+  --success-50:   var(--color-success-soft);
+  --success-600:  var(--color-success);
+  --warning:      var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
+  --warning-light: var(--color-warning-soft);
+  --warning-50:   var(--color-warning-soft);
+  --warning-600:  var(--color-warning);
+  --danger:       var(--color-danger);
+  --danger-soft:  var(--color-danger-soft);
+  --danger-light: var(--color-danger-soft);
+  --danger-50:    var(--color-danger-soft);
+  --danger-600:   var(--color-danger);
+  /* Map legacy slate/gray scale to kit ink tokens so that any
+     `var(--gray-400)` / `var(--gray-50)` written inline at the
+     component level resolves to the TRILINK design system. */
+  --gray-50:  var(--color-surface-2);
+  --gray-100: var(--color-hairline);
+  --gray-200: var(--color-hairline);
+  --gray-300: var(--color-ink-4);
+  --gray-400: var(--color-ink-3);
+  --gray-500: var(--color-ink-3);
+  --gray-600: var(--color-ink-2);
+  --gray-700: var(--color-ink-2);
+  --gray-800: var(--color-ink);
+  --gray-900: var(--color-ink);
+  /* Same treatment for legacy primary scale (only used as accents). */
+  --primary-50:  var(--color-surface-2);
+  --primary-100: var(--color-hairline);
+  --primary-200: var(--color-ink-4);
+  --primary-300: var(--color-ink-3);
+  --primary-400: var(--color-ink-2);
+  --primary-500: var(--color-ink);
+  --primary-600: var(--color-ink);
+  --primary-700: var(--color-ink);
+  --primary-800: var(--color-ink);
+  --primary-900: var(--color-ink);
+  --purple-light: var(--color-surface-2);
+  --font:        var(--font-inter, "Inter", system-ui, sans-serif);
+  --font-serif:  var(--font-instrument-serif, "Instrument Serif", serif);
+  --font-mono:   var(--font-jetbrains-mono, "JetBrains Mono", monospace);
+  --shadow-pop:  0 1px 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06), 0 16px 32px rgba(0,0,0,0.08);
+}
+
+/* ----- App shell (kit's `.app` flex layout) ---------------------- */
+.app { display: flex; min-height: 100vh; width: 100%; }
+
+/* ----- Page wrapper used by every kit page ----------------------- */
+.kit-page { padding: 22px 28px 56px; max-width: 1280px; width: 100%; margin: 0 auto; }
+.kit-page-wide { max-width: none; padding: 0; }
+
+/* ----- PageHead — kit's `.phead` heading row -------------------- */
+.phead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; padding-bottom: 20px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.phead__meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-3); margin-bottom: 6px;
+}
+.phead__title {
+  font-size: 22px; font-weight: 500; letter-spacing: -0.022em;
+  color: var(--ink); margin: 0; line-height: 1.1;
+}
+.phead__title .serif {
+  font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--brand);
+}
+.phead__sub {
+  font-size: 13px; color: var(--ink-2); margin-top: 6px; letter-spacing: -0.003em;
+}
+.phead__actions { display: flex; gap: 8px; align-items: center; }
+.role-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 999px;
+  background: var(--role-student);
+}
+.role-teacher .role-dot, .kit-page[data-role="teacher"] .role-dot { background: var(--role-teacher); }
+.role-admin .role-dot,   .kit-page[data-role="admin"]   .role-dot { background: var(--role-admin); }
+.role-parent .role-dot,  .kit-page[data-role="parent"]  .role-dot { background: var(--role-parent); }
+.dot-sep { color: var(--ink-4); margin: 0 6px; font-size: 10px; }
+.live-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.live-chip::before {
+  content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--success);
+}
+.live-chip--violet::before { background: var(--brand); }
+.live-chip--warn::before { background: var(--warning); }
+
+/* ----- Kit buttons — `.btn-kit*` (namespaced to avoid clashing
+        with the legacy `.btn`/`.btn-primary` block higher up) ---- */
+.btn-kit {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 11px; height: 28px; border-radius: 7px;
+  font-size: 12.5px; font-weight: 500; transition: all 100ms;
+  white-space: nowrap; letter-spacing: -0.005em; border: 0; cursor: pointer;
+  font-family: inherit;
+}
+.btn-kit svg { width: 13px; height: 13px; stroke-width: 1.8; }
+.btn-kit-primary  { background: var(--ink); color: #fff; }
+.btn-kit-primary:hover { background: #1f1f22; }
+.btn-kit-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--hairline); }
+.btn-kit-secondary:hover { background: var(--surface-2); }
+.btn-kit-ghost    { background: transparent; color: var(--ink-2); }
+.btn-kit-ghost:hover { background: rgba(15,16,18,0.06); color: var(--ink); }
+.btn-kit-brand    { background: var(--brand); color: #fff; }
+.btn-kit-brand:hover { background: var(--brand-ink); }
+.btn-kit-ai {
+  background: var(--brand-soft); color: var(--brand-ink);
+  border: 1px solid rgba(91,91,214,0.18);
+}
+.btn-kit-ai:hover { background: #e4e4fd; }
+.btn-kit-danger {
+  background: var(--color-danger); color: #fff;
+  border: 1px solid var(--color-danger);
+}
+.btn-kit-danger:hover { background: #aa2848; border-color: #aa2848; }
+.btn-kit-danger-soft {
+  background: var(--color-danger-soft); color: var(--color-danger);
+  border: 1px solid rgba(196,53,84,0.22);
+}
+.btn-kit-danger-soft:hover { background: #f6dadf; }
+.btn-kit-warning {
+  background: var(--color-warning-soft); color: var(--color-warning);
+  border: 1px solid rgba(196,53,84,0.22);
+}
+.btn-kit-warning:hover { background: #f6e6d3; }
+.btn-kit-success {
+  background: var(--color-success-soft); color: var(--color-success);
+  border: 1px solid rgba(13,138,95,0.22);
+}
+.btn-kit-success:hover { background: #d2efdf; }
+.btn-kit-lg { height: 32px; padding: 0 13px; font-size: 13px; }
+.iconbtn {
+  width: 28px; height: 28px; border-radius: 7px; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-2); position: relative; transition: background 120ms;
+  border: 0; cursor: pointer;
+}
+.iconbtn:hover { background: rgba(15,16,18,0.06); color: var(--ink); }
+.iconbtn svg { width: 15px; height: 15px; stroke-width: 1.5; }
+.iconbtn .dot {
+  position: absolute; top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--danger); border: 1.5px solid var(--bg);
+}
+
+/* ----- Kit card -------------------------------------------------- */
+.k-card {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 12px; overflow: hidden;
+}
+.k-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--hairline);
+  gap: 12px; min-height: 44px;
+}
+.k-card__title {
+  font-size: 13px; font-weight: 500; letter-spacing: -0.008em; color: var(--ink);
+}
+.k-card__sub {
+  font-size: 11.5px; color: var(--ink-3); margin-top: 2px; letter-spacing: -0.003em;
+}
+.k-card__body { padding: 14px 16px; }
+
+/* ----- Stat grid + stat tile ------------------------------------ */
+.stat-grid {
+  display: grid; gap: 1px; background: var(--hairline);
+  border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden;
+}
+.stat-grid.cols-6 { grid-template-columns: repeat(6, 1fr); }
+.stat-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1200px) {
+  .stat-grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
+  .stat-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+.stat {
+  background: var(--surface); padding: 14px 16px; display: flex;
+  flex-direction: column; gap: 8px; position: relative; min-height: 92px;
+}
+.stat__label {
+  font-size: 12px; color: var(--ink-3); font-weight: 400;
+  letter-spacing: -0.003em; display: flex; align-items: center; gap: 6px;
+}
+.stat__label svg { width: 12px; height: 12px; color: var(--ink-4); stroke-width: 1.5; }
+.stat__value {
+  font-size: 26px; font-weight: 500; letter-spacing: -0.025em;
+  color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "lnum";
+}
+.stat__note {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--ink-3); letter-spacing: -0.003em;
+}
+.stat__delta {
+  display: inline-flex; align-items: center; gap: 1px;
+  font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.stat__delta--up   { color: var(--success); }
+.stat__delta--down { color: var(--danger); }
+
+/* ----- Pill (kit's status chip) --------------------------------- */
+.k-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 7px 1px 6px; border-radius: 999px;
+  font-size: 11px; font-weight: 500; letter-spacing: -0.002em;
+  background: var(--surface-2); color: var(--ink-2);
+  border: 1px solid var(--hairline); white-space: nowrap; line-height: 1.5;
+}
+.k-pill .b-dot {
+  width: 5px; height: 5px; border-radius: 999px;
+  background: var(--ink-3); flex-shrink: 0;
+}
+.k-pill--active  { color: var(--success);  background: var(--success-soft); border-color: rgba(13,138,95,0.16); }
+.k-pill--active  .b-dot { background: var(--success); }
+.k-pill--pending { color: var(--warning);  background: var(--warning-soft); border-color: rgba(176,112,0,0.18); }
+.k-pill--pending .b-dot { background: var(--warning); }
+.k-pill--danger  { color: var(--danger);   background: var(--danger-soft);  border-color: rgba(196,53,84,0.18); }
+.k-pill--danger  .b-dot { background: var(--danger); }
+.k-pill--brand   { color: var(--brand-ink); background: var(--brand-soft); border-color: rgba(91,91,214,0.18); }
+.k-pill--brand   .b-dot { background: var(--brand); }
+.k-pill--solid   { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* ----- ActivityRow (`.row`) ------------------------------------- */
+.k-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto auto;
+  align-items: center; gap: 12px; padding: 9px 10px;
+  border-radius: 6px; transition: background 100ms; cursor: pointer;
+}
+.k-row:hover { background: var(--surface-2); }
+.k-row__icon {
+  width: 24px; height: 24px; border-radius: 6px; color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.k-row__icon svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.k-row__title {
+  font-size: 13px; font-weight: 500; color: var(--ink); line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+.k-row__detail { font-size: 12px; color: var(--ink-3); margin-top: 2px; letter-spacing: -0.003em; }
+.k-row__type   { font-size: 11.5px; color: var(--ink-3); padding-right: 4px; }
+.k-row__date   { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.k-row__chev   { width: 12px; height: 12px; color: var(--ink-4); }
+
+/* ----- Tabs (underline) ----------------------------------------- */
+.k-tabs { display: flex; gap: 0; position: relative; border-bottom: 0; }
+.k-tab  {
+  padding: 0 10px 8px; height: 28px; font-size: 12.5px; font-weight: 400;
+  color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px;
+  position: relative; letter-spacing: -0.005em; background: none; border: 0; cursor: pointer;
+}
+.k-tab:hover { color: var(--ink); }
+.k-tab.active { color: var(--ink); font-weight: 500; }
+.k-tab.active::after {
+  content: ""; position: absolute; bottom: -1px; left: 8px; right: 8px;
+  height: 1.5px; background: var(--ink); border-radius: 999px;
+}
+.k-tab__count { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.k-tab.active .k-tab__count { color: var(--ink-2); }
+
+/* ----- Bars ----------------------------------------------------- */
+.k-bar {
+  height: 4px; background: var(--surface-2); border-radius: 999px; overflow: hidden;
+}
+.k-bar__fill {
+  height: 100%; border-radius: 999px; background: var(--ink);
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.k-bar__fill--brand   { background: var(--brand); }
+.k-bar__fill--success { background: var(--success); }
+.k-bar__fill--warning { background: var(--warning); }
+.k-bar__fill--danger  { background: var(--danger); }
+
+/* ----- Layouts -------------------------------------------------- */
+.grid-2  { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+.grid-12 { display: grid; grid-template-columns: 1fr 320px; gap: 14px; }
+@media (max-width: 1100px) {
+  .grid-2, .grid-12 { grid-template-columns: 1fr; }
+}
+.section-stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* ----- Class card ----------------------------------------------- */
+.classcard {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 10px; padding: 14px; display: flex; flex-direction: column;
+  gap: 10px; transition: border-color 140ms; cursor: pointer;
+}
+.classcard:hover { border-color: var(--hairline-2); }
+.classcard__head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.classcard__title {
+  font-size: 13.5px; font-weight: 500; letter-spacing: -0.008em; color: var(--ink);
+}
+.classcard__sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.classcard__meta {
+  display: flex; gap: 12px; font-size: 11.5px; color: var(--ink-2); align-items: center;
+}
+.classcard__meta b { color: var(--ink); font-weight: 500; }
+.classcard__meta-sep { color: var(--ink-4); }
+
+/* ----- Quick action --------------------------------------------- */
+.qa {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  background: transparent; border-radius: 6px; font-size: 12.5px;
+  font-weight: 400; color: var(--ink); text-align: left; width: 100%;
+  transition: background 100ms; border: 0; cursor: pointer; font-family: inherit;
+}
+.qa:hover { background: var(--surface-2); }
+.qa svg.lead { width: 14px; height: 14px; color: var(--ink-3); stroke-width: 1.5; flex-shrink: 0; }
+.qa svg.chev { margin-left: auto; width: 12px; height: 12px; color: var(--ink-4); }
+
+/* ----- Form fields ---------------------------------------------- */
+.k-field { display: flex; flex-direction: column; gap: 5px; }
+.k-field__label {
+  font-size: 12px; font-weight: 400; color: var(--ink-2); letter-spacing: -0.003em;
+}
+.k-field input, .k-field textarea, .k-field select {
+  width: 100%; padding: 7px 10px; border-radius: 7px;
+  border: 1px solid var(--hairline); background: var(--surface);
+  font-size: 13px; outline: none; color: var(--ink);
+  transition: border 120ms, box-shadow 120ms; font-family: inherit;
+}
+.k-field input::placeholder, .k-field textarea::placeholder { color: var(--ink-4); }
+.k-field input:focus, .k-field textarea:focus, .k-field select:focus {
+  border-color: var(--hairline-3); box-shadow: 0 0 0 3px rgba(15,16,18,0.05);
+}
+.k-field textarea { resize: vertical; min-height: 76px; font-family: inherit; }
+
+/* ----- Segmented control --------------------------------------- */
+.segment {
+  display: inline-flex; padding: 2px; background: var(--surface-2);
+  border-radius: 7px; border: 1px solid var(--hairline); gap: 1px; width: 100%;
+}
+.segment__opt {
+  flex: 1; padding: 5px 10px; border-radius: 5px;
+  font-size: 12px; font-weight: 400; color: var(--ink-2); text-align: center;
+  background: none; border: 0; cursor: pointer; font-family: inherit;
+}
+.segment__opt:hover { color: var(--ink); }
+.segment__opt.active {
+  background: var(--surface); color: var(--ink); font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* ----- Toggle --------------------------------------------------- */
+.toggle {
+  position: relative; width: 28px; height: 16px;
+  background: var(--hairline-2); border-radius: 999px;
+  display: inline-block; cursor: pointer; transition: background 160ms; flex-shrink: 0;
+  border: 0;
+}
+.toggle::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 12px; height: 12px; border-radius: 999px; background: #fff;
+  transition: transform 160ms;
+}
+.toggle.on { background: var(--ink); }
+.toggle.on::after { transform: translateX(12px); }
+
+/* ----- Announcement compact -------------------------------------- */
+.ann {
+  padding: 12px 14px; background: var(--surface); border-radius: 8px;
+  display: flex; flex-direction: column; gap: 4px; transition: background 100ms;
+  cursor: pointer; border-bottom: 1px solid var(--hairline);
+}
+.ann:last-child { border-bottom: 0; }
+.ann:hover { background: var(--surface-2); }
+.ann__head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--ink-3);
+}
+.ann__title {
+  font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: -0.005em;
+}
+.ann__body {
+  font-size: 12px; color: var(--ink-2); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; letter-spacing: -0.003em;
+}
+
+/* ----- Grades table -------------------------------------------- */
+/* Make any direct ancestor of `.gtable` horizontally scrollable on
+   narrow viewports without breaking the table's normal block layout. */
+:where(*:has(> .gtable)) { overflow-x: auto; max-width: 100%; }
+.gtable { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 100%; }
+.gtable th {
+  text-align: left; font-size: 11.5px; font-weight: 400; color: var(--ink-3);
+  padding: 10px 16px; border-bottom: 1px solid var(--hairline); background: var(--surface);
+}
+.gtable td {
+  padding: 11px 16px; border-bottom: 1px solid var(--hairline);
+  font-size: 12.5px; color: var(--ink-2); vertical-align: middle;
+}
+.gtable tr:last-child td { border-bottom: 0; }
+.gtable tr:hover td { background: var(--surface-2); }
+.gtable td b { color: var(--ink); font-weight: 500; }
+
+/* ----- Avatar (kit's `.avatar`) -------------------------------- */
+.k-avatar {
+  width: 24px; height: 24px; border-radius: 999px;
+  background: var(--surface-3); color: var(--ink-2);
+  font-weight: 500; font-size: 10.5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  letter-spacing: 0.02em; flex-shrink: 0;
+}
+.k-avatar--lg { width: 56px; height: 56px; font-size: 18px; }
+.k-avatar--xl { width: 76px; height: 76px; font-size: 26px; }
+.k-avatar--brand { background: var(--brand-soft); color: var(--brand-ink); }
+[data-role="student"] .k-avatar--filled { background: var(--role-student); color: #fff; }
+[data-role="teacher"] .k-avatar--filled { background: var(--role-teacher); color: #fff; }
+[data-role="admin"]   .k-avatar--filled { background: var(--role-admin); color: #fff; }
+[data-role="parent"]  .k-avatar--filled { background: var(--role-parent); color: #fff; }
+
+/* ----- ProgressRing (kit's `.ring`) ---------------------------- */
+.ring { position: relative; flex-shrink: 0; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring__track { fill: none; stroke: var(--surface-2); stroke-width: 2.5; }
+.ring__fill  { fill: none; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 800ms ease; }
+.ring__text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500; color: var(--ink);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.ring--lg .ring__track, .ring--lg .ring__fill { stroke-width: 3; }
+.ring--lg .ring__text { font-size: 13.5px; font-weight: 500; }
+
+/* ----- Kbd ------------------------------------------------------ */
+.k-kbd {
+  font-family: var(--font); font-size: 10.5px; color: var(--ink-3);
+  background: var(--surface-2); border: 1px solid var(--hairline);
+  border-radius: 4px; padding: 0 4px; font-weight: 500; line-height: 1.6;
+}
+
+/* ----- Learning Path hero (`.lpath__*`) ----------------------- */
+.lpath__hero {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; position: relative; overflow: hidden;
+}
+.lpath__hero::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(360px 200px at 95% 50%, rgba(91,91,214,0.06), transparent 70%);
+  pointer-events: none;
+}
+.lpath__hero > * { position: relative; }
+.lpath__ai-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px 3px 7px; background: var(--brand-soft); color: var(--brand-ink);
+  border-radius: 999px; border: 1px solid rgba(91,91,214,0.16);
+  font-size: 11px; font-weight: 500; margin-bottom: 10px;
+}
+.lpath__ai-chip svg { width: 11px; height: 11px; }
+.lpath__h1 {
+  font-size: 22px; font-weight: 500; letter-spacing: -0.022em;
+  color: var(--ink); line-height: 1.1; margin: 0;
+}
+.lpath__h1 .serif {
+  font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--brand-ink);
+}
+.lpath__hero-sub {
+  font-size: 13px; color: var(--ink-2); margin-top: 8px; max-width: 480px; line-height: 1.5;
+}
+.topic-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--hairline); border: 1px solid var(--hairline);
+  border-radius: 12px; overflow: hidden;
+}
+@media (max-width: 1100px) { .topic-grid { grid-template-columns: repeat(2, 1fr); } }
+.topic {
+  background: var(--surface); padding: 14px; display: flex;
+  gap: 12px; align-items: center; position: relative; transition: background 100ms;
+}
+.topic:hover { background: var(--surface-2); }
+.topic--weak::before {
+  content: ""; position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 2px; background: var(--warning);
+}
+.topic__body { flex: 1; min-width: 0; }
+.topic__title { font-size: 13px; font-weight: 500; letter-spacing: -0.005em; color: var(--ink); line-height: 1.3; }
+.topic__meta {
+  font-size: 11.5px; color: var(--ink-3); margin-top: 3px;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* ----- Proctor (Live Monitor) — dark monochrome ---------------- */
+.proctor {
+  background: #0a0a0c; color: #e6e6e8;
+  display: grid; grid-template-columns: 1fr 320px;
+  min-height: calc(100vh - 48px);
+}
+.proctor__main { padding: 22px 24px; overflow: auto; }
+.proctor__head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; padding-bottom: 18px; border-bottom: 1px solid #1c1c1f; margin-bottom: 18px;
+}
+.proctor__head-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: #6f6f74; margin-bottom: 6px;
+}
+.proctor__h1 {
+  font-size: 18px; font-weight: 500; letter-spacing: -0.018em;
+  color: #fff; line-height: 1.1;
+}
+.proctor__sub { font-size: 12.5px; color: #8c8c92; margin-top: 6px; }
+.proctor__live {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: #19c97c; font-weight: 500;
+}
+.proctor__live::before {
+  content: ""; width: 6px; height: 6px; border-radius: 999px;
+  background: #19c97c; box-shadow: 0 0 0 0 #19c97c;
+  animation: kit-pulse 1.8s infinite;
+}
+@keyframes kit-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(25,201,124,0.5); }
+  70%  { box-shadow: 0 0 0 5px rgba(25,201,124,0); }
+  100% { box-shadow: 0 0 0 0 rgba(25,201,124,0); }
+}
+.proctor__metrics { display: flex; gap: 36px; }
+.proctor__metric { display: flex; flex-direction: column; gap: 4px; }
+.proctor__metric-val {
+  font-size: 22px; font-weight: 500; letter-spacing: -0.022em;
+  font-variant-numeric: tabular-nums; color: #fff; line-height: 1;
+}
+.proctor__metric-lbl { font-size: 11px; color: #6f6f74; font-weight: 400; }
+.proctor__table {
+  border: 1px solid #1c1c1f; border-radius: 10px; overflow: hidden;
+}
+.proctor__table-head, .proctor__row {
+  display: grid;
+  grid-template-columns: 1.4fr 96px 80px 80px 1fr 180px;
+  gap: 14px; align-items: center; padding: 10px 16px;
+}
+.proctor__table-head {
+  font-size: 11px; color: #6f6f74; font-weight: 400;
+  background: #111114; border-bottom: 1px solid #1c1c1f;
+}
+.proctor__row {
+  border-bottom: 1px solid #161618; font-size: 12.5px; color: #b9b9bd;
+  transition: background 100ms;
+}
+.proctor__row:hover { background: rgba(255,255,255,0.02); }
+.proctor__row:last-child { border-bottom: 0; }
+.proctor__student { display: flex; align-items: center; gap: 10px; }
+.proctor__avatar {
+  width: 26px; height: 26px; border-radius: 999px;
+  background: #1f1f22; color: #d6d6da; font-weight: 500;
+  font-size: 10.5px; display: flex; align-items: center; justify-content: center;
+  letter-spacing: 0.02em; flex-shrink: 0;
+}
+.proctor__name { color: #fff; font-weight: 400; font-size: 12.5px; }
+.proctor__id   { font-family: var(--font-mono); font-size: 10.5px; color: #6f6f74; }
+.pstat {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 400;
+}
+.pstat::before {
+  content: ""; width: 5px; height: 5px; border-radius: 999px; background: currentColor;
+}
+.pstat--active    { color: #19c97c; }
+.pstat--active::before { box-shadow: 0 0 0 0 #19c97c; animation: kit-pulse 1.8s infinite; }
+.pstat--idle      { color: #e3a73c; }
+.pstat--violated  { color: #ed5070; }
+.pstat--submitted { color: #6f6f74; }
+.vbadge {
+  display: inline-flex; align-items: center; font-weight: 500;
+  font-size: 12px; font-variant-numeric: tabular-nums; color: #ed5070;
+}
+.vbadge--none { color: #4a4a4e; }
+.proctor__progress {
+  width: 100%; height: 2px; background: #1c1c1f; border-radius: 999px; overflow: hidden;
+}
+.proctor__progress-fill { height: 100%; background: #d6d6da; border-radius: 999px; }
+.proctor__progress-fill--danger    { background: #ed5070; }
+.proctor__progress-fill--submitted { background: #6f6f74; }
+.proctor__actions { display: flex; gap: 4px; justify-content: flex-end; }
+.proctor__btn {
+  padding: 4px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 400;
+  color: #b9b9bd; background: transparent; border: 1px solid #28282b;
+  display: inline-flex; align-items: center; gap: 5px; transition: all 100ms; cursor: pointer;
+  font-family: inherit;
+}
+.proctor__btn:hover { color: #fff; background: rgba(255,255,255,0.04); border-color: #353539; }
+.proctor__btn svg { width: 11px; height: 11px; }
+.proctor__btn--danger { color: #ed5070; border-color: rgba(237,80,112,0.25); }
+.proctor__btn--danger:hover { background: rgba(237,80,112,0.08); color: #f47388; }
+.proctor__side {
+  background: #08080a; border-left: 1px solid #1c1c1f; padding: 20px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+}
+.proctor__side-h { display: flex; align-items: center; justify-content: space-between; }
+.proctor__side-title { font-size: 12.5px; font-weight: 500; color: #fff; }
+.proctor__log {
+  display: flex; flex-direction: column; gap: 1px;
+  font-family: var(--font-mono); font-size: 11px;
+  border-top: 1px solid #161618; padding-top: 12px;
+}
+.plog__line {
+  display: grid; grid-template-columns: 56px 1fr; gap: 10px;
+  padding: 4px 0; color: #8c8c92; line-height: 1.45;
+  border-bottom: 1px solid transparent;
+}
+.plog__time             { color: #4a4a4e; }
+.plog__line--alert      { color: #ed5070; }
+.plog__line--warn       { color: #e3a73c; }
+.plog__line--ok         { color: #b9b9bd; }
+.plog__line--ok strong  { color: #fff; font-weight: 500; }
+.proctor__ws {
+  background: rgba(25,201,124,0.04);
+  border: 1px solid rgba(25,201,124,0.12);
+  border-radius: 8px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px;
+}
+.proctor__ws-text { color: #19c97c; flex: 1; font-weight: 500; }
+.proctor__ws-meta { color: #4a4a4e; font-size: 10.5px; font-family: var(--font-mono); margin-top: 2px; }
+.proctor__ws .dot {
+  width: 6px; height: 6px; border-radius: 999px; background: #19c97c; flex-shrink: 0;
+}
+.proctor__warning {
+  padding: 12px 14px; background: rgba(237,80,112,0.05);
+  border: 1px solid rgba(237,80,112,0.16); border-radius: 8px;
+}
+.proctor__warning-h {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #ed5070; font-weight: 500; margin-bottom: 4px;
+}
+.proctor__warning-b { font-size: 11.5px; color: #8c8c92; line-height: 1.5; }
+
+/* ----- Exam Taking (lock-screen feel) --------------------------- */
+.exam {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; z-index: 100;
+}
+.exam__bar {
+  height: 52px; background: var(--surface); border-bottom: 1px solid var(--hairline);
+  padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.exam__title-block { display: flex; align-items: center; gap: 12px; }
+.exam__title-block .role-dot { background: var(--brand); }
+.exam__title { font-size: 13.5px; font-weight: 500; letter-spacing: -0.008em; color: var(--ink); }
+.exam__sub   { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+.exam__timer {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 500;
+  color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.exam__timer.warn { color: var(--warning); }
+.exam__progress {
+  font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.exam__progress b { color: var(--ink); font-weight: 500; }
+.exam__body {
+  flex: 1; display: grid; grid-template-columns: 1fr 260px; overflow: hidden;
+}
+.exam__main { overflow-y: auto; padding: 48px 60px; }
+.exam__qcontainer { max-width: 640px; margin: 0 auto; }
+.exam__qnum {
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-3);
+  font-weight: 500; letter-spacing: 0.03em; margin-bottom: 14px; text-transform: uppercase;
+}
+.exam__qtext {
+  font-size: 20px; font-weight: 500; letter-spacing: -0.018em;
+  color: var(--ink); line-height: 1.4; margin-bottom: 28px;
+}
+.exam__option {
+  display: flex; align-items: center; gap: 14px; padding: 13px 16px;
+  border: 1px solid var(--hairline); border-radius: 10px; margin-bottom: 6px;
+  font-size: 13.5px; cursor: pointer; background: var(--surface);
+  transition: border-color 120ms, background 120ms;
+}
+.exam__option:hover { border-color: var(--hairline-2); }
+.exam__option.selected {
+  border-color: var(--ink); background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.exam__bubble {
+  width: 16px; height: 16px; border-radius: 999px;
+  border: 1.5px solid var(--hairline-3); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; background: var(--surface);
+}
+.exam__option.selected .exam__bubble { border-color: var(--ink); background: var(--ink); }
+.exam__option.selected .exam__bubble::after {
+  content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--surface);
+}
+.exam__option-key {
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-weight: 500; width: 14px;
+}
+.exam__nav {
+  border-left: 1px solid var(--hairline); background: var(--surface);
+  padding: 22px 20px; overflow-y: auto;
+}
+.exam__nav-title { font-size: 11.5px; font-weight: 500; color: var(--ink-3); margin-bottom: 12px; }
+.qgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.qcell {
+  aspect-ratio: 1; border-radius: 5px; background: var(--surface-2);
+  color: var(--ink-2); font-size: 11px; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  cursor: pointer; font-family: var(--font-mono); transition: all 100ms;
+  font-variant-numeric: tabular-nums; border: 0;
+}
+.qcell:hover { background: var(--surface-3); }
+.qcell.current { background: var(--ink); color: #fff; }
+.qcell.answered {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--hairline-2);
+}
+.qcell.flagged::after {
+  content: ""; position: absolute; top: 2px; right: 2px;
+  width: 4px; height: 4px; background: var(--warning); border-radius: 999px;
+}
+.exam__legend {
+  margin-top: 16px; display: flex; flex-direction: column;
+  gap: 6px; font-size: 11px; color: var(--ink-3);
+}
+.exam__legend-row { display: flex; align-items: center; gap: 8px; }
+.exam__legend-row .sw { width: 10px; height: 10px; border-radius: 3px; }
+.exam__foot {
+  height: 52px; background: var(--surface); border-top: 1px solid var(--hairline);
+  padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
+}
+.exam__violation {
+  background: var(--warning-soft); border-bottom: 1px solid rgba(176,112,0,0.18);
+  padding: 8px 24px; display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; color: var(--warning); font-weight: 400;
+}
+.exam__violation svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ----- Empty card ---------------------------------------------- */
+.empty-card { padding: 48px 20px; text-align: center; }
+.empty-card svg { color: var(--ink-4); margin-bottom: 8px; }
+.empty-card__t { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+.empty-card__b {
+  font-size: 12px; color: var(--ink-3); max-width: 280px; margin: 0 auto; line-height: 1.5;
+}
+
+/* ----- Portal selector (`shell.jsx` lines 7–78) ------------------ */
+.portal {
+  min-height: 100vh; width: 100%;
+  display: flex; flex-direction: column;
+  background: var(--bg); position: relative;
+}
+.portal__nav {
+  height: 56px; padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+}
+.portal__nav-brand { display: flex; align-items: center; gap: 8px; }
+.portal__nav-logo {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--ink); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.portal__nav-logo svg { width: 13px; height: 13px; }
+.portal__nav-name { font-size: 13.5px; font-weight: 500; letter-spacing: -0.011em; }
+.portal__nav-status {
+  font-size: 11.5px; color: var(--ink-3);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.portal__nav-status::before {
+  content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--success);
+}
+.portal__nav-meta {
+  font-size: 12px; color: var(--ink-3);
+  display: flex; gap: 20px; align-items: center;
+}
+.portal__nav-meta a { color: var(--ink-2); }
+.portal__nav-meta a:hover { color: var(--ink); }
+.portal__inner {
+  width: 100%; max-width: 980px; margin: 0 auto;
+  padding: 96px 32px 80px; flex: 1;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.portal__chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 10px 4px 4px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 999px; font-size: 11.5px; color: var(--ink-2);
+  font-weight: 400; margin-bottom: 28px; width: fit-content; letter-spacing: -0.003em;
+}
+.portal__chip-tag {
+  background: var(--ink); color: #fff; padding: 1px 8px;
+  border-radius: 999px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.01em;
+}
+.portal__title {
+  font-size: 56px; font-weight: 400; letter-spacing: -0.035em;
+  line-height: 1.02; color: var(--ink); margin: 0 0 16px;
+}
+.portal__title .serif {
+  font-family: var(--font-serif); font-style: italic; font-weight: 400;
+  letter-spacing: -0.025em; color: var(--brand);
+}
+.portal__sub {
+  font-size: 16px; color: var(--ink-2); max-width: 540px;
+  line-height: 1.55; margin: 0 0 48px; letter-spacing: -0.003em;
+}
+.portal__label {
+  font-size: 11.5px; color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 14px; font-weight: 500;
+}
+.portal__grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+@media (max-width: 880px) {
+  .portal__grid { grid-template-columns: repeat(2, 1fr); }
+  .portal__title { font-size: 40px; }
+  .portal__inner { padding: 64px 24px 48px; }
+}
+.portal__card {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 12px; padding: 18px 18px 16px;
+  cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 18px;
+  transition: border-color 140ms ease, transform 140ms ease;
+  position: relative; min-height: 160px;
+  font-family: inherit;
+}
+.portal__card:hover {
+  border-color: var(--hairline-2); transform: translateY(-1px);
+}
+.portal__card[data-role="student"]:hover { box-shadow: inset 0 0 0 1px rgba(91,91,214,0.22); }
+.portal__card[data-role="teacher"]:hover { box-shadow: inset 0 0 0 1px rgba(26,127,95,0.22); }
+.portal__card[data-role="admin"]:hover   { box-shadow: inset 0 0 0 1px rgba(124,58,237,0.22); }
+.portal__card[data-role="parent"]:hover  { box-shadow: inset 0 0 0 1px rgba(196,107,74,0.22); }
+.portal__card-icon {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center; color: var(--ink);
+}
+.portal__card-icon svg { width: 18px; height: 18px; stroke-width: 1.5; }
+.portal__card[data-role="student"] .portal__card-icon { color: var(--role-student); }
+.portal__card[data-role="teacher"] .portal__card-icon { color: var(--role-teacher); }
+.portal__card[data-role="admin"]   .portal__card-icon { color: var(--role-admin); }
+.portal__card[data-role="parent"]  .portal__card-icon { color: var(--role-parent); }
+.portal__card-title {
+  font-size: 15px; font-weight: 500; letter-spacing: -0.014em; color: var(--ink);
+}
+.portal__card-desc {
+  font-size: 12.5px; color: var(--ink-2); line-height: 1.5;
+  margin: 0; letter-spacing: -0.003em;
+}
+.portal__card-cta {
+  margin-top: auto; display: inline-flex; align-items: center;
+  gap: 4px; font-size: 12px; color: var(--ink-3); font-weight: 400;
+}
+.portal__card-cta svg { width: 12px; height: 12px; transition: transform 160ms; }
+.portal__card:hover .portal__card-cta { color: var(--ink); }
+.portal__card:hover .portal__card-cta svg { transform: translateX(2px); }
+.portal__foot {
+  margin-top: 48px; padding-top: 24px;
+  border-top: 1px solid var(--hairline);
+  display: flex; align-items: center; gap: 28px;
+  font-size: 12px; color: var(--ink-3);
+}
+.portal__foot__item { display: inline-flex; align-items: center; gap: 6px; }
+.portal__foot__item svg { width: 13px; height: 13px; color: var(--ink-3); }
+
+/* ============================================================
+   TRILINK kit — dark mode tokens (verbatim port).
+   Activated when the root `<html>` element has class="dark"
+   (managed by next-themes via `<ThemeToggle/>`).
+   ============================================================ */
+.dark {
+  --color-bg:        #0e0e10;
+  --color-surface:   #18181b;
+  --color-surface-2: #1f1f23;
+  --color-surface-3: #28282c;
+  --color-hairline:   rgba(255,255,255,0.07);
+  --color-hairline-2: rgba(255,255,255,0.12);
+  --color-hairline-3: rgba(255,255,255,0.20);
+  --color-ink:   #f3f3f5;
+  --color-ink-2: #b9b9bd;
+  --color-ink-3: #82828a;
+  --color-ink-4: #5a5a60;
+  --color-brand:       #8b8bff;
+  --color-brand-ink:   #a5a5ff;
+  --color-brand-soft:  rgba(139,139,255,0.10);
+  --color-brand-faint: rgba(139,139,255,0.06);
+  --color-success-soft: rgba(13,138,95,0.14);
+  --color-warning-soft: rgba(176,112,0,0.14);
+  --color-danger-soft:  rgba(196,53,84,0.14);
+}
+/* Kit-name aliases also flip (the `:root` block aliases `--bg` etc. to the
+   `--color-*` scale, so they inherit the new values automatically). */
+
+/* Kit's dark-mode component overrides */
+.dark .btn-kit-primary       { background: #fff; color: var(--color-ink); }
+.dark .btn-kit-primary:hover { background: #ebebec; }
+.dark .btn-kit-ai            { background: rgba(139,139,255,0.10); color: #a5a5ff; border-color: rgba(139,139,255,0.22); }
+.dark .toggle.on             { background: #fff; }
+.dark .toggle.on::after      { background: var(--color-ink); }
+.dark ::selection            { background: rgba(139,139,255,0.28); color: #fff; }
+.dark .header                { background: rgba(14,14,16,0.85); }
+.dark .qcell.answered        { background: var(--color-surface); border-color: var(--color-hairline-2); }
+.dark .qcell.current         { background: #fff; color: var(--color-ink); }
+.dark .exam__option.selected { box-shadow: inset 0 0 0 1px #fff; border-color: #fff; }
+.dark .exam__option.selected .exam__bubble { background: #fff; border-color: #fff; }
+.dark .exam__option.selected .exam__bubble::after { background: var(--color-ink); }
+.dark .ring__track           { stroke: var(--color-surface-3); }
+.dark .cb                    { background: var(--color-surface); }
+.dark .cb.on                 { background: #fff; border-color: #fff; color: var(--color-ink); }
+.dark .sidebar.role-student .sidebar__logo,
+.dark .portal__card-icon     { /* honour brand tint in dark */ }
+.dark .sidebar.role-student .sidebar__logo { background: #8b8bff; }
+
+/* Shadcn primitives reading the dual-aliased `--color-*` tokens already
+   flip automatically; explicit shadow override for floating layers. */
+.dark {
+  --shadow-pop: 0 1px 1px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.50), 0 24px 48px rgba(0,0,0,0.45);
+}
+
+/* ============================================================
+   TRILINK kit — additional component CSS (verbatim port from
+   the kit's `styles.css` lines 2060-2333). These classes power
+   the Calendar, Chat, AI tutor chat, detail-grid layouts, and
+   the attendance heatmap. Appended last so they win over any
+   legacy `.chat-list` / `.tab` rules elsewhere in this file.
+   ============================================================ */
+
+/* ----- Calendar ----------------------------------------------- */
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+  background: var(--hairline); border: 1px solid var(--hairline);
+  border-radius: 12px; overflow: hidden;
+}
+.cal-day-head {
+  background: var(--surface); padding: 8px 10px;
+  font-size: 10.5px; color: var(--ink-3); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.cal-day {
+  background: var(--surface); min-height: 100px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px; position: relative;
+}
+.cal-day.out { background: var(--bg); color: var(--ink-4); }
+.cal-day.today .cal-day__num {
+  background: var(--ink); color: #fff; width: 20px; height: 20px;
+  border-radius: 999px; display: inline-flex; align-items: center;
+  justify-content: center; font-weight: 500;
+}
+.cal-day__num {
+  font-size: 11.5px; font-weight: 500; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.005em;
+}
+.cal-day.out .cal-day__num { color: var(--ink-4); }
+.cal-event {
+  background: var(--brand-soft); color: var(--brand-ink);
+  font-size: 10.5px; font-weight: 500; padding: 2px 6px; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: -0.003em; cursor: pointer;
+}
+.cal-event--success { background: var(--success-soft); color: var(--success); }
+.cal-event--warning { background: var(--warning-soft); color: var(--warning); }
+.cal-event--danger  { background: var(--danger-soft);  color: var(--danger); }
+.cal-event--neutral { background: var(--surface-2);    color: var(--ink-2); }
+
+/* ----- Chat shell --------------------------------------------- */
+.chat-shell {
+  display: grid; grid-template-columns: 280px 1fr;
+  min-height: calc(100vh - 50px);
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 12px; overflow: hidden; margin: 22px 28px;
+}
+.chat-shell .chat-list {
+  border-right: 1px solid var(--hairline); overflow-y: auto;
+  background: var(--surface);
+}
+.chat-list__h {
+  padding: 12px 16px; border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.chat-shell .chat-item {
+  display: flex; gap: 10px; padding: 10px 14px;
+  border-bottom: 1px solid var(--hairline); cursor: pointer;
+}
+.chat-shell .chat-item:hover,
+.chat-shell .chat-item.active { background: var(--surface-2); }
+.chat-item__b { flex: 1; min-width: 0; }
+.chat-item__name {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+}
+.chat-item__name b {
+  font-size: 13px; font-weight: 500; letter-spacing: -0.005em; color: var(--ink);
+}
+.chat-item__time {
+  font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.chat-item__preview {
+  font-size: 12px; color: var(--ink-3); margin-top: 1px; line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item__unread {
+  background: var(--brand); color: #fff; font-size: 10px; font-weight: 500;
+  padding: 1px 6px; border-radius: 999px; margin-top: 4px;
+  display: inline-block; align-self: flex-end;
+}
+.chat-thread { display: flex; flex-direction: column; min-width: 0; }
+.chat-thread__h {
+  padding: 12px 18px; border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface);
+}
+.chat-thread__body {
+  flex: 1; padding: 20px 24px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px; background: var(--bg);
+}
+.chat-msg { display: flex; gap: 10px; max-width: 68%; }
+.chat-msg.me { align-self: flex-end; flex-direction: row-reverse; }
+.chat-msg__bubble {
+  padding: 8px 12px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  font-size: 13px; line-height: 1.5; color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.chat-msg.me .chat-msg__bubble {
+  background: var(--ink); color: #fff; border-color: var(--ink);
+}
+.chat-msg__time {
+  font-size: 10.5px; color: var(--ink-3); margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.chat-day { text-align: center; font-size: 11px; color: var(--ink-3); margin: 6px 0; }
+.chat-compose {
+  padding: 12px 16px; border-top: 1px solid var(--hairline);
+  display: flex; gap: 8px; align-items: flex-end; background: var(--surface);
+}
+.chat-compose textarea {
+  flex: 1; border: 1px solid var(--hairline); border-radius: 10px;
+  background: var(--surface); padding: 9px 12px; font-size: 13px; resize: none;
+  min-height: 36px; max-height: 120px; outline: none; font-family: inherit;
+}
+.chat-compose textarea:focus {
+  border-color: var(--brand); box-shadow: 0 0 0 3px rgba(91,91,214,0.12);
+}
+
+/* ----- AI tutor chat ------------------------------------------ */
+.ai-chat {
+  display: flex; flex-direction: column; min-height: 540px;
+  border: 1px solid rgba(91,91,214,0.16); border-radius: 12px; overflow: hidden;
+  background: linear-gradient(180deg, var(--brand-faint), var(--surface) 80%);
+}
+.ai-chat__body {
+  flex: 1; padding: 22px 28px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ai-msg { display: flex; gap: 10px; max-width: 78%; }
+.ai-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.ai-msg__avatar {
+  width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0;
+  background: var(--brand); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 500;
+}
+.ai-msg.user .ai-msg__avatar { background: var(--ink); }
+.ai-msg__bubble {
+  font-size: 13.5px; line-height: 1.55; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 10px; padding: 10px 14px; letter-spacing: -0.005em;
+}
+.ai-msg.user .ai-msg__bubble {
+  background: var(--ink); color: #fff; border-color: var(--ink);
+}
+.ai-msg__chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+/* ----- Detail page generic ------------------------------------ */
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 300px; gap: 14px;
+}
+@media (max-width: 1100px) { .detail-grid { grid-template-columns: 1fr; } }
+
+.kv {
+  display: grid; grid-template-columns: 120px 1fr;
+  gap: 4px 12px; font-size: 12.5px;
+}
+.kv dt { color: var(--ink-3); padding: 6px 0; }
+.kv dd { color: var(--ink); padding: 6px 0; margin: 0; font-weight: 400; }
+
+/* ----- Attendance heatmap ------------------------------------- */
+.heat {
+  display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px;
+}
+.heat__cell {
+  aspect-ratio: 1; border-radius: 3px; background: var(--surface-2);
+}
+.heat__cell--p1 { background: rgba(13,138,95,0.18); }
+.heat__cell--p2 { background: rgba(13,138,95,0.32); }
+.heat__cell--p3 { background: rgba(13,138,95,0.55); }
+.heat__cell--p4 { background: rgba(13,138,95,0.85); }
+.heat__cell--absent { background: rgba(196,53,84,0.55); }
+.heat__cell--late   { background: rgba(176,112,0,0.5); }
+.heat__cell--out    { background: transparent; }
+
+/* ----- Section stack already exists; tab counter, dot-sep ----- */
+.tab__count {
+  display: inline-block; margin-left: 6px; padding: 0 5px;
+  font-size: 10px; font-weight: 500;
+  background: var(--surface-2); color: var(--ink-3);
+  border-radius: 999px; min-width: 16px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dot-sep { color: var(--ink-4); padding: 0 6px; }
+
+/* ----- Card head / sub / body / title (kit pattern, namespaced
+        under .k-card so we don't override shadcn `.card` higher
+        up that may be used elsewhere) ------------------------- */
+.k-card .card__head {
+  padding: 14px 16px; border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.k-card .card__title {
+  font-size: 13.5px; font-weight: 500; color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.k-card .card__sub {
+  font-size: 11.5px; color: var(--ink-3); margin-top: 2px;
+}
+.k-card .card__body { padding: 14px 16px; }
+
+/* ============================================================
+   GLOBAL RESKIN OVERRIDE — alias legacy admin/teacher/student/
+   parent inner-page chrome to the TRILINK kit's design language
+   without touching 30+ individual page files. Appended last so
+   it wins over every earlier `.page-wrapper`/`.page-header`/
+   `.card`/`.btn`/`table` rule.
+
+   This is the bridge: pages that we already ported call kit
+   classes directly (`kit-page`, `phead`, `k-card`, `btn-kit`),
+   and every other still-legacy page now inherits the same
+   visual chrome through these overrides.
+   ============================================================ */
+
+/* Page outer wrapper */
+.page-wrapper,
+.ui-page,
+main > div:has(> .page-header):not([class*="kit-"]):not([class*="chat-"]):not([class*="portal"]) {
+  padding: 22px 28px 56px !important;
+  max-width: 1280px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  background: transparent !important;
+}
+
+/* Page header row → kit's `.phead` shape */
+.page-header,
+.ui-page-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding-bottom: 18px !important;
+  margin-bottom: 18px !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  flex-wrap: wrap;
+  box-shadow: none !important;
+}
+
+/* Page title — kit display weight, no overscaled fonts */
+.page-title,
+.ui-page-title,
+.page-header h1,
+.page-header h2 {
+  font-family: var(--font-inter), system-ui, sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.022em !important;
+  color: var(--color-ink) !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+}
+
+.page-subtitle,
+.ui-page-description,
+.page-header p {
+  font-size: 13px !important;
+  color: var(--color-ink-3) !important;
+  margin-top: 4px !important;
+  letter-spacing: -0.005em !important;
+  line-height: 1.5 !important;
+}
+
+/* Cards — flat surface, hairline border, kit corner radius */
+.page-wrapper .card,
+.ui-page .card,
+main .card:not(.k-card):not([class*="kit-"]):not([class*="chat-"]) {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  padding: 16px !important;
+  transform: none !important;
+}
+.page-wrapper .card:hover,
+.ui-page .card:hover,
+main .card:hover:not(.k-card) {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.card-title,
+.ui-card-title,
+.card-header h2,
+.card-header h3 {
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
+  color: var(--color-ink) !important;
+}
+.card-subtitle,
+.ui-card-description,
+.card-header p {
+  font-size: 11.5px !important;
+  color: var(--color-ink-3) !important;
+}
+
+/* Primary / secondary / ghost buttons — match `.btn-kit*` */
+.page-wrapper .btn-primary,
+.ui-page .btn-primary,
+main .btn-primary:not(.btn-kit-primary) {
+  background: var(--color-ink) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  padding: 0 11px !important;
+  height: 28px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
+  box-shadow: none !important;
+}
+.page-wrapper .btn-primary:hover,
+.ui-page .btn-primary:hover,
+main .btn-primary:hover:not(.btn-kit-primary) {
+  background: #1f1f22 !important;
+  transform: none !important;
+}
+.page-wrapper .btn-secondary,
+.ui-page .btn-secondary,
+main .btn-secondary:not(.btn-kit-secondary) {
+  background: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 7px !important;
+  padding: 0 11px !important;
+  height: 28px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+.page-wrapper .btn-secondary:hover,
+.ui-page .btn-secondary:hover,
+main .btn-secondary:hover:not(.btn-kit-secondary) {
+  background: var(--color-surface-2) !important;
+  transform: none !important;
+}
+
+/* Tables — match `.gtable` */
+.page-wrapper table:not(.gtable),
+.ui-page table:not(.gtable),
+.table-wrapper table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.page-wrapper table:not(.gtable) th,
+.ui-page table:not(.gtable) th,
+.table-wrapper table th {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  text-align: left;
+  padding: 11px 16px !important;
+  color: var(--color-ink-3) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+  letter-spacing: -0.003em !important;
+  text-transform: none !important;
+}
+.page-wrapper table:not(.gtable) td,
+.ui-page table:not(.gtable) td,
+.table-wrapper table td {
+  padding: 12px 16px !important;
+  font-size: 13px !important;
+  color: var(--color-ink) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  letter-spacing: -0.005em !important;
+}
+.page-wrapper table:not(.gtable) tr:last-child td,
+.ui-page table:not(.gtable) tr:last-child td,
+.table-wrapper table tr:last-child td {
+  border-bottom: 0 !important;
+}
+.page-wrapper table:not(.gtable) tr:hover td,
+.ui-page table:not(.gtable) tr:hover td,
+.table-wrapper table tr:hover td {
+  background: var(--color-surface-2) !important;
+}
+
+/* Form inputs */
+.page-wrapper input:not([type=checkbox]):not([type=radio]),
+.page-wrapper select,
+.page-wrapper textarea,
+.ui-page input:not([type=checkbox]):not([type=radio]),
+.ui-page select,
+.ui-page textarea {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 7px !important;
+  font-size: 12.5px !important;
+  color: var(--color-ink) !important;
+  font-family: inherit !important;
+}
+.page-wrapper input:focus:not([type=checkbox]):not([type=radio]),
+.page-wrapper select:focus,
+.page-wrapper textarea:focus,
+.ui-page input:focus:not([type=checkbox]):not([type=radio]),
+.ui-page select:focus,
+.ui-page textarea:focus {
+  border-color: var(--color-brand) !important;
+  box-shadow: 0 0 0 3px rgba(91,91,214,0.12) !important;
+  outline: none !important;
+}
+
+/* Status pill — `.status-badge` from legacy → `.k-pill` look */
+.status-badge,
+.status-pill,
+.pill,
+.badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 1px 7px !important;
+  background: var(--color-surface-2) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 4px !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.003em !important;
+  color: var(--color-ink-2) !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   TRILINK kit — Sidebar + Header + Main chrome (verbatim port
+   from kit's `styles.css` lines 116-377 and 1759-1774). Required
+   so the new `<KitSidebar/>` + `<KitHeader/>` render identically
+   to the kit.
+   ============================================================ */
+.app { display: flex; min-height: 100vh; width: 100%; }
+
+/* ---------- Sidebar (kit) ---------- */
+.kit-shell-sidebar {
+  width: 224px; flex-shrink: 0;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-hairline);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.kit-shell-sidebar .sidebar__brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 14px 12px;
+}
+.kit-shell-sidebar .sidebar__logo {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--color-ink); color: #fff; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.kit-shell-sidebar.role-student .sidebar__logo { background: var(--color-role-student); }
+.kit-shell-sidebar.role-teacher .sidebar__logo { background: var(--color-role-teacher); }
+.kit-shell-sidebar.role-admin   .sidebar__logo { background: var(--color-role-admin); }
+.kit-shell-sidebar.role-parent  .sidebar__logo { background: var(--color-role-parent); }
+
+.kit-shell-sidebar .sidebar__brand-text {
+  display: flex; flex-direction: column; line-height: 1.15; flex: 1; min-width: 0;
+}
+.kit-shell-sidebar .sidebar__brand-name {
+  font-weight: 500; font-size: 13.5px; letter-spacing: -0.012em;
+  color: var(--color-ink); display: flex; align-items: center; gap: 6px;
+}
+.kit-shell-sidebar .sidebar__brand-dot {
+  width: 5px; height: 5px; border-radius: 999px;
+  background: var(--color-success); flex-shrink: 0;
+}
+.kit-shell-sidebar .sidebar__brand-role {
+  font-size: 11px; color: var(--color-ink-3); font-weight: 400; margin-top: 1px;
+}
+.kit-shell-sidebar .sidebar__scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 8px 8px;
+}
+.kit-shell-sidebar .sidebar__section {
+  font-size: 10.5px; font-weight: 500;
+  color: var(--color-ink-3); padding: 14px 8px 4px; letter-spacing: 0;
+}
+.kit-shell-sidebar .sidebar__nav { display: flex; flex-direction: column; gap: 1px; }
+.kit-shell-sidebar .sidebar__item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 6px;
+  font-size: 13px; color: var(--color-ink-2); font-weight: 400;
+  width: 100%; text-align: left; cursor: pointer;
+  background: transparent; border: 0; font-family: inherit;
+  text-decoration: none;
+  transition: background 100ms ease, color 100ms ease;
+}
+.kit-shell-sidebar .sidebar__item:hover {
+  background: rgba(15,16,18,0.04); color: var(--color-ink);
+}
+.kit-shell-sidebar .sidebar__item svg {
+  width: 15px; height: 15px; stroke-width: 1.5; flex-shrink: 0;
+  color: var(--color-ink-3);
+}
+.kit-shell-sidebar .sidebar__item:hover svg { color: var(--color-ink-2); }
+.kit-shell-sidebar .sidebar__item.active {
+  background: rgba(15,16,18,0.05); color: var(--color-ink); font-weight: 500;
+}
+.kit-shell-sidebar .sidebar__item.active svg { color: var(--color-ink); }
+.kit-shell-sidebar .sidebar__item .badge-num {
+  margin-left: auto; font-size: 10.5px; font-weight: 500;
+  color: var(--color-ink-3); font-variant-numeric: tabular-nums;
+}
+.kit-shell-sidebar .sidebar__item.active .badge-num { color: var(--color-ink-2); }
+.kit-shell-sidebar .sidebar__item .badge-num.hot {
+  background: var(--color-danger-soft); color: var(--color-danger);
+  padding: 0 5px; border-radius: 999px; font-weight: 500;
+}
+.kit-shell-sidebar .sidebar__footer {
+  padding: 8px 8px 10px; border-top: 1px solid var(--color-hairline);
+}
+.kit-shell-sidebar .sidebar__user {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  background: transparent; border: 0; width: 100%; text-align: left; font-family: inherit;
+}
+.kit-shell-sidebar .sidebar__user:hover { background: rgba(15,16,18,0.04); }
+.kit-shell-sidebar .sidebar__avatar {
+  width: 22px; height: 22px; border-radius: 999px;
+  background: var(--color-ink); color: #fff;
+  font-weight: 500; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; letter-spacing: 0.02em;
+}
+.kit-shell-sidebar.role-teacher .sidebar__avatar { background: var(--color-role-teacher); }
+.kit-shell-sidebar.role-admin   .sidebar__avatar { background: var(--color-role-admin); }
+.kit-shell-sidebar.role-parent  .sidebar__avatar { background: var(--color-role-parent); }
+.kit-shell-sidebar .sidebar__user-text {
+  display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1;
+}
+.kit-shell-sidebar .sidebar__user-name {
+  font-size: 12.5px; font-weight: 500; color: var(--color-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kit-shell-sidebar .sidebar__user-meta {
+  font-size: 11px; color: var(--color-ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kit-shell-sidebar .sidebar__user svg.chev {
+  width: 12px; height: 12px; color: var(--color-ink-3);
+}
+
+/* ---------- Main + Header (kit) ---------- */
+.kit-shell-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  background: var(--color-bg); position: relative;
+}
+.kit-shell-main::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0;
+  height: 2px; opacity: 0.85; pointer-events: none;
+}
+.kit-shell-main.role-student::before { background: var(--color-role-student); }
+.kit-shell-main.role-teacher::before { background: var(--color-role-teacher); }
+.kit-shell-main.role-admin::before   { background: var(--color-role-admin); }
+.kit-shell-main.role-parent::before  { background: var(--color-role-parent); }
+
+.kit-shell-header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(251, 251, 250, 0.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--color-hairline);
+  height: 48px; padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.dark .kit-shell-header { background: rgba(14,14,16,0.85); }
+.kit-shell-header .header__title {
+  display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+}
+.kit-shell-header .header__crumb {
+  font-size: 13px; color: var(--color-ink-3); font-weight: 400; white-space: nowrap;
+}
+.kit-shell-header .header__crumb-sep { color: var(--color-ink-4); }
+.kit-shell-header .header__h1 {
+  font-size: 13.5px; font-weight: 500; letter-spacing: -0.011em;
+  color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kit-shell-header .header__actions {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.kit-shell-header .header__cmdk {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 28px; padding: 0 8px 0 10px; border-radius: 7px;
+  border: 1px solid var(--color-hairline); background: var(--color-surface);
+  color: var(--color-ink-3); font-size: 12.5px;
+  transition: background 120ms; min-width: 180px;
+  font-family: inherit; cursor: pointer;
+}
+.kit-shell-header .header__cmdk:hover {
+  background: var(--color-surface-2); color: var(--color-ink-2);
+}
+.kit-shell-header .header__cmdk svg { width: 13px; height: 13px; }
+.kit-shell-header .header__cmdk span { flex: 1; text-align: left; }
+.kit-shell-header .header__cmdk kbd {
+  font-family: inherit; font-size: 10.5px;
+  color: var(--color-ink-3); background: var(--color-surface-3);
+  border-radius: 4px; padding: 1px 5px; font-weight: 500; letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   TRILINK kit — legacy hero & summary reskin overrides.
+
+   Many admin / teacher / student / parent pages still use legacy
+   class names like `.school-setup-hero`, `.school-setup-summary-grid`,
+   `.admin-dash-summary-card`, etc. Rather than rewrite every page's
+   JSX, this block force-reskins those legacy classes into the kit's
+   `.phead` + `.stat` aesthetic.
+
+   Specificity intentionally uses `!important` so it always wins over
+   the original CSS that ships alongside each component.
+   ============================================================ */
+
+/* ----- Page wrapper → kit-page sizing ---------------------------- */
+.page-wrapper,
+.ui-page {
+  max-width: 1280px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 22px 28px 56px !important;
+}
+
+/* ----- Hero rows → `.phead` -------------------------------------- */
+.school-setup-hero,
+.admin-dash-hero,
+.registration-hero,
+.attendance-hero,
+.audit-hero,
+.feedback-hero,
+.profile-hero,
+.page-header,
+.exam-hero,
+.notif-hero,
+.materials-hero,
+.assignments-hero,
+.classes-hero,
+.students-hero,
+.teachers-hero,
+.parents-hero,
+.children-hero,
+.grades-hero {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  padding: 0 0 20px !important;
+  margin: 0 0 20px !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* ----- Hero kicker (eyebrow) → `.phead__meta` -------------------- */
+.school-setup-kicker,
+.admin-dash-kicker,
+.registration-kicker,
+.kicker,
+.eyebrow,
+.page-eyebrow,
+.page-kicker,
+.hero-kicker {
+  font-size: 12px !important;
+  color: var(--color-ink-3) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin: 0 0 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.school-setup-kicker svg,
+.admin-dash-kicker svg,
+.registration-kicker svg,
+.kicker svg,
+.eyebrow svg,
+.hero-kicker svg {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--color-ink-3) !important;
+}
+
+/* ----- Hero title → `.phead__title` ------------------------------ */
+.school-setup-title,
+.admin-dash-title,
+.registration-title,
+.page-title,
+.hero-title,
+.page-header h1,
+.page-header h2,
+h1.page-title,
+h2.page-title {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.022em !important;
+  color: var(--color-ink) !important;
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+
+/* ----- Hero subtitle → `.phead__sub` ----------------------------- */
+.school-setup-subtitle,
+.admin-dash-subtitle,
+.registration-subtitle,
+.page-subtitle,
+.hero-subtitle,
+.page-header p {
+  font-size: 13px !important;
+  color: var(--color-ink-2) !important;
+  margin: 6px 0 0 !important;
+  letter-spacing: -0.003em !important;
+  font-weight: 400 !important;
+}
+
+/* ----- Summary grid → `.stat-grid` ------------------------------- */
+.school-setup-summary-grid,
+.admin-dash-summary-grid,
+.registration-summary-grid,
+.attendance-summary-grid,
+.audit-summary-grid,
+.summary-grid,
+.kpi-grid,
+.metrics-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 8px !important;
+  margin-bottom: 14px !important;
+}
+@media (max-width: 900px) {
+  .school-setup-summary-grid,
+  .admin-dash-summary-grid,
+  .registration-summary-grid,
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ----- Summary card → `.stat` ------------------------------------ */
+.school-setup-summary-card,
+.admin-dash-summary-card,
+.registration-summary-card,
+.attendance-summary-card,
+.audit-summary-card,
+.summary-card,
+.kpi-card,
+.metric-card,
+.stat-card {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 8px !important;
+  padding: 14px !important;
+  position: relative !important;
+  box-shadow: none !important;
+  transition: background 120ms !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-height: auto !important;
+  transform: none !important;
+}
+.school-setup-summary-card:hover,
+.admin-dash-summary-card:hover,
+.registration-summary-card:hover,
+.summary-card:hover {
+  background: var(--color-surface-2) !important;
+  transform: none !important;
+}
+
+/* ----- Summary icon — flatten, monochrome ----------------------- */
+.school-setup-summary-icon,
+.admin-dash-summary-icon,
+.registration-summary-icon,
+.summary-card-icon,
+.kpi-icon,
+.metric-icon {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
+  background: var(--color-surface-2) !important;
+  color: var(--color-ink-2) !important;
+  border: 1px solid var(--color-hairline) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 0 4px !important;
+}
+.school-setup-summary-icon svg,
+.admin-dash-summary-icon svg,
+.summary-card-icon svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+/* ----- Summary label/value/note → `.stat__*` -------------------- */
+.school-setup-summary-label,
+.admin-dash-summary-label,
+.registration-summary-label,
+.summary-card-label,
+.kpi-label,
+.metric-label,
+.stat-label {
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  color: var(--color-ink-3) !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin: 0 !important;
+}
+.school-setup-summary-value,
+.admin-dash-summary-value,
+.registration-summary-value,
+.summary-card-value,
+.kpi-value,
+.metric-value,
+.stat-value {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  color: var(--color-ink) !important;
+  letter-spacing: -0.022em !important;
+  font-variant-numeric: tabular-nums !important;
+  margin: 0 !important;
+  line-height: 1.05 !important;
+}
+.school-setup-summary-note,
+.admin-dash-summary-note,
+.registration-summary-note,
+.summary-card-note,
+.kpi-note,
+.metric-note,
+.stat-note {
+  font-size: 11.5px !important;
+  color: var(--color-ink-3) !important;
+  margin: 0 !important;
+}
+
+/* ----- Card titles / section titles ----------------------------- */
+.card-title,
+.school-setup-section-title,
+.section-title,
+h3.card-title,
+h2.card-title {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--color-ink) !important;
+  letter-spacing: -0.007em !important;
+  margin: 0 0 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-transform: none !important;
+}
+.card-title svg,
+.section-title svg,
+.school-setup-section-title svg {
+  width: 14px !important;
+  height: 14px !important;
+  color: var(--color-ink-3) !important;
+}
+
+/* ----- Toast / floating notice ---------------------------------- */
+.toast,
+.school-setup-toast,
+.notice {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 4px 16px rgba(15,16,18,0.08) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  color: var(--color-ink) !important;
+}
+
+/* ----- Skeleton shimmer (legacy admin) -------------------------- */
+.admin-skeleton,
+.skel,
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 0%,
+    var(--color-surface) 50%,
+    var(--color-surface-2) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: kit-shimmer 1.4s ease-in-out infinite !important;
+  border-radius: 6px !important;
+}
+@keyframes kit-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ----- Big legacy `.btn` → kit-flat ----------------------------- */
+.btn.btn-primary,
+button.btn-primary,
+button.btn.btn-primary {
+  background: var(--color-ink) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  padding: 0 11px !important;
+  height: 28px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
+.btn.btn-primary:hover,
+button.btn-primary:hover { background: #1f1f22 !important; }
+
+.btn.btn-secondary,
+button.btn-secondary {
+  background: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 7px !important;
+  padding: 0 11px !important;
+  height: 28px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+}
+.btn.btn-secondary:hover,
+button.btn-secondary:hover { background: var(--color-surface-2) !important; }
+
+/* Generic icon size in legacy buttons */
+.btn svg,
+.btn-primary svg,
+.btn-secondary svg {
+  width: 13px !important;
+  height: 13px !important;
+  stroke-width: 1.8 !important;
+}
+
+/* ----- Page hero with icon block (admin-dash) ------------------- */
+.admin-dash-hero-icon,
+.school-setup-hero-icon,
+.registration-hero-icon {
+  display: none !important;
+}
+
+/* ----- Legacy tabs → kit `.k-tabs` look ------------------------- */
+.tabs:not(.k-tabs) {
+  display: flex !important;
+  gap: 0 !important;
+  position: relative !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 14px !important;
+}
+.tabs:not(.k-tabs) .tab {
+  padding: 0 12px 10px !important;
+  height: 32px !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  color: var(--color-ink-3) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  position: relative !important;
+  letter-spacing: -0.005em !important;
+  background: none !important;
+  border: 0 !important;
+  cursor: pointer !important;
+  border-radius: 0 !important;
+}
+.tabs:not(.k-tabs) .tab:hover { color: var(--color-ink) !important; }
+.tabs:not(.k-tabs) .tab.active {
+  color: var(--color-ink) !important;
+  font-weight: 500 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tabs:not(.k-tabs) .tab.active::after {
+  content: "" !important;
+  position: absolute !important;
+  bottom: -1px !important;
+  left: 10px !important;
+  right: 10px !important;
+  height: 1.5px !important;
+  background: var(--color-ink) !important;
+  border-radius: 999px !important;
+}
+
+/* ----- Legacy input-group / input-field → kit field ------------- */
+.input-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+.input-group label {
+  font-size: 11px !important;
+  color: var(--color-ink-3) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin: 0 !important;
+}
+.input-field {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.input-field > input,
+.input-field > select,
+.input-field > textarea {
+  width: 100% !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 7px !important;
+  padding: 6px 9px !important;
+  height: 30px !important;
+  font-size: 12.5px !important;
+  color: var(--color-ink) !important;
+  letter-spacing: -0.005em !important;
+  font-family: inherit !important;
+  box-shadow: none !important;
+}
+.input-field > textarea { height: auto !important; min-height: 76px !important; }
+.input-field > input:focus,
+.input-field > select:focus,
+.input-field > textarea:focus {
+  border-color: var(--color-brand) !important;
+  box-shadow: 0 0 0 3px rgba(91,91,214,0.12) !important;
+  outline: none !important;
+}
+
+/* Legacy cards on functional pages */
+.card:not(.k-card) {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 12px !important;
+  padding: 18px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Legacy danger/success alert callouts */
+.card[style*="var(--danger)"],
+.card[style*="--danger-light"] {
+  background: var(--color-danger-soft) !important;
+  border: 1px solid rgba(196,53,84,0.18) !important;
+  color: var(--color-danger) !important;
+  border-radius: 8px !important;
+}
+
+/* ============================================================
+   Sweeping page-pattern overrides.
+
+   The various functional pages use ad-hoc class names like
+   `.classes-kicker`, `.attendance-summary-card`, etc. Use attribute
+   selectors so every variant is captured at once.
+   ============================================================ */
+
+/* Any *-hero element ------------------------------------------- */
+[class$="-hero"]:not(.kit-page):not(.k-card) {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  padding: 0 0 20px !important;
+  margin: 0 0 20px !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Any *-kicker / hero eyebrow ---------------------------------- */
+[class$="-kicker"] {
+  font-size: 12px !important;
+  color: var(--color-ink-3) !important;
+  font-weight: 400 !important;
+  margin: 0 0 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+[class$="-kicker"] svg {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--color-ink-3) !important;
+}
+
+/* Any *-title heading inside hero ------------------------------ */
+[class$="-title"]:is(h1, h2),
+h1[class$="-title"],
+h2[class$="-title"] {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.022em !important;
+  color: var(--color-ink) !important;
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+
+/* Any *-subtitle ----------------------------------------------- */
+[class$="-subtitle"] {
+  font-size: 13px !important;
+  color: var(--color-ink-2) !important;
+  margin: 6px 0 0 !important;
+  letter-spacing: -0.003em !important;
+  font-weight: 400 !important;
+}
+
+/* Any *-summary-grid ------------------------------------------- */
+[class$="-summary-grid"] {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 8px !important;
+  margin-bottom: 14px !important;
+}
+@media (max-width: 900px) {
+  [class$="-summary-grid"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Any *-summary-card ------------------------------------------- */
+[class$="-summary-card"] {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 8px !important;
+  padding: 14px !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-height: auto !important;
+  transform: none !important;
+}
+
+/* Any *-summary-icon flatten ----------------------------------- */
+[class*="-summary-icon"] {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
+  background: var(--color-surface-2) !important;
+  color: var(--color-ink-2) !important;
+  border: 1px solid var(--color-hairline) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 0 4px !important;
+}
+[class*="-summary-icon"] svg {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--color-ink-2) !important;
+}
+[class*="-summary-icon"].blue,
+[class*="-summary-icon"].teal,
+[class*="-summary-icon"].orange,
+[class*="-summary-icon"].purple,
+[class*="-summary-icon"].green,
+[class*="-summary-icon"].red {
+  /* override colored variants — kit is monochrome */
+  background: var(--color-surface-2) !important;
+  color: var(--color-ink-2) !important;
+}
+
+/* Any *-summary-label ------------------------------------------ */
+[class$="-summary-label"] {
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  color: var(--color-ink-3) !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin: 0 !important;
+}
+
+/* Any *-summary-value ------------------------------------------ */
+[class$="-summary-value"] {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  color: var(--color-ink) !important;
+  letter-spacing: -0.022em !important;
+  font-variant-numeric: tabular-nums !important;
+  margin: 0 !important;
+  line-height: 1.05 !important;
+}
+
+/* Any *-summary-note ------------------------------------------- */
+[class$="-summary-note"] {
+  font-size: 11.5px !important;
+  color: var(--color-ink-3) !important;
+  margin: 0 !important;
+}
+
+/* Toolbar / filter row ----------------------------------------- */
+.toolbar,
+.filter-bar,
+.filters,
+.filter-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 0 14px !important;
+  margin: 0 0 14px !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+/* Modal / dialog overlay -------------------------------------- */
+.modal-overlay,
+.dialog-overlay,
+.overlay {
+  background: rgba(15,16,18,0.4) !important;
+  backdrop-filter: blur(4px) !important;
+}
+.modal,
+.dialog,
+.modal-content {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 50px rgba(15,16,18,0.18) !important;
+}
+.modal-header,
+.dialog-header {
+  border-bottom: 1px solid var(--color-hairline) !important;
+  padding: 14px 18px !important;
+}
+.modal-title,
+.dialog-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--color-ink) !important;
+  letter-spacing: -0.011em !important;
+}
+.modal-body { padding: 16px 18px !important; }
+.modal-footer {
+  border-top: 1px solid var(--color-hairline) !important;
+  padding: 12px 18px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+/* ==============================================================
+   FINAL OVERRIDE PASS — neutralize legacy CSS tokens that some
+   pages still reference via class names. All these rules use
+   `!important` because they're competing with legacy stylesheets
+   loaded earlier in the cascade.
+
+   The intent is: anywhere in the app, if a page hasn't been
+   migrated to kit primitives yet, the visual aesthetic still
+   resolves to the TRILINK design language (hairline borders,
+   flat surfaces, ink-on-surface typography, no gradients).
+   ============================================================== */
+
+/* ----- Outline / tertiary / icon buttons -------------------- */
+.btn.btn-outline,
+.btn-outline,
+.btn.btn-tertiary,
+.btn-tertiary,
+.btn.btn-ghost,
+.btn-ghost-legacy {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  color: var(--color-ink) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  font-size: 12.5px !important;
+  letter-spacing: -0.005em !important;
+  padding: 7px 11px !important;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease !important;
+}
+.btn.btn-outline:hover,
+.btn-outline:hover,
+.btn.btn-tertiary:hover,
+.btn-tertiary:hover {
+  background: var(--color-surface-2) !important;
+  border-color: var(--color-ink-4) !important;
+  color: var(--color-ink) !important;
+}
+
+/* ----- Danger / warning button skins ------------------------ */
+.btn.btn-danger,
+.btn-danger {
+  background: var(--color-danger) !important;
+  border: 1px solid var(--color-danger) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  font-size: 12.5px !important;
+}
+.btn.btn-warning,
+.btn-warning {
+  background: var(--color-warning-soft) !important;
+  border: 1px solid rgba(196,53,84,0.22) !important;
+  color: var(--color-warning) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+.btn.btn-success,
+.btn-success {
+  background: var(--color-success) !important;
+  border: 1px solid var(--color-success) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* ----- Action-card / panel hero blocks ---------------------- */
+.summary-card,
+.action-card,
+.panel-card,
+.hero-card,
+.feature-card {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  padding: 18px 20px !important;
+  color: var(--color-ink) !important;
+}
+.summary-card *,
+.action-card *,
+.hero-card * {
+  background-image: none !important;
+}
+
+/* ----- Stat / metric tile (legacy) -------------------------- */
+.stat-card,
+.metric-card,
+.kpi-card,
+.dashboard-stat,
+.stat-tile-legacy {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  padding: 14px 16px !important;
+}
+.stat-card .stat-value,
+.stat-card .value,
+.metric-card .value,
+.kpi-value {
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.018em !important;
+  color: var(--color-ink) !important;
+  font-variant-numeric: tabular-nums !important;
+  background: none !important;
+  -webkit-text-fill-color: var(--color-ink) !important;
+}
+.stat-card .stat-label,
+.stat-card .label,
+.metric-card .label,
+.kpi-label {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  color: var(--color-ink-3) !important;
+  text-transform: uppercase !important;
+}
+
+/* ----- Section header / divider headings -------------------- */
+.section-title,
+.section-heading,
+h2.section-title,
+h3.section-title {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.014em !important;
+  color: var(--color-ink) !important;
+  margin-bottom: 8px !important;
+}
+.section-subtitle,
+.section-description {
+  font-size: 12.5px !important;
+  color: var(--color-ink-2) !important;
+  margin-bottom: 14px !important;
+  font-weight: 400 !important;
+}
+
+/* ----- Empty / placeholder state ---------------------------- */
+.empty-state,
+.placeholder-block,
+.no-data {
+  background: var(--color-surface) !important;
+  border: 1px dashed var(--color-hairline) !important;
+  border-radius: 10px !important;
+  padding: 28px 18px !important;
+  text-align: center !important;
+  color: var(--color-ink-3) !important;
+  font-size: 13px !important;
+}
+.empty-state-title { color: var(--color-ink) !important; font-weight: 500 !important; }
+
+/* ----- Status pill / chip (legacy) -------------------------- */
+.status-pill,
+.chip,
+.tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  background: var(--color-surface-2) !important;
+  border: 1px solid var(--color-hairline) !important;
+  color: var(--color-ink-2) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+.status-pill.success,
+.chip.success,
+.tag.success {
+  background: var(--color-success-soft) !important;
+  border-color: rgba(13,138,95,0.22) !important;
+  color: var(--color-success) !important;
+}
+.status-pill.danger,
+.chip.danger,
+.tag.danger {
+  background: var(--color-danger-soft) !important;
+  border-color: rgba(196,53,84,0.22) !important;
+  color: var(--color-danger) !important;
+}
+.status-pill.warning,
+.chip.warning,
+.tag.warning {
+  background: var(--color-warning-soft) !important;
+  border-color: rgba(196,53,84,0.22) !important;
+  color: var(--color-warning) !important;
+}
+
+/* ----- Profile / settings rows ------------------------------ */
+.profile-form,
+.settings-form,
+.form-section {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  padding: 18px 20px !important;
+}
+.profile-row,
+.settings-row,
+.form-row {
+  border-bottom: 1px solid var(--color-hairline) !important;
+  padding: 10px 0 !important;
+}
+.profile-row:last-child,
+.settings-row:last-child,
+.form-row:last-child {
+  border-bottom: none !important;
+}
+
+/* ----- File / attachment rows ------------------------------ */
+.file-row,
+.attachment-row,
+.upload-row {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-size: 12.5px !important;
+  color: var(--color-ink) !important;
+}
+
+/* ----- Notification / activity rows ------------------------ */
+.notification-row,
+.activity-row,
+.feed-row,
+.timeline-row {
+  background: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-hairline) !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  padding: 12px 14px !important;
+  display: flex !important;
+  gap: 12px !important;
+}
+
+/* ----- Subtle heading divider on every section header ------ */
+.page-section-divider,
+hr.section-divider {
+  border: none !important;
+  border-top: 1px solid var(--color-hairline) !important;
+  margin: 18px 0 !important;
+}
+
+/* ==============================================================
+   Strong neutralization for inline gradients / heavy weights
+   that some legacy pages still set inline. CSS `!important`
+   beats element-level CSS rules but not inline `style=` attrs,
+   so this only mops up class-based applications.
+   ============================================================== */
+[class*="gradient"]:not(.k-card):not(.kit-shell-sidebar):not(.kit-shell-header) {
+  background-image: none !important;
+}
+.no-gradient,
+.kit-flat {
+  background: var(--color-surface) !important;
+  background-image: none !important;
 }

@@ -10,3 +10,4 @@ export { PageHeader } from "./PageHeader";
 export { Input, Textarea } from "./Input";
 export { Avatar } from "./Avatar";
 export { StatTile } from "./StatTile";
+export { SafeHtml } from "./SafeHtml";

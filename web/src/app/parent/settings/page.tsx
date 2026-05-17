@@ -1,6 +1,7 @@
 "use client";
-import SettingsPage from "@/components/SettingsPage";
 
-export default function ParentSettings() {
-    return <SettingsPage />;
+import { SettingsKitPage } from "@/components/kit";
+
+export default function ParentSettingsPage() {
+    return <SettingsKitPage role="parent" />;
 }

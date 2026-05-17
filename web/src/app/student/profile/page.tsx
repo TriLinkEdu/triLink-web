@@ -6,6 +6,7 @@ import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 import { useToastStore } from "@/store/toastStore";
 import { patchMe, uploadProfileImage } from "@/lib/admin-api";
 import { refreshStoredProfile } from "@/lib/auth";
+import { Icon as KitIcon, PageHead as KitPageHead } from "@/components/kit";
 
 type StudentProfile = {
     firstName: string;
@@ -181,17 +182,34 @@ export default function StudentProfilePage() {
 
     return (
         <div className="page-wrapper">
-            <div className="page-header" style={{ marginBottom: "1rem" }}>
-                <h1 className="page-title">My Profile</h1>
-                {!isEditing ? (
-                    <button className="btn btn-primary" onClick={startEditing}>Edit</button>
-                ) : (
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button className="btn btn-secondary" onClick={cancelEditing} disabled={saving}>Cancel</button>
-                        <button className="btn btn-primary" onClick={saveProfile} disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
-                    </div>
-                )}
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Account
+                        <span className="dot-sep">·</span>
+                        Student
+                    </>
+                }
+                title="My profile"
+                sub="Contact details, photo, and account security."
+                actions={
+                    !isEditing ? (
+                        <button type="button" className="btn-kit btn-kit-primary" onClick={startEditing}>
+                            <KitIcon name="edit" /> Edit
+                        </button>
+                    ) : (
+                        <>
+                            <button type="button" className="btn-kit btn-kit-secondary" onClick={cancelEditing} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button type="button" className="btn-kit btn-kit-primary" onClick={saveProfile} disabled={saving}>
+                                <KitIcon name="check" /> {saving ? "Saving…" : "Save changes"}
+                            </button>
+                        </>
+                    )
+                }
+            />
 
             <div className="card">
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.9fr)", gap: "1rem", alignItems: "center" }}>

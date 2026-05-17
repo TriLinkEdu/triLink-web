@@ -1,6 +1,5 @@
-"use client";
-import { ParentCalendarPage } from "@/components/PortalMvpPages";
+import { CalendarKitPage } from "@/components/kit/calendar-kit";
 
-export default function Page() {
-    return <ParentCalendarPage />;
+export default function ParentCalendarPage() {
+    return <CalendarKitPage role="parent" />;
 }

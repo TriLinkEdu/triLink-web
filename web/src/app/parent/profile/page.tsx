@@ -6,7 +6,8 @@ import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 import { useToastStore } from "@/store/toastStore";
 import { patchMe, uploadProfileImage } from "@/lib/admin-api";
 import { refreshStoredProfile } from "@/lib/auth";
-import Select from "@/components/Select";
+import { KitSelect } from "@/components/kit/local";
+import { Icon as KitIcon, PageHead as KitPageHead } from "@/components/kit";
 
 type ParentProfile = {
     firstName: string;
@@ -179,17 +180,34 @@ export default function ParentProfilePage() {
 
     return (
         <div className="page-wrapper">
-            <div className="page-header" style={{ marginBottom: "1rem" }}>
-                <h1 className="page-title">My Profile</h1>
-                {!isEditing ? (
-                    <button className="btn btn-primary" onClick={startEditing}>Edit</button>
-                ) : (
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button className="btn btn-secondary" onClick={cancelEditing} disabled={saving}>Cancel</button>
-                        <button className="btn btn-primary" onClick={saveProfile} disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
-                    </div>
-                )}
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Account
+                        <span className="dot-sep">·</span>
+                        Parent
+                    </>
+                }
+                title="My profile"
+                sub="Contact details, photo, and account security."
+                actions={
+                    !isEditing ? (
+                        <button type="button" className="btn-kit btn-kit-primary" onClick={startEditing}>
+                            <KitIcon name="edit" /> Edit
+                        </button>
+                    ) : (
+                        <>
+                            <button type="button" className="btn-kit btn-kit-secondary" onClick={cancelEditing} disabled={saving}>
+                                Cancel
+                            </button>
+                            <button type="button" className="btn-kit btn-kit-primary" onClick={saveProfile} disabled={saving}>
+                                <KitIcon name="check" /> {saving ? "Saving…" : "Save changes"}
+                            </button>
+                        </>
+                    )
+                }
+            />
 
             <div className="card">
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.9fr)", gap: "1rem", alignItems: "center" }}>
@@ -256,7 +274,7 @@ export default function ParentProfilePage() {
                             <EditableField label="Occupation" value={draft.occupation} onChange={(value) => setDraft((prev) => ({ ...prev, occupation: value }))} placeholder="Occupation" disabled={saving} />
                             <div className="input-group">
                                 <label>Relationship</label>
-                                <Select
+<KitSelect 
                                     value={draft.relationship}
                                     onChange={(e) => setDraft((prev) => ({ ...prev, relationship: e.target.value }))}
                                     disabled={saving}
@@ -265,7 +283,7 @@ export default function ParentProfilePage() {
                                     <option value="Father">Father</option>
                                     <option value="Mother">Mother</option>
                                     <option value="Guardian">Guardian</option>
-                                </Select>
+                                </KitSelect>
                             </div>
                         </div>
                     )}

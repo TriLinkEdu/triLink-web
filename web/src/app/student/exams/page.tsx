@@ -8,11 +8,11 @@ import {
   Clock3,
   FileText,
   PlayCircle,
-  Search,
   Timer,
 } from "lucide-react";
 import { getActiveAcademicYear, listStudentExams, type Exam } from "@/lib/admin-api";
 import { getStoredUser } from "@/lib/auth";
+import { Icon, PageHead, StatGrid, StatTile } from "@/components/kit";
 
 type ExamStatus = "available" | "completed" | "upcoming" | "missed";
 
@@ -121,45 +121,54 @@ export default function StudentExamsPage() {
   };
 
   return (
-    <div style={pageShell}>
-      <div style={{ display: "grid", gap: "1.5rem", maxWidth: 1440, margin: "0 auto" }}>
-        <section style={{ ...card, padding: "2rem", background: "linear-gradient(135deg, #FFFFFF 0%, #F5F3FF 58%, #EEF2FF 100%)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "1.5rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.42rem 0.75rem", borderRadius: 999, background: "#EEF2FF", color: "#4F46E5", fontWeight: 900, fontSize: "0.78rem", marginBottom: "1rem" }}>
-                <FileText size={15} />
-                Exam Center
-              </div>
-              <h1 className="premium-hero-title" style={{ margin: 0, color: "#0F172A", lineHeight: 1.04, fontWeight: 900, letterSpacing: 0 }}>
-                Exams
-              </h1>
-              <p style={{ margin: "0.75rem 0 0", color: "#64748B", fontWeight: 600, lineHeight: 1.7 }}>
-                {yearLabel ? `Showing exams for ${yearLabel}.` : "No active academic year found."}
-              </p>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 280, padding: "0.75rem 0.95rem", borderRadius: 18, background: "#fff", border: "1px solid #E2E8F0" }}>
-              <Search size={18} color="#94A3B8" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search exams" style={{ width: "100%", border: 0, outline: 0, background: "transparent", color: "#0F172A", fontWeight: 700 }} />
-            </div>
+    <div className="kit-page" data-role="student">
+      <PageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Exam center
+            <span className="dot-sep">·</span>
+            {yearLabel || "No active year"}
+          </>
+        }
+        title="Exams"
+        sub={yearLabel ? `Showing exams for ${yearLabel}.` : "No active academic year found."}
+        actions={
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              minWidth: 260,
+              padding: "6px 10px",
+              borderRadius: 7,
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-hairline)",
+            }}
+          >
+            <Icon name="search" size={13} style={{ color: "var(--ink-3)" }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search exams"
+              style={{
+                width: "100%",
+                border: 0,
+                outline: 0,
+                background: "transparent",
+                color: "var(--ink)",
+                fontSize: 12.5,
+              }}
+            />
           </div>
-        </section>
+        }
+      />
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
-          {[
-            { label: "All Exams", value: counts.all, icon: FileText, bg: "linear-gradient(135deg, #E0E7FF 0%, #F5D0FE 100%)", color: "#4F46E5" },
-            { label: "Available", value: counts.available, icon: PlayCircle, bg: "linear-gradient(135deg, #DCFCE7 0%, #BAE6FD 100%)", color: "#047857" },
-            { label: "Completed", value: counts.completed, icon: CheckCircle2, bg: "linear-gradient(135deg, #E0E7FF 0%, #DBEAFE 100%)", color: "#3730A3" },
-            { label: "Upcoming", value: counts.upcoming, icon: Clock3, bg: "linear-gradient(135deg, #FEF3C7 0%, #FED7AA 100%)", color: "#B45309" },
-          ].map((item) => (
-            <div key={item.label} style={{ ...card, padding: "1.35rem" }}>
-              <div style={{ width: 50, height: 50, borderRadius: 18, background: item.bg, color: item.color, display: "grid", placeItems: "center", marginBottom: "1rem" }}>
-                <item.icon size={21} />
-              </div>
-              <div style={{ color: "#64748B", fontSize: "0.8rem", fontWeight: 800 }}>{item.label}</div>
-              <div style={{ color: "#0F172A", fontSize: "2rem", fontWeight: 900, marginTop: "0.25rem" }}>{item.value}</div>
-            </div>
-          ))}
-        </section>
+      <StatGrid cols={4} className="!mb-[14px]">
+        <StatTile icon="file" label="All exams" value={String(counts.all)} note="all scheduled" />
+        <StatTile icon="play" label="Available" value={String(counts.available)} note="ready to attempt" />
+        <StatTile icon="check" label="Completed" value={String(counts.completed)} note="submitted" />
+        <StatTile icon="clock" label="Upcoming" value={String(counts.upcoming)} note="scheduled later" /></StatGrid>
 
         <section style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "1.25rem 1.5rem", display: "flex", gap: "0.6rem", flexWrap: "wrap", borderBottom: "1px solid #F1F5F9" }}>
@@ -251,7 +260,6 @@ export default function StudentExamsPage() {
             </div>
           )}
         </section>
-      </div>
     </div>
   );
 }

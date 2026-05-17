@@ -4,6 +4,7 @@ import { listAssignmentsForStudent, submitAssignment, type Assignment } from "@/
 import { getStoredUser } from "@/lib/auth";
 import { getFileUrl, getApiBase, openFile } from "@/lib/api";
 import { authFetch } from "@/lib/auth";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 function statusColor(a: Assignment) {
   if (!a.submission || a.submission.status === "pending") {
@@ -91,15 +92,18 @@ export default function StudentAssignments() {
         </div>
       )}
 
-      <div className="page-header">
-        <div>
-          <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            My Assignments
-          </h1>
-          <p className="page-subtitle">View and submit your assignments</p>
-        </div>
-      </div>
+      <KitPageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Coursework
+            <span className="dot-sep">·</span>
+            {assignments.length} task{assignments.length === 1 ? "" : "s"}
+          </>
+        }
+        title="My assignments"
+        sub="Review tasks, submit work, and track grades."
+      />
 
       {/* Assignment detail / submit panel */}
       {selected && (

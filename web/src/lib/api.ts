@@ -17,6 +17,10 @@ export function getApiBase(): string {
   return envBase;
 }
 
+/**
+ * @deprecated The download endpoint requires JWT. Direct <img src> usage will 401.
+ * Use openFile() or AuthenticatedAvatar / Avatar primitive which fetch with auth.
+ */
 export function getFileUrl(fileId: string | null | undefined): string {
   if (!fileId) return "";
   return `${getApiBase()}/api/files/${fileId}/download`;
@@ -39,15 +43,13 @@ export const apiPath = {
 export async function openFile(fileId: string | null | undefined): Promise<void> {
   if (!fileId) return;
   try {
-    const base = getApiBase() || "http://localhost:4000";
+    const base = getApiBase();
     const { authFetch } = await import("./auth");
     const res = await authFetch(`${base}/api/files/${fileId}/url`);
-    if (res.ok) {
-      const data = await res.json() as { url: string };
-      window.open(data.url, "_blank", "noopener,noreferrer");
-      return;
-    }
-  } catch { /* fall through */ }
-  // Fallback: use the redirect endpoint
-  window.open(getFileUrl(fileId), "_blank", "noopener,noreferrer");
+    if (!res.ok) throw new Error(`File access failed (${res.status})`);
+    const data = (await res.json()) as { url: string };
+    window.open(data.url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    console.error("openFile failed:", err);
+  }
 }

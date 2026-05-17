@@ -4,7 +4,9 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import RealtimeToast from "@/components/RealtimeToast";
 import TablePagination from "@/components/TablePagination";
+import { SafeHtml } from "@/components/ui";
 import { type ToastState } from "@/hooks/useRealtimeNotifications";
+import { PageHead as KitPageHead } from "@/components/kit";
 
 import {
     getActiveAcademicYear,
@@ -31,7 +33,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { createPortal } from "react-dom";
 import ExamMonitor from "@/components/ExamMonitor";
-import Select from "@/components/Select";
+import { KitSelect } from "@/components/kit/local";
 import { refreshStoredProfile } from "@/lib/auth";
 import { cachedFetch, invalidateCachePrefix } from "@/lib/cache";
 import { useCurrentUser } from "@/lib/useCurrentUser";
@@ -590,11 +592,12 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
 
     const snippetBtn = (item: Snippet & { html: string }, key: string) => (
         <button key={key} title={item.tip} onClick={() => insertSnippet(item)}
-            dangerouslySetInnerHTML={{ __html: item.html }}
             style={{ padding: "0.1rem 0.4rem", minWidth: 30, height: 26, borderRadius: 4, border: "1.5px solid var(--gray-200)", background: "#fff", cursor: "pointer" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--primary-50)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--primary-300)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gray-200)"; }}
-        />
+        >
+            <SafeHtml html={item.html} />
+        </button>
     );
 
     return (
@@ -620,7 +623,7 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
                                 <div key={tip.title} style={{ background: "#fff", borderRadius: 4, padding: "0.5rem 0.65rem" }}>
                                     <div style={{ fontWeight: 700, color: "#78350f", fontSize: "0.75rem", marginBottom: "0.25rem" }}>{tip.title}</div>
                                     <code style={{ fontSize: "0.72rem", color: "#b45309", display: "block", marginBottom: "0.15rem" }}>{tip.code}</code>
-                                    {rendered && <div style={{ fontSize: "0.7rem", color: "#78350f" }}>→&nbsp;<span dangerouslySetInnerHTML={{ __html: rendered }} /></div>}
+                                    {rendered && <div style={{ fontSize: "0.7rem", color: "#78350f" }}>→&nbsp;<SafeHtml html={rendered} /></div>}
                                     <div style={{ fontSize: "0.67rem", color: "#a16207", marginTop: "0.15rem" }}>{tip.note}</div>
                                 </div>
                             );
@@ -661,8 +664,8 @@ function LatexField({ label, value, onChange, rows = 3, placeholder, mini = fals
 
             {/* Always-visible live preview when there is content */}
             {!mini && value.trim() && (
-                <div style={{ marginTop: "0.3rem", padding: "0.5rem 0.75rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: 4, fontSize: "0.9rem", lineHeight: 1.8 }}
-                    dangerouslySetInnerHTML={{ __html: renderLatex(value) }} />
+                <SafeHtml as="div" html={renderLatex(value)}
+                    style={{ marginTop: "0.3rem", padding: "0.5rem 0.75rem", background: "var(--primary-50)", border: "1px solid var(--primary-100)", borderRadius: 4, fontSize: "0.9rem", lineHeight: 1.8 }} />
             )}
             {!mini && <p style={{ fontSize: "0.63rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>{cfg.hintLine}</p>}
         </div>
@@ -1562,7 +1565,7 @@ export default function TeacherExams() {
                         {/* ── Modal Header ── */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.1rem 1.5rem", borderBottom: "1.5px solid var(--gray-100)", flexShrink: 0 }}>
                             <div>
-                                <h3 style={{ fontWeight: 800, fontSize: "1.05rem", margin: 0 }}>Student Responses</h3>
+                                <h3 style={{ fontWeight: 500, fontSize: 16, letterSpacing: "-0.014em", color: "var(--ink)", margin: 0 }}>Student Responses</h3>
                                 <div style={{ fontSize: "0.76rem", color: "var(--gray-400)", marginTop: "0.15rem" }}>Exam submission detail — question by question</div>
                             </div>
                             <button onClick={() => setEvaluating(null)} style={{ width: 32, height: 32, borderRadius: 4, border: "1.5px solid var(--gray-200)", background: "var(--gray-50)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1593,7 +1596,7 @@ export default function TeacherExams() {
                                 </div>
                             ) : evalAttemptDetails ? (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                    <h4 style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "1px solid var(--gray-100)", paddingBottom: "0.5rem", margin: 0 }}>
+                                    <h4 style={{ fontSize: 11, fontWeight: 500, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid var(--color-hairline)", paddingBottom: 8, margin: 0 }}>
                                         Responses
                                     </h4>
                                     {Object.entries(evalAttemptDetails.answers || {}).map(([qId, answer]: [string, any], idx) => {
@@ -1734,15 +1737,21 @@ export default function TeacherExams() {
 
             {/* ── CSV Column Picker Modal removed ── */}
 
-            <div className="page-header teacher-exams-hero">
-                <div>
-                    <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-                        Exams & Assessments
-                    </h1>
-                    <p className="page-subtitle">Create quizzes, manage exam bank &amp; student grades</p>
-                </div>
-            </div>
+            <KitPageHead
+                meta={
+                    <>
+                        <span className="role-dot" />
+                        Assessment workspace
+                        <span className="dot-sep">·</span>
+                        {bank.length} exam{bank.length === 1 ? "" : "s"} in bank
+                        <span className="dot-sep">·</span>
+                        {user?.subject || "No subject assigned"}
+                    </>
+                }
+                title={<>Exam builder</>}
+                sub="Create quizzes, manage your exam bank, and release student grades."
+            />
+
 
             {apiErr && (
                 <div className="card" style={{ marginBottom: "1rem", padding: "0.85rem 1rem", color: "var(--danger)", border: "1.5px solid var(--danger-light)", background: "var(--danger-light)" }}>
@@ -1859,11 +1868,11 @@ export default function TeacherExams() {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "0.875rem" }}>
                                 <div className="input-group">
                                     <label>Question Type</label>
-                                    <Select value={q.type} onChange={e => updateQ({ type: e.target.value as any, correct: "" })} style={{ padding: "0.6rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", width: "100%", fontSize: "0.85rem" }}>
+                                    <KitSelect value={q.type} onChange={e => updateQ({ type: e.target.value as any, correct: "" })} style={{ padding: "0.6rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", width: "100%", fontSize: "0.85rem" }}>
                                         <option value="mcq">Multiple Choice (Choose)</option>
                                         <option value="truefalse">True / False</option>
                                         <option value="fillin">Blank Space (Fill in)</option>
-                                    </Select>
+                                    </KitSelect>
                                 </div>
                             </div>
 
@@ -2012,7 +2021,7 @@ export default function TeacherExams() {
                                     <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.73rem", padding: "0.3rem 0", borderBottom: "1px solid var(--gray-100)", gap: "0.4rem" }}>
                                         <code style={{ color: "var(--primary-700)", background: "var(--primary-50)", padding: "0.1rem 0.35rem", borderRadius: 4, fontSize: "0.68rem", flexShrink: 0, maxWidth: 90 }}>{name}</code>
                                         {note && <span style={{ color: "var(--gray-400)", fontSize: "0.65rem", flex: 1 }}>{note}</span>}
-                                        <span dangerouslySetInnerHTML={{ __html: rendered }} />
+                                        <SafeHtml html={rendered} />
                                     </div>
                                 );
                             })}
@@ -2037,7 +2046,7 @@ export default function TeacherExams() {
                             </p>
                         </div>
                         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                            <Select
+                            <KitSelect
                                 value={bankClassFilter}
                                 onChange={e => {
                                     setBankClassFilter(e.target.value);
@@ -2050,7 +2059,7 @@ export default function TeacherExams() {
                                 {offeringsForClassSelect.map(o => (
                                     <option key={o.id} value={o.id}>{offeringLabel(o)}</option>
                                 ))}
-                            </Select>
+                            </KitSelect>
                             <div className="header-search" style={{ width: 200 }}>
                                 <input value={bankSearch} onChange={e => { setBankSearch(e.target.value); setBankPage(1); }} placeholder="Search questions…" />
                             </div>
@@ -2062,7 +2071,7 @@ export default function TeacherExams() {
                             <tbody>
                                 {filteredBank.slice((bankPage - 1) * bankRows, bankPage * bankRows).map(item => (
                                     <tr key={item.id}>
-                                        <td style={{ maxWidth: 320 }}><div dangerouslySetInnerHTML={{ __html: renderLatex(item.q) }} style={{ fontSize: "0.875rem", fontWeight: 500 }} /></td>
+                                        <td style={{ maxWidth: 320 }}><SafeHtml as="div" html={renderLatex(item.q)} style={{ fontSize: "0.875rem", fontWeight: 500 }} /></td>
                                         <td><span className="badge badge-primary">{item.subj}</span></td>
                                         <td style={{ fontSize: "0.85rem" }}>{item.type}</td>
                                         <td style={{ fontSize: "0.85rem" }}>{item.used}×</td>
@@ -2127,29 +2136,32 @@ export default function TeacherExams() {
                                             const roster = rosterByExam[ex.id] || [];
                                             const activeCount = roster.filter(s => s.status === "in_progress").length;
                                             return (
-                                                <div key={ex.id} style={{ padding: "1rem", borderRadius: "12px", background: "var(--gray-50)", border: `1.5px solid ${isLive ? "var(--success)" : "var(--gray-100)"}` }}>
-                                                    <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "var(--gray-900)", marginBottom: "0.4rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</div>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                                                        <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isLive ? "var(--success)" : "var(--gray-400)" }}>{isLive ? "● LIVE" : "○ INACTIVE"}</span>
-                                                        <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--gray-500)" }}>{activeCount} active</span>
+                                                <div key={ex.id} className="k-card" style={{ padding: 14 }}>
+                                                    <div style={{ fontSize: 13.5, fontWeight: 500, letterSpacing: "-0.012em", color: "var(--ink)", marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</div>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: isLive ? "var(--color-success)" : "var(--ink-3)" }}>
+                                                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: isLive ? "var(--color-success)" : "var(--ink-4)", display: "inline-block" }} />
+                                                            {isLive ? "Live" : "Inactive"}
+                                                        </span>
+                                                        <span style={{ fontSize: 12, color: "var(--ink-3)", fontVariantNumeric: "tabular-nums" }}>{activeCount} active</span>
                                                     </div>
-                                                    <button onClick={() => setMonitoringExam(ex)} className="btn btn-primary btn-sm" style={{ width: "100%", justifyContent: "center", fontSize: "0.8rem" }}>
+                                                    <button type="button" onClick={() => setMonitoringExam(ex)} className="btn-kit btn-kit-primary" style={{ width: "100%", justifyContent: "center" }}>
                                                         Monitor
                                                     </button>
                                                 </div>
                                             );
                                         })}
                                         {liveExams.length === 0 && (
-                                            <div style={{ gridColumn: "1 / -1", padding: "2rem", textAlign: "center", color: "var(--gray-400)", border: "1.5px dashed var(--gray-200)", borderRadius: "12px", fontSize: "0.85rem" }}>
+                                            <div style={{ gridColumn: "1 / -1", padding: "28px 16px", textAlign: "center", color: "var(--ink-3)", border: "1px dashed var(--color-hairline)", borderRadius: 10, fontSize: 13, background: "var(--color-surface-2)" }}>
                                                 No published exams found to monitor.
                                             </div>
                                         )}
                                     </div>
                                     {totalLivePages > 1 && (
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "0.75rem 1.25rem", borderTop: "1px solid var(--gray-100)" }}>
-                                            <button className="btn btn-secondary btn-sm" onClick={() => setLiveMonitorPage(p => Math.max(1, p - 1))} disabled={liveMonitorPage === 1}>‹</button>
-                                            <span style={{ fontSize: "0.82rem", color: "var(--gray-500)" }}>{liveMonitorPage} / {totalLivePages}</span>
-                                            <button className="btn btn-secondary btn-sm" onClick={() => setLiveMonitorPage(p => Math.min(totalLivePages, p + 1))} disabled={liveMonitorPage === totalLivePages}>›</button>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--color-hairline)" }}>
+                                            <button type="button" className="btn-kit btn-kit-ghost" onClick={() => setLiveMonitorPage(p => Math.max(1, p - 1))} disabled={liveMonitorPage === 1}>‹</button>
+                                            <span style={{ fontSize: 12.5, color: "var(--ink-3)", fontVariantNumeric: "tabular-nums" }}>{liveMonitorPage} / {totalLivePages}</span>
+                                            <button type="button" className="btn-kit btn-kit-ghost" onClick={() => setLiveMonitorPage(p => Math.min(totalLivePages, p + 1))} disabled={liveMonitorPage === totalLivePages}>›</button>
                                         </div>
                                     )}
                                 </>
@@ -2195,10 +2207,10 @@ export default function TeacherExams() {
                             }
 
                             return [...classGroupMap.entries()].map(([gKey, grp]) => (
-                                <div key={gKey} style={{ borderBottom: "2px solid var(--gray-100)" }}>
-                                    <div style={{ padding: "0.6rem 1.25rem", background: "var(--primary-50)", borderBottom: "1px solid var(--primary-100)" }}>
-                                        <span style={{ fontWeight: 800, fontSize: "0.82rem", color: "var(--primary-700)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{grp.label}</span>
-                                        <span style={{ marginLeft: "0.75rem", fontSize: "0.72rem", color: "var(--primary-500)" }}>{grp.exams.size} exam{grp.exams.size !== 1 ? "s" : ""}</span>
+                                <div key={gKey} style={{ borderBottom: "1px solid var(--color-hairline)" }}>
+                                    <div style={{ padding: "10px 20px", background: "var(--color-surface-2)", borderBottom: "1px solid var(--color-hairline)" }}>
+                                        <span style={{ fontWeight: 500, fontSize: 11.5, color: "var(--ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{grp.label}</span>
+                                        <span style={{ marginLeft: 10, fontSize: 11.5, color: "var(--ink-3)", fontVariantNumeric: "tabular-nums" }}>{grp.exams.size} exam{grp.exams.size !== 1 ? "s" : ""}</span>
                                     </div>
                                     {[...grp.exams.entries()].map(([examTitle, rows], examIdx) => {
                                         const examObj = publishedExams.find(e => e.title === examTitle);

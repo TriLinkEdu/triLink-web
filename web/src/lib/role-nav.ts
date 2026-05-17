@@ -4,7 +4,7 @@ import {
     CalendarDays, Megaphone, Bell, MessageSquare, ClipboardCheck,
     Users, UserPlus, School, FileText, Award, Sparkles, MessageCircleHeart,
     Activity, Settings, User as UserIcon, BookMarked, ListChecks, FolderOpen,
-    PenTool, BarChart3,
+    PenTool, BarChart3, ShieldAlert, Compass,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -49,6 +49,7 @@ export const roleNav: Record<NavRole, NavItem[]> = {
         { label: "Assignments", href: "/teacher/assignments", section: "Coursework", icon: I(ClipboardList) },
         { label: "Grades", href: "/teacher/grades", icon: I(BarChart3) },
         { label: "Exams", href: "/teacher/exams", icon: I(FileText) },
+        { label: "Live exam monitor", href: "/teacher/exam-monitor", icon: I(ShieldAlert) },
         { label: "Materials", href: "/teacher/materials", icon: I(FolderOpen) },
         { label: "Announcements", href: "/teacher/announcements", section: "Communication", icon: I(Megaphone) },
         { label: "Notifications", href: "/teacher/notifications", icon: I(Bell) },
@@ -61,6 +62,7 @@ export const roleNav: Record<NavRole, NavItem[]> = {
         { label: "Dashboard", href: "/student/dashboard", section: "Main", icon: I(LayoutDashboard) },
         { label: "Courses", href: "/student/courses", icon: I(BookOpen) },
         { label: "Curriculum", href: "/student/curriculum", icon: I(ListChecks) },
+        { label: "Learning path", href: "/student/learning-path", icon: I(Compass) },
         { label: "Assignments", href: "/student/assignments", section: "Coursework", icon: I(ClipboardList) },
         { label: "Exams", href: "/student/exams", icon: I(FileText) },
         { label: "Grades", href: "/student/grades", icon: I(BarChart3) },

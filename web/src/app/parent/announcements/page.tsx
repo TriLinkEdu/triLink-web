@@ -1,6 +1,7 @@
 "use client";
-import { ParentAnnouncementsPage } from "@/components/PortalMvpPages";
 
-export default function Page() {
-    return <ParentAnnouncementsPage />;
+import { AnnouncementsKitPage } from "@/components/kit";
+
+export default function ParentAnnouncementsPage() {
+    return <AnnouncementsKitPage role="parent" />;
 }

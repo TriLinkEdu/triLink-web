@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, CalendarDays, GraduationCap, RefreshCcw, Sparkles, UserRoundCheck } from "lucide-react";
-import { Search } from "lucide-react";
-import Select from "@/components/Select";
+import { KitSelect, KitDialog, KitToast, KitInput } from "@/components/kit/local";
+import {
+  Icon as KitIcon,
+  PageHead as KitPageHead,
+  Pill,
+  StatGrid as KitStatGrid,
+  StatTile as KitStatTile,
+} from "@/components/kit";
 import TablePagination from "@/components/TablePagination";
+import { useConfirm } from "@/hooks/useConfirm";
 import {
   type AcademicYear,
   type ClassOffering,
@@ -69,6 +75,7 @@ function ClassesSkeleton() {
 }
 
 export default function AdminClasses() {
+  const { confirm, element: confirmEl } = useConfirm();
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [yearId, setYearId] = useState<string>("");
   const [offerings, setOfferings] = useState<ClassOffering[]>([]);
@@ -93,8 +100,17 @@ export default function AdminClasses() {
   });
   const [editTeacherId, setEditTeacherId] = useState("");
 
-  
-  const filteredOfferings = offerings.filter(o => {
+  const showT = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const gMap = useMemo(() => new Map(grades.map((x) => [x.id, x])), [grades]);
+  const sMap = useMemo(() => new Map(sections.map((x) => [x.id, x])), [sections]);
+  const subMap = useMemo(() => new Map(subjects.map((x) => [x.id, x])), [subjects]);
+  const tMap = useMemo(() => new Map(teachers.map((x) => [x.id, x])), [teachers]);
+
+  const filteredOfferings = offerings.filter((o) => {
     if (!filterText.trim()) return true;
     const q = filterText.toLowerCase();
     const label = labelOffering(o, gMap, sMap, subMap).toLowerCase();
@@ -108,17 +124,6 @@ export default function AdminClasses() {
   const startIdx = currentPage * rowsPerPage;
   const endIdx = Math.min(startIdx + rowsPerPage, total);
   const visibleRows = filteredOfferings.slice(startIdx, endIdx);
-
-
-  const showT = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3200);
-  };
-
-  const gMap = useMemo(() => new Map(grades.map((x) => [x.id, x])), [grades]);
-  const sMap = useMemo(() => new Map(sections.map((x) => [x.id, x])), [sections]);
-  const subMap = useMemo(() => new Map(subjects.map((x) => [x.id, x])), [subjects]);
-  const tMap = useMemo(() => new Map(teachers.map((x) => [x.id, x])), [teachers]);
 
   const loadCore = useCallback(async () => {
     const [y, g, sec, subj, t] = await Promise.all([
@@ -217,7 +222,14 @@ export default function AdminClasses() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this class offering? Enrollments may block deletion on the server.")) return;
+    const ok = await confirm({
+      title: "Delete class offering?",
+      message:
+        "Existing enrollments may block deletion on the server. This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await deleteClassOffering(id);
       await loadOfferings(yearId);
@@ -263,145 +275,198 @@ export default function AdminClasses() {
   const assignedTeacherCount = new Set(offerings.map((o) => o.teacherId).filter(Boolean)).size;
 
   return (
-    <div className="page-wrapper">
-      {toast && (
+    <div className="kit-page" data-role="admin">
+      {toast ? <KitToast message={toast} /> : null}
+
+      <KitPageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Academic structure
+            <span className="dot-sep">·</span>
+            {activeYear?.label ?? "No active year"}
+          </>
+        }
+        title="Class offerings"
+        sub="Classes offered this year, with section, subject, and teacher assignment."
+        actions={
+          <button
+            type="button"
+            className="btn-kit btn-kit-primary"
+            onClick={openCreate}
+            disabled={!yearId}
+          >
+            <KitIcon name="plus" /> New offering
+          </button>
+        }
+      />
+
+      <KitStatGrid cols={4} className="!mb-[14px]">
+        <KitStatTile icon="book" label="Offerings" value={String(offerings.length)} note="current year classes" />
+        <KitStatTile icon="user" label="Assigned teachers" value={String(assignedTeacherCount)} note="unique faculty" />
+        <KitStatTile icon="cap" label="Students scope" value={years.length ? "Open" : "Pending"} note="enrollment-based" />
+        <KitStatTile icon="cal" label="Active year" value={activeYear?.label ?? "None"} note="switch below" />
+      </KitStatGrid>
+
+      {err ? (
         <div
+          role="alert"
+          className="k-card"
           style={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            zIndex: 9999,
-            background: "#fff",
-            borderRadius: 14,
-            padding: "1rem 1.5rem",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-            border: "1.5px solid var(--success)",
-            fontWeight: 600,
+            padding: "10px 14px",
+            background: "var(--color-danger-soft)",
+            borderColor: "rgba(196,53,84,0.18)",
+            color: "var(--color-danger)",
+            fontSize: 12.5,
+            marginBottom: 14,
           }}
         >
-          {toast}
-        </div>
-      )}
-
-      <div className="classes-hero">
-        <div>
-          <p className="classes-kicker">
-            <Sparkles size={14} />
-            Scheduling Hub
-          </p>
-          <h1 className="classes-title">Class offerings</h1>
-          <p className="classes-subtitle">Classes offered this year, with section, subject, and teacher assignment</p>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={openCreate} disabled={!yearId}>
-          + New offering
-        </button>
-      </div>
-
-      <div className="classes-summary-grid">
-        <div className="card classes-summary-card">
-          <div className="classes-summary-icon blue">
-            <BookOpen size={18} />
-          </div>
-          <div className="classes-summary-label">Offerings</div>
-          <div className="classes-summary-value">{offerings.length}</div>
-          <div className="classes-summary-note">Current year classes</div>
-        </div>
-        <div className="card classes-summary-card">
-          <div className="classes-summary-icon teal">
-            <UserRoundCheck size={18} />
-          </div>
-          <div className="classes-summary-label">Assigned teachers</div>
-          <div className="classes-summary-value">{assignedTeacherCount}</div>
-          <div className="classes-summary-note">Unique faculty assigned</div>
-        </div>
-        <div className="card classes-summary-card">
-          <div className="classes-summary-icon orange">
-            <GraduationCap size={18} />
-          </div>
-          <div className="classes-summary-label">Students scope</div>
-          <div className="classes-summary-value">{years.length ? "Open" : "Pending"}</div>
-          <div className="classes-summary-note">Based on class enrollments</div>
-        </div>
-        <div className="card classes-summary-card">
-          <div className="classes-summary-icon purple">
-            <CalendarDays size={18} />
-          </div>
-          <div className="classes-summary-label">Active year</div>
-          <div className="classes-summary-value classes-summary-small">{activeYear?.label ?? "None"}</div>
-          <div className="classes-summary-note">Switch or activate below</div>
-        </div>
-      </div>
-
-      {err && (
-        <div className="card" style={{ marginBottom: "1rem", color: "var(--danger)", padding: "1rem" }}>
           {err}
         </div>
-      )}
+      ) : null}
 
-      <div className="card classes-panel" style={{ marginBottom: "1rem" }}>
-        <label style={{ fontWeight: 600, display: "block", marginBottom: "0.5rem" }}>Academic year</label>
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-          <Select
-            value={yearId}
-            onChange={(e) => setYearId(e.target.value)}
-            style={{ padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", fontWeight: 600, minWidth: 220, outline: "none", cursor: "pointer" }}
-          >
-            {years.length === 0 && <option value="">No years — create one under School setup</option>}
+      {/* Filter toolbar */}
+      <div
+        className="k-card"
+        style={{
+          padding: 12,
+          marginBottom: 14,
+          display: "grid",
+          gridTemplateColumns: "minmax(220px, 1.4fr) 1fr auto",
+          gap: 10,
+          alignItems: "end",
+        }}
+      >
+        <div className="k-field">
+          <span className="k-field__label">Academic year</span>
+          <KitSelect value={yearId} onChange={(e) => setYearId(e.target.value)}>
+            {years.length === 0 && (
+              <option value="">No years — create one under School setup</option>
+            )}
             {years.map((y) => (
               <option key={y.id} value={y.id}>
                 {y.label}
                 {y.isActive ? " (active)" : ""}
               </option>
             ))}
-          </Select>
-          {yearId && (
-            <button type="button" className="btn btn-secondary" onClick={() => setYearActive(yearId)}>
-              <RefreshCcw size={14} />
-              Set as active year
-            </button>
-          )}
+          </KitSelect>
         </div>
+        <div className="k-field">
+          <span className="k-field__label">Search</span>
+          <div style={{ position: "relative" }}>
+            <KitIcon
+              name="search"
+              size={13}
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--ink-3)",
+                pointerEvents: "none",
+              }}
+            />
+            <KitInput
+              value={filterText}
+              onChange={(e) => {
+                setFilterText(e.target.value);
+                setPage(0);
+              }}
+              placeholder="Search by class label or teacher name"
+              style={{ paddingLeft: 30 }}
+            />
+          </div>
+        </div>
+        {yearId ? (
+          <button
+            type="button"
+            className="btn-kit btn-kit-secondary"
+            onClick={() => setYearActive(yearId)}
+            disabled={years.find((y) => y.id === yearId)?.isActive}
+          >
+            <KitIcon name="refresh" /> Set as active year
+          </button>
+        ) : (
+          <span />
+        )}
       </div>
 
-      <div className="card classes-panel">
-        <div className="classes-table-head">
-          <h3 className="card-title classes-section-title">Class list</h3>
-          <span className="admin-dash-chip">{offerings.length} total</span>
+      <section className="k-card">
+        <div className="k-card__head">
+          <div>
+            <div className="k-card__title">
+              <KitIcon name="book" /> Class list
+            </div>
+            <div className="k-card__sub">
+              {filterText.trim()
+                ? `${total} of ${offerings.length} match “${filterText}”`
+                : `${offerings.length} offering${offerings.length === 1 ? "" : "s"} this year`}
+            </div>
+          </div>
         </div>
-        <div className="table-wrapper">
-          <table>
+
+        <div style={{ overflowX: "auto" }}>
+          <table className="gtable">
             <thead>
               <tr>
                 <th>Class</th>
                 <th>Teacher</th>
-                <th />
+                <th style={{ width: 110 }}>Status</th>
+                <th style={{ textAlign: "right", width: 240 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {offerings.length === 0 ? (
+              {total === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ color: "var(--gray-500)", padding: "1.5rem" }}>
-                    No offerings for this year.
+                  <td colSpan={4} style={{ padding: 28, textAlign: "center", color: "var(--ink-3)" }}>
+                    {offerings.length === 0
+                      ? "No offerings for this year."
+                      : "No offerings match the current filter."}
                   </td>
                 </tr>
               ) : (
                 visibleRows.map((o) => {
                   const tn = tMap.get(o.teacherId);
                   const tname = tn ? `${tn.firstName} ${tn.lastName}` : "—";
+                  const hasTeacher = Boolean(o.teacherId && tn);
                   return (
                     <tr key={o.id}>
-                      <td style={{ fontWeight: 600 }}>{labelOffering(o, gMap, sMap, subMap)}</td>
+                      <td style={{ fontWeight: 500, color: "var(--ink)" }}>
+                        {labelOffering(o, gMap, sMap, subMap)}
+                      </td>
                       <td>{tname}</td>
-                      <td style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                        <Link href={`/admin/classes/${o.id}`} className="btn btn-secondary" style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem" }}>
-                          Enrollments
-                        </Link>
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: "0.8rem" }} onClick={() => openEditTeacher(o)}>
-                          Change teacher
-                        </button>
-                        <button type="button" className="btn btn-danger" style={{ fontSize: "0.8rem" }} onClick={() => handleDelete(o.id)}>
-                          Delete
-                        </button>
+                      <td>
+                        <Pill kind={hasTeacher ? "active" : "pending"}>
+                          {hasTeacher ? "Staffed" : "Unstaffed"}
+                        </Pill>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            gap: 6,
+                            justifyContent: "flex-end",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <Link href={`/admin/classes/${o.id}`} className="btn-kit btn-kit-ghost">
+                            <KitIcon name="users" /> Enrollments
+                          </Link>
+                          <button
+                            type="button"
+                            className="btn-kit btn-kit-ghost"
+                            onClick={() => openEditTeacher(o)}
+                          >
+                            <KitIcon name="edit" /> Teacher
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-kit btn-kit-danger-soft"
+                            onClick={() => handleDelete(o.id)}
+                          >
+                            <KitIcon name="trash" /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -410,92 +475,144 @@ export default function AdminClasses() {
             </tbody>
           </table>
         </div>
-      </div>
+        <TablePagination
+          total={total}
+          page={currentPage}
+          rowsPerPage={rowsPerPage}
+          onPageChange={setPage}
+          onRowsPerPageChange={(v) => {
+            setRowsPerPage(v);
+            setPage(0);
+          }}
+        />
+      </section>
 
-      {showModal && (
-        <div className="modal-overlay" style={{ zIndex: 9998, padding: "1rem" }}>
-          <div className="modal" style={{ maxWidth: 520, width: "100%", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }}>New class offering</h2>
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              <label>
-                Grade
-                <Select value={form.gradeId} onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
-                  {grades.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label>
-                Section
-                <Select value={form.sectionId} onChange={(e) => setForm((f) => ({ ...f, sectionId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
-                  {sections.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label>
-                Subject
-                <Select value={form.subjectId} onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label>
-                Teacher
-                <Select value={form.teacherId} onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.firstName} {t.lastName} ({t.email})
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label>
-                Optional label
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ width: "100%", marginTop: 4, padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }} placeholder="e.g. Advanced Math" />
-              </label>
-            </div>
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleCreate}>
-                Create
-              </button>
-            </div>
+      {showModal ? (
+        <KitDialog title="New class offering" onClose={() => setShowModal(false)}>
+          <div className="k-field">
+            <span className="k-field__label">Grade</span>
+            <KitSelect
+              value={form.gradeId}
+              onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))}
+            >
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </KitSelect>
           </div>
-        </div>
-      )}
+          <div className="k-field">
+            <span className="k-field__label">Section</span>
+            <KitSelect
+              value={form.sectionId}
+              onChange={(e) => setForm((f) => ({ ...f, sectionId: e.target.value }))}
+            >
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </KitSelect>
+          </div>
+          <div className="k-field">
+            <span className="k-field__label">Subject</span>
+            <KitSelect
+              value={form.subjectId}
+              onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))}
+            >
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </KitSelect>
+          </div>
+          <div className="k-field">
+            <span className="k-field__label">Teacher</span>
+            <KitSelect
+              value={form.teacherId}
+              onChange={(e) => setForm((f) => ({ ...f, teacherId: e.target.value }))}
+            >
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.firstName} {t.lastName} ({t.email})
+                </option>
+              ))}
+            </KitSelect>
+          </div>
+          <div className="k-field">
+            <span className="k-field__label">Optional label</span>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Advanced Math"
+            />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              justifyContent: "flex-end",
+              marginTop: 12,
+            }}
+          >
+            <button
+              type="button"
+              className="btn-kit btn-kit-secondary"
+              onClick={() => setShowModal(false)}
+            >
+              Cancel
+            </button>
+            <button type="button" className="btn-kit btn-kit-primary" onClick={handleCreate}>
+              <KitIcon name="plus" /> Create offering
+            </button>
+          </div>
+        </KitDialog>
+      ) : null}
 
-      {editId && (
-        <div className="modal-overlay" style={{ zIndex: 9998, padding: "1rem" }}>
-          <div className="modal" style={{ maxWidth: 420, width: "100%", padding: "2rem" }}>
-            <h2 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "1rem" }}>Assign teacher</h2>
-            <Select value={editTeacherId} onChange={(e) => setEditTeacherId(e.target.value)} style={{ width: "100%", padding: "0.6rem 1rem", borderRadius: "20px", border: "1px solid var(--primary-200)", background: "var(--primary-50)", color: "var(--primary-800)", outline: "none" }}>
+      {editId ? (
+        <KitDialog title="Assign teacher" onClose={() => setEditId(null)}>
+          <div className="k-field">
+            <span className="k-field__label">Teacher</span>
+            <KitSelect
+              value={editTeacherId}
+              onChange={(e) => setEditTeacherId(e.target.value)}
+            >
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.firstName} {t.lastName}
                 </option>
               ))}
-            </Select>
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditId(null)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-primary" onClick={saveEditTeacher}>
-                Save
-              </button>
-            </div>
+            </KitSelect>
           </div>
-        </div>
-      )}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              justifyContent: "flex-end",
+              marginTop: 12,
+            }}
+          >
+            <button
+              type="button"
+              className="btn-kit btn-kit-secondary"
+              onClick={() => setEditId(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-kit btn-kit-primary"
+              onClick={saveEditTeacher}
+            >
+              <KitIcon name="check" /> Save
+            </button>
+          </div>
+        </KitDialog>
+      ) : null}
+      {confirmEl}
     </div>
   );
 }
+

@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
+/**
+ * Internal mail relay for password-reset and registration-style emails.
+ *
+ * SECURITY:
+ *  - Requires `x-internal-secret` header to match SEND_EMAIL_SECRET env var.
+ *    Without that env var set, every request is rejected (default-deny).
+ *  - Naive in-memory IP rate limit (8 req / 5 min / IP) to slow obvious abuse.
+ *  - All payload fields are HTML-escaped before interpolation into the body.
+ *  - URLs in `href` attributes are validated to be http/https.
+ *
+ * TODO: in Plan F we plan to move all outbound mail to the backend and
+ * delete this Next route entirely.
+ */
+
 export interface RegistrationEmailPayload {
     emailType?: "registration" | "reset-password";
     to: string;
@@ -9,13 +23,58 @@ export interface RegistrationEmailPayload {
     role: "student" | "teacher" | "parent" | "admin";
     tempPassword?: string;
     resetLink?: string;
-    // role-specific extras
     grade?: string;
     section?: string;
     subject?: string;
     department?: string;
     childName?: string;
     relationship?: string;
+}
+
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const RATE_LIMIT_MAX = 8;
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = rateLimitStore.get(ip);
+    if (!entry || entry.resetAt < now) {
+        rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return true;
+    }
+    if (entry.count >= RATE_LIMIT_MAX) return false;
+    entry.count += 1;
+    return true;
+}
+
+function escapeHtml(value: unknown): string {
+    if (value == null) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function safeUrl(value: unknown, fallback = "#"): string {
+    const raw = typeof value === "string" ? value.trim() : "";
+    if (!raw) return fallback;
+    try {
+        const u = new URL(raw);
+        if (u.protocol !== "http:" && u.protocol !== "https:") return fallback;
+        return escapeHtml(u.toString());
+    } catch {
+        return fallback;
+    }
+}
+
+function isAllowedEmail(value: unknown): value is string {
+    return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+function isAllowedRole(value: unknown): value is RegistrationEmailPayload["role"] {
+    return value === "student" || value === "teacher" || value === "parent" || value === "admin";
 }
 
 function roleColor(role: string) {
@@ -26,25 +85,23 @@ function roleColor(role: string) {
 
 function buildRoleDetails(payload: RegistrationEmailPayload): string {
     const rows: [string, string][] = [];
-
     if (payload.role === "student") {
-        if (payload.grade) rows.push(["Grade", payload.grade]);
-        if (payload.section) rows.push(["Section", payload.section]);
+        if (payload.grade) rows.push(["Grade", escapeHtml(payload.grade)]);
+        if (payload.section) rows.push(["Section", escapeHtml(payload.section)]);
     } else if (payload.role === "teacher") {
-        if (payload.subject) rows.push(["Subject", payload.subject]);
-        if (payload.department) rows.push(["Department", payload.department]);
+        if (payload.subject) rows.push(["Subject", escapeHtml(payload.subject)]);
+        if (payload.department) rows.push(["Department", escapeHtml(payload.department)]);
     } else if (payload.role === "parent") {
-        if (payload.childName) rows.push(["Child's Name", payload.childName]);
-        if (payload.relationship) rows.push(["Relationship", payload.relationship]);
+        if (payload.childName) rows.push(["Child's Name", escapeHtml(payload.childName)]);
+        if (payload.relationship) rows.push(["Relationship", escapeHtml(payload.relationship)]);
     }
-
     return rows
         .map(
             ([label, value]) => `
         <tr>
           <td style="padding:10px 16px;color:#64748b;font-size:14px;font-weight:600;width:140px;">${label}</td>
           <td style="padding:10px 16px;color:#1e293b;font-size:14px;">${value}</td>
-        </tr>`
+        </tr>`,
         )
         .join("");
 }
@@ -52,6 +109,14 @@ function buildRoleDetails(payload: RegistrationEmailPayload): string {
 function buildEmailHtml(payload: RegistrationEmailPayload): string {
     const { primary, light, icon } = roleColor(payload.role);
     const roleLabel = payload.role.charAt(0).toUpperCase() + payload.role.slice(1);
+    const safe = {
+        to: escapeHtml(payload.to),
+        firstName: escapeHtml(payload.firstName ?? ""),
+        lastName: escapeHtml(payload.lastName ?? ""),
+        tempPassword: escapeHtml(payload.tempPassword ?? ""),
+        roleLabel: escapeHtml(roleLabel),
+        resetLink: safeUrl(payload.resetLink),
+    };
     const roleDetails = buildRoleDetails(payload);
 
     if (payload.emailType === "reset-password") {
@@ -85,7 +150,7 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
             <td style="background:${light};padding:32px 40px;border-bottom:1px solid #e2e8f0;">
               <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:#0f172a;">Reset Your Password</h1>
               <p style="margin:0;font-size:15px;color:#475569;line-height:1.6;">
-                We received a request to reset the password for the TriLink ${roleLabel} account associated with <strong>${payload.to}</strong>.
+                We received a request to reset the password for the TriLink ${safe.roleLabel} account associated with <strong>${safe.to}</strong>.
               </p>
             </td>
           </tr>
@@ -94,7 +159,7 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
               <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
                 Click the button below to reset your password. This link will expire in 30 minutes.
               </p>
-              <a href="${payload.resetLink || '#'}"
+              <a href="${safe.resetLink}"
                  style="display:inline-block;background:${primary};color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:10px;letter-spacing:0.3px;">
                 Reset Password
               </a>
@@ -115,7 +180,9 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
 </html>`;
     }
 
-    // Default: Registration Email
+    const frontendBase = (process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    const loginHref = safeUrl(`${frontendBase}/${payload.role}/login`, `${frontendBase}/login`);
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,8 +195,6 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
     <tr>
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,${primary},${primary}dd);padding:40px 40px 32px;">
               <table width="100%" cellpadding="0" cellspacing="0">
@@ -146,46 +211,40 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
               </table>
             </td>
           </tr>
-
-          <!-- Welcome Banner -->
           <tr>
             <td style="background:${light};padding:24px 40px;border-bottom:1px solid #e2e8f0;">
               <p style="margin:0;font-size:13px;font-weight:700;color:${primary};letter-spacing:1px;text-transform:uppercase;">Account Created</p>
               <h1 style="margin:6px 0 0;font-size:26px;font-weight:800;color:#0f172a;line-height:1.3;">
-                Welcome, ${payload.firstName}! 👋
+                Welcome, ${safe.firstName}!
               </h1>
               <p style="margin:10px 0 0;font-size:15px;color:#475569;line-height:1.6;">
-                Your <strong>${roleLabel}</strong> account has been successfully registered on TriLink. 
+                Your <strong>${safe.roleLabel}</strong> account has been successfully registered on TriLink.
                 Below are your account details and temporary login credentials.
               </p>
             </td>
           </tr>
-
-          <!-- Account Details -->
           <tr>
             <td style="padding:32px 40px 0;">
               <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Account Information</p>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
                 <tr style="border-bottom:1px solid #e2e8f0;">
                   <td style="padding:10px 16px;color:#64748b;font-size:14px;font-weight:600;width:140px;">Full Name</td>
-                  <td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;">${payload.firstName} ${payload.lastName}</td>
+                  <td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;">${safe.firstName} ${safe.lastName}</td>
                 </tr>
                 <tr style="border-bottom:1px solid #e2e8f0;">
                   <td style="padding:10px 16px;color:#64748b;font-size:14px;font-weight:600;">Email</td>
-                  <td style="padding:10px 16px;color:#1e293b;font-size:14px;">${payload.to}</td>
+                  <td style="padding:10px 16px;color:#1e293b;font-size:14px;">${safe.to}</td>
                 </tr>
                 <tr style="border-bottom:1px solid #e2e8f0;">
                   <td style="padding:10px 16px;color:#64748b;font-size:14px;font-weight:600;">Role</td>
                   <td style="padding:10px 16px;">
-                    <span style="background:${light};color:${primary};font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">${roleLabel}</span>
+                    <span style="background:${light};color:${primary};font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;">${safe.roleLabel}</span>
                   </td>
                 </tr>
                 ${roleDetails ? `<tr style="border-top:1px solid #e2e8f0;">${roleDetails}</tr>` : ""}
               </table>
             </td>
           </tr>
-
-          <!-- Credentials Box -->
           <tr>
             <td style="padding:24px 40px 0;">
               <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Login Credentials</p>
@@ -196,14 +255,14 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
                       <tr>
                         <td style="padding-bottom:14px;">
                           <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;">Email / Username</p>
-                          <p style="margin:0;font-size:15px;font-weight:600;color:#1e293b;">${payload.to}</p>
+                          <p style="margin:0;font-size:15px;font-weight:600;color:#1e293b;">${safe.to}</p>
                         </td>
                       </tr>
                       <tr>
                         <td>
                           <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;">Temporary Password</p>
                           <div style="display:inline-block;background:${primary};color:#ffffff;font-size:20px;font-weight:800;padding:10px 24px;border-radius:8px;letter-spacing:3px;font-family:monospace;">
-                            ${payload.tempPassword}
+                            ${safe.tempPassword}
                           </div>
                         </td>
                       </tr>
@@ -213,33 +272,27 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
               </table>
             </td>
           </tr>
-
-          <!-- Warning -->
           <tr>
             <td style="padding:20px 40px 0;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;">
                 <tr>
                   <td style="padding:14px 18px;">
                     <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6;">
-                      ⚠️ <strong>Important:</strong> This is a temporary password. You will be prompted to change it upon your first login. Please keep your credentials secure and do not share them.
+                      <strong>Important:</strong> This is a temporary password. You will be prompted to change it upon your first login. Please keep your credentials secure and do not share them.
                     </p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-
-          <!-- Login Button -->
           <tr>
             <td style="padding:28px 40px 0;text-align:center;">
-              <a href="${(process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "")}/${payload.role}/login"
+              <a href="${loginHref}"
                  style="display:inline-block;background:linear-gradient(135deg,${primary},${primary}cc);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:10px;letter-spacing:0.3px;">
-                Log In to Your Account →
+                Log In to Your Account
               </a>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="padding:32px 40px;text-align:center;border-top:1px solid #e2e8f0;margin-top:32px;">
               <p style="margin:0 0 6px;font-size:13px;color:#94a3b8;">
@@ -248,10 +301,9 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
               <p style="margin:0;font-size:12px;color:#cbd5e1;">
                 If you did not expect this account, please contact your school administrator.
               </p>
-              <p style="margin:16px 0 0;font-size:14px;font-weight:700;color:${primary};">TriLink • Educational Excellence</p>
+              <p style="margin:16px 0 0;font-size:14px;font-weight:700;color:${primary};">TriLink &middot; Educational Excellence</p>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
@@ -260,18 +312,54 @@ function buildEmailHtml(payload: RegistrationEmailPayload): string {
 </html>`;
 }
 
+function getClientIp(req: NextRequest): string {
+    const fwd = req.headers.get("x-forwarded-for");
+    if (fwd) return fwd.split(",")[0]!.trim();
+    return req.headers.get("x-real-ip") || "unknown";
+}
+
 export async function POST(req: NextRequest) {
+    const expectedSecret = process.env.SEND_EMAIL_SECRET;
+    if (!expectedSecret) {
+        return NextResponse.json(
+            { error: "Email relay disabled (SEND_EMAIL_SECRET is not configured)" },
+            { status: 503 },
+        );
+    }
+    const presented = req.headers.get("x-internal-secret");
+    if (presented !== expectedSecret) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const ip = getClientIp(req);
+    if (!rateLimit(ip)) {
+        return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
+    let payload: RegistrationEmailPayload;
     try {
-        const payload: RegistrationEmailPayload = await req.json();
+        payload = (await req.json()) as RegistrationEmailPayload;
+    } catch {
+        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-        if (payload.emailType === "reset-password") {
-            if (!payload.to) return NextResponse.json({ error: "Missing email" }, { status: 400 });
-        } else {
-            if (!payload.to || !payload.firstName || !payload.tempPassword) {
-                return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-            }
+    if (!isAllowedEmail(payload.to)) {
+        return NextResponse.json({ error: "Invalid recipient email" }, { status: 400 });
+    }
+    if (!isAllowedRole(payload.role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (payload.emailType === "reset-password") {
+        if (!payload.resetLink) {
+            return NextResponse.json({ error: "Missing resetLink" }, { status: 400 });
         }
+    } else {
+        if (!payload.firstName || !payload.tempPassword) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+    }
 
+    try {
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST ?? "smtp.gmail.com",
             port: Number(process.env.SMTP_PORT ?? 465),
@@ -282,9 +370,10 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        const title = payload.emailType === "reset-password"
-            ? `🔒 Reset Your Password - TriLink Security`
-            : `🎉 Welcome to TriLink – Your ${payload.role.charAt(0).toUpperCase() + payload.role.slice(1)} Account is Ready`;
+        const title =
+            payload.emailType === "reset-password"
+                ? "Reset Your Password - TriLink Security"
+                : `Welcome to TriLink - Your ${payload.role.charAt(0).toUpperCase() + payload.role.slice(1)} Account is Ready`;
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM ?? `"TriLink School System" <${process.env.SMTP_USER}>`,
@@ -298,7 +387,7 @@ export async function POST(req: NextRequest) {
         console.error("[send-email] Error:", err);
         return NextResponse.json(
             { error: err instanceof Error ? err.message : "Failed to send email" },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }

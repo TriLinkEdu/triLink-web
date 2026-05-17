@@ -1,6 +1,5 @@
-"use client";
-import { StudentCalendarPage } from "@/components/PortalMvpPages";
+import { CalendarKitPage } from "@/components/kit/calendar-kit";
 
-export default function Page() {
-    return <StudentCalendarPage />;
+export default function StudentCalendarPage() {
+    return <CalendarKitPage role="student" />;
 }

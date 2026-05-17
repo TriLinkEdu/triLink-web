@@ -7,6 +7,16 @@ import { authFetch, getStoredUser, setStoredUser } from "@/lib/auth";
 import { apiPath, getApiBase } from "@/lib/api";
 import AuthenticatedAvatar from "@/components/AuthenticatedAvatar";
 import { useToastStore } from "@/store/toastStore";
+import {
+  Icon,
+  KField,
+  KitErrorBanner,
+  KitInput,
+  KitLoadingBlock,
+  KitSpinner,
+  PageHead,
+  Pill,
+} from "@/components/kit";
 
 function roleLabel(role: string): string {
   switch (role) {
@@ -33,6 +43,7 @@ export default function AdminProfile() {
   const { showToast } = useToastStore();
   const [loading, setLoading] = useState(true);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const [curPwd, setCurPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -139,6 +150,8 @@ export default function AdminProfile() {
       setErr("Image must be 5MB or less.");
       return;
     }
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
     try {
       setAvatarUploading(true);
       const uploaded = await uploadProfileImage(file);
@@ -158,63 +171,99 @@ export default function AdminProfile() {
     } finally {
       setAvatarUploading(false);
       e.target.value = "";
+      URL.revokeObjectURL(previewUrl);
+      setAvatarPreview(null);
     }
   };
 
   if (!stored?.id) {
     return (
-      <div className="page-wrapper">
-        <p style={{ color: "var(--gray-500)" }}>Not logged in.</p>
+      <div className="kit-page" data-role="admin">
+        <KitErrorBanner message="Not logged in." />
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-          <div style={{ width: "36px", height: "36px", border: "3px solid var(--gray-200)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-          <div style={{ color: "var(--gray-500)", fontWeight: 500 }}>Loading profile...</div>
-          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        </div>
+      <div className="kit-page" data-role="admin">
+        <KitLoadingBlock label="Loading profile…" />
       </div>
     );
   }
 
   const initials = `${firstName[0] ?? "?"}${lastName[0] ?? ""}`.toUpperCase();
-  const memberSince = u?.createdAt ? new Date(u.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
+  const memberSince = u?.createdAt
+    ? new Date(u.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
 
   return (
-    <div className="page-wrapper">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Your profile</h1>
-          <p className="page-subtitle">Contact details and account security</p>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={saveProfile}>
-          Save changes
-        </button>
-      </div>
-      {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
+    <div className="kit-page" data-role="admin">
+      <PageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Account
+            <span className="dot-sep">·</span>
+            {u?.role ?? "admin"}
+          </>
+        }
+        title="Your profile"
+        sub="Contact details and account security."
+        actions={
+          <button type="button" className="btn-kit btn-kit-primary" onClick={saveProfile}>
+            <Icon name="check" /> Save changes
+          </button>
+        }
+      />
+      {err && <KitErrorBanner message={err} />}
 
-      <div className="content-grid" style={{ alignItems: "start" }}>
-        <div
-          className="card"
-          style={{
-            padding: "1.75rem",
-            background: "linear-gradient(160deg, #f5f3ff 0%, #fff 45%, #eef2ff 100%)",
-            border: "1px solid #e9d5ff",
-          }}
-        >
-          <AuthenticatedAvatar
-            fileId={u?.profileImageFileId}
-            initials={initials}
-            size={88}
-            alt="Profile"
-            style={{ margin: "0 auto 1rem", border: "3px solid #ddd6fe" }}
-          />
-          <div style={{ textAlign: "center" }}>
-            <label style={{ display: "inline-flex", margin: "0 auto 0.75rem", cursor: avatarUploading ? "not-allowed" : "pointer" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 280px) minmax(0, 1fr)",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        {/* Identity card */}
+        <div className="k-card" style={{ padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="Avatar preview"
+                width={84}
+                height={84}
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "1px solid var(--color-hairline)",
+                }}
+              />
+            ) : (
+              <AuthenticatedAvatar
+                fileId={u?.profileImageFileId}
+                initials={initials}
+                size={84}
+                alt="Profile"
+                style={{ border: "1px solid var(--color-hairline)" }}
+              />
+            )}
+          </div>
+          <div style={{ textAlign: "center", marginBottom: 12 }}>
+            <label
+              style={{
+                display: "inline-flex",
+                cursor: avatarUploading ? "not-allowed" : "pointer",
+              }}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -222,85 +271,167 @@ export default function AdminProfile() {
                 disabled={avatarUploading}
                 style={{ display: "none" }}
               />
-              <span className="btn btn-secondary btn-sm">{avatarUploading ? "Uploading…" : "Upload photo"}</span>
+              <span className="btn-kit btn-kit-secondary">
+                {avatarUploading ? (
+                  <>
+                    <KitSpinner size={11} /> Uploading…
+                  </>
+                ) : (
+                  <>
+                    <Icon name="upload" /> Upload photo
+                  </>
+                )}
+              </span>
             </label>
           </div>
-          <h2 style={{ fontSize: "1.35rem", fontWeight: 800, textAlign: "center", margin: "0 0 0.35rem" }}>
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 500,
+              letterSpacing: "-0.016em",
+              textAlign: "center",
+              margin: "0 0 2px",
+              color: "var(--ink)",
+            }}
+          >
             {firstName} {lastName}
           </h2>
-          <p style={{ color: "var(--gray-600)", fontSize: "0.9rem", textAlign: "center", margin: "0 0 0.75rem" }}>{u?.email}</p>
-          <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                padding: "0.35rem 0.75rem",
-                borderRadius: 999,
-                background: "#ede9fe",
-                color: "#5b21b6",
-              }}
-            >
-              {roleLabel(stored.role ?? "admin")}
-            </span>
+          <p
+            style={{
+              color: "var(--ink-2)",
+              fontSize: 12.5,
+              textAlign: "center",
+              margin: "0 0 10px",
+            }}
+          >
+            {u?.email}
+          </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 6,
+              flexWrap: "wrap",
+              marginBottom: 14,
+            }}
+          >
+            <Pill kind="neutral">{roleLabel(stored.role ?? "admin")}</Pill>
             {memberSince && (
-              <span style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>Member since {memberSince}</span>
+              <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+                Member since {memberSince}
+              </span>
             )}
           </div>
-          <p style={{ fontSize: "0.85rem", color: "var(--gray-600)", marginTop: "1.25rem", textAlign: "center", lineHeight: 1.5 }}>
-            This is the account you use to manage the school. Keep your password private and update your phone so staff can reach you if needed.
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--ink-2)",
+              margin: "0 0 14px",
+              textAlign: "center",
+              lineHeight: 1.55,
+            }}
+          >
+            This is the account you use to manage the school. Keep your password private and
+            update your phone so staff can reach you if needed.
           </p>
-          <div style={{ marginTop: "1.25rem", textAlign: "center" }}>
-            <Link href="/admin/settings" className="btn btn-secondary" style={{ fontSize: "0.875rem" }}>
-              School &amp; display settings
+          <div style={{ textAlign: "center" }}>
+            <Link href="/admin/settings" className="btn-kit btn-kit-ghost">
+              <Icon name="settings" /> School &amp; display settings
             </Link>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: "1rem" }}>
-              Contact information
-            </h3>
-            <div style={{ display: "grid", gap: "0.85rem", maxWidth: 420 }}>
-              <label>
-                First name
-                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
-              <label>
-                Last name
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
-              <label>
-                Phone
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+251…" style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
+        {/* Forms column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="k-card">
+            <div className="k-card__head">
+              <div className="k-card__title">Contact information</div>
+              <div className="k-card__sub">Your name and phone shown to staff.</div>
+            </div>
+            <div
+              className="k-card__body"
+              style={{ display: "grid", gap: 10, maxWidth: 480 }}
+            >
+              <KField label="First name">
+                <KitInput
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                />
+              </KField>
+              <KField label="Last name">
+                <KitInput
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                />
+              </KField>
+              <KField label="Phone" hint="Use the international format, e.g. +251 911 234 567.">
+                <KitInput
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+251 911 234 567"
+                  autoComplete="tel"
+                />
+              </KField>
             </div>
           </div>
 
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: "0.5rem" }}>
-              Password
-            </h3>
-            <p style={{ fontSize: "0.875rem", color: "var(--gray-600)", marginBottom: "1rem" }}>Use a strong password you do not use on other sites.</p>
-            {pwdErr && <p style={{ color: "var(--danger)", fontSize: "0.875rem", marginBottom: "0.75rem" }}>{pwdErr}</p>}
-            <form onSubmit={changePassword} style={{ display: "grid", gap: "0.75rem", maxWidth: 420 }}>
-              <label>
-                Current password
-                <input type="password" value={curPwd} onChange={(e) => setCurPwd(e.target.value)} autoComplete="current-password" style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
-              <label>
-                New password
-                <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} autoComplete="new-password" style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
-              <label>
-                Confirm new password
-                <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} autoComplete="new-password" style={{ display: "block", width: "100%", marginTop: 6, padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid var(--gray-200)" }} />
-              </label>
-              <button type="submit" className="btn btn-primary" disabled={pwdLoading}>
-                {pwdLoading ? "Updating…" : "Update password"}
-              </button>
+          <div className="k-card">
+            <div className="k-card__head">
+              <div className="k-card__title">Password</div>
+              <div className="k-card__sub">
+                Use a strong password you do not use on other sites.
+              </div>
+            </div>
+            <form
+              onSubmit={changePassword}
+              className="k-card__body"
+              style={{ display: "grid", gap: 10, maxWidth: 480 }}
+            >
+              {pwdErr && <KitErrorBanner message={pwdErr} />}
+              <KField label="Current password">
+                <KitInput
+                  type="password"
+                  value={curPwd}
+                  onChange={(e) => setCurPwd(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </KField>
+              <KField label="New password">
+                <KitInput
+                  type="password"
+                  value={newPwd}
+                  onChange={(e) => setNewPwd(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </KField>
+              <KField label="Confirm new password">
+                <KitInput
+                  type="password"
+                  value={confirmPwd}
+                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </KField>
+              <div>
+                <button
+                  type="submit"
+                  className="btn-kit btn-kit-primary"
+                  disabled={pwdLoading}
+                  style={{ justifyContent: "center" }}
+                >
+                  {pwdLoading ? (
+                    <>
+                      <KitSpinner size={11} /> Updating…
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="shield" /> Update password
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>

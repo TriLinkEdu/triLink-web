@@ -9,9 +9,11 @@ import {
 } from "@/lib/admin-api";
 import { getFileUrl, openFile } from "@/lib/api";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import Select from "@/components/Select";
+import { KitSelect } from "@/components/kit/local";
 import TablePagination from "@/components/TablePagination";
 import { cachedFetch } from "@/lib/cache";
+import { Icon as KitIcon, PageHead as KitPageHead } from "@/components/kit";
+import { useConfirm } from "@/hooks/useConfirm";
 
 function offeringLabel(o: ClassOffering) {
   const g = (o as any).gradeName || "";
@@ -34,6 +36,7 @@ function submissionBadge(s: AssignmentSubmission) {
 
 export default function TeacherAssignments() {
   useCurrentUser("teacher");
+  const { confirm, element: confirmEl } = useConfirm();
   const [offerings, setOfferings] = useState<ClassOffering[]>([]);
   const [selectedClass, setSelectedClass] = useState("");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -130,7 +133,13 @@ export default function TeacherAssignments() {
   };
 
   const handleDelete = async (a: Assignment) => {
-    if (!confirm(`Delete "${a.title}"?`)) return;
+    const ok = await confirm({
+      title: "Delete assignment?",
+      message: `“${a.title}” will be permanently removed.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     try { await deleteAssignment(a.id); showToast("Deleted"); await loadAssignments(selectedClass); }
     catch (e) { showToast(e instanceof Error ? e.message : "Failed", false); }
   };
@@ -182,29 +191,32 @@ export default function TeacherAssignments() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="page-header" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
-        <div>
-          <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            Assignments
-          </h1>
-          <p className="page-subtitle">Create, publish, and grade student assignments</p>
-        </div>
-        <button className="btn btn-primary" onClick={openCreate} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Assignment
-        </button>
-      </div>
+      <KitPageHead
+        meta={
+          <>
+            <span className="role-dot" />
+            Teaching
+            <span className="dot-sep">·</span>
+            {assignments.length} active
+          </>
+        }
+        title="Assignments"
+        sub="Create, publish, and grade student assignments."
+        actions={
+          <button type="button" className="btn-kit btn-kit-primary" onClick={openCreate}>
+            <KitIcon name="plus" /> New assignment
+          </button>
+        }
+      />
 
       {/* Class filter */}
       <div className="card" style={{ marginBottom: "1.25rem", padding: "0.85rem 1.25rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
           <label style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--gray-600)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Class</label>
-          <Select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={{ padding: "0.45rem 0.75rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.9rem", background: "#fff", minWidth: 200 }}>
+          <KitSelect value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={{ padding: "0.45rem 0.75rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.9rem", background: "#fff", minWidth: 200 }}>
             <option value="">All my classes</option>
             {offerings.map(o => <option key={o.id} value={o.id}>{offeringLabel(o)}</option>)}
-          </Select>
+          </KitSelect>
         </div>
       </div>
 
@@ -227,11 +239,11 @@ export default function TeacherAssignments() {
               </div>
               <div className="input-group">
                 <label>Submission Type</label>
-                <Select value={form.submissionType} onChange={e => setForm(f => ({ ...f, submissionType: e.target.value as SubmissionType }))} style={{ padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.9rem", background: "#fff", width: "100%" }}>
+                <KitSelect value={form.submissionType} onChange={e => setForm(f => ({ ...f, submissionType: e.target.value as SubmissionType }))} style={{ padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.9rem", background: "#fff", width: "100%" }}>
                   <option value="file">File Upload</option>
                   <option value="text">Text Response</option>
                   <option value="none">No Submission (Info only)</option>
-                </Select>
+                </KitSelect>
               </div>
               <div className="input-group">
                 <label>Max Score</label>
@@ -408,7 +420,7 @@ export default function TeacherAssignments() {
                       <>
                         <button className="btn btn-secondary btn-sm" onClick={() => openEdit(a)}>Edit</button>
                         <button className="btn btn-primary btn-sm" onClick={() => handlePublish(a)}>Publish</button>
-                        <button className="btn btn-sm" style={{ background: "var(--danger-light)", color: "var(--danger)", border: "none", cursor: "pointer", borderRadius: 4, padding: "0.3rem 0.6rem", fontSize: "0.8rem" }} onClick={() => handleDelete(a)}>Delete</button>
+                        <button type="button" className="btn-kit btn-kit-danger" onClick={() => handleDelete(a)}>Delete</button>
                       </>
                     ) : (
                       <button className="btn btn-secondary btn-sm" onClick={() => handleUnpublish(a)}>Unpublish</button>
@@ -420,6 +432,7 @@ export default function TeacherAssignments() {
           })}
         </div>
       )}
+      {confirmEl}
     </div>
   );
 }
