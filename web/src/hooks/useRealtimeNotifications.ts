@@ -36,9 +36,22 @@ export function useRealtimeNotifications(userId?: string, userName?: string) {
         });
 
         const unsubError = chatRealtime.on("connection:error", (payload) => {
-             // Silence connection errors from auto-toasts to avoid annoyance, 
+             // Silence connection errors from auto-toasts to avoid annoyance,
              // but could be used for debugging.
              console.error("Realtime connection error:", payload.message);
+        });
+
+        // Exam proctoring events
+        const unsubViolation = chatRealtime.on("attempt:violation", (payload) => {
+            showToast(`⚠️ Exam violation: Student switched tabs or exited fullscreen`, 'error');
+        });
+
+        const unsubActivity = chatRealtime.on("attempt:activity", (payload) => {
+            if (payload.kind === 'submit') {
+                showToast(`✅ Exam submitted by student`, 'notification');
+            } else if (payload.kind === 'locked') {
+                showToast(`🔒 Student exam session locked due to violation`, 'error');
+            }
         });
 
         return () => {
@@ -46,6 +59,8 @@ export function useRealtimeNotifications(userId?: string, userName?: string) {
             unsubNotif();
             unsubAnnounce();
             unsubError();
+            unsubViolation();
+            unsubActivity();
         };
     }, [userId, userName]);
 
