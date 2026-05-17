@@ -12,7 +12,6 @@ import {
   Clock,
   Copy as CopyIcon,
   CornerUpRight,
-  Mic,
   MoreHorizontal,
   MessageSquareText,
   Paperclip,
@@ -245,17 +244,12 @@ export default function RestChat({ role: forcedRole }: RestChatProps) {
     try { return new Set<string>(JSON.parse(localStorage.getItem("chat:pinnedConvs") ?? "[]")); }
     catch { return new Set(); }
   });
-  // Image lightbox, scroll-to-bottom, drag-drop, voice recording
+  // Image lightbox, scroll-to-bottom, drag-drop
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string | null } | null>(null);
   const [scrolledUp, setScrolledUp] = useState(false);
   const [newSinceScroll, setNewSinceScroll] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordChunksRef = useRef<Blob[]>([]);
-  const recordTimerRef = useRef<number | null>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -820,54 +814,6 @@ export default function RestChat({ role: forcedRole }: RestChatProps) {
       n.onclick = () => { window.focus(); n.close(); };
       window.setTimeout(() => n.close(), 6000);
     } catch { /* ignore */ }
-  }
-
-  async function startVoiceRecord() {
-    if (isRecording) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Microphone is not available in this browser.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      recordChunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size > 0) recordChunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        const blob = new Blob(recordChunksRef.current, { type: mr.mimeType || "audio/webm" });
-        stream.getTracks().forEach((t) => t.stop());
-        if (recordTimerRef.current != null) { window.clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
-        setIsRecording(false);
-        setRecordingSeconds(0);
-        if (blob.size < 800) return; // discard near-empty
-        const ext = (mr.mimeType || "audio/webm").includes("mp4") ? "m4a" : "webm";
-        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
-        try {
-          setAttachmentUploading(true);
-          const uploaded = await uploadChatFile(file);
-          setPendingAttachment({ id: uploaded.id, filename: uploaded.filename, mime: uploaded.mime, path: uploaded.path });
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Unable to upload voice clip.");
-        } finally {
-          setAttachmentUploading(false);
-        }
-      };
-      mediaRecorderRef.current = mr;
-      mr.start();
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordTimerRef.current = window.setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Microphone permission denied.");
-    }
-  }
-
-  function stopVoiceRecord(send: boolean) {
-    const mr = mediaRecorderRef.current;
-    if (!mr) return;
-    if (!send) recordChunksRef.current = [];
-    try { mr.stop(); } catch { /* ignore */ }
-    mediaRecorderRef.current = null;
   }
 
   async function handleEditMessage(messageId: string) {
@@ -1476,41 +1422,22 @@ export default function RestChat({ role: forcedRole }: RestChatProps) {
                 }}
               />
               <button
-                type="button"
-                className="chat-compose-icon-btn"
-                aria-label="Emoji picker"
-                onClick={() => setEmojiPickerOpen((value) => !value)}
-                disabled={conversationIsBlocked}
-              >
-                🙂
-              </button>
-              <button
-                type="button"
-                className="chat-compose-icon-btn"
-                aria-label="Attach file"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={attachmentUploading || conversationIsBlocked}
-              >
-                <Paperclip size={18} />
-              </button>
-              {isRecording ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0.4rem 0.7rem", borderRadius: 999, background: "#fee2e2", border: "1px solid #fecaca", color: "#b91c1c", fontWeight: 700, fontSize: "0.82rem" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#dc2626", animation: "pulse 1.5s ease-in-out infinite" }} />
-                  Recording {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}
-                  <button type="button" onClick={() => stopVoiceRecord(false)} aria-label="Cancel recording" style={{ border: "none", background: "transparent", cursor: "pointer", color: "#b91c1c" }}><X size={14} /></button>
-                  <button type="button" onClick={() => stopVoiceRecord(true)} aria-label="Send voice" style={{ border: "none", background: "#dc2626", color: "#fff", cursor: "pointer", width: 28, height: 28, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Square size={12} fill="#fff" /></button>
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        if (activeConversationId) {
+                          setDraft(activeConversationId, `${drafts[activeConversationId] ?? ""}${drafts[activeConversationId] ? " " : ""}${emoji}`);
+                        }
+                        setEmojiPickerOpen(false);
+                      }}
+                      style={{ borderRadius: 999, padding: "0.2rem 0.5rem" }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  className="chat-compose-icon-btn"
-                  aria-label="Record voice message"
-                  title="Record voice"
-                  onClick={() => void startVoiceRecord()}
-                  disabled={attachmentUploading || conversationIsBlocked}
-                >
-                  <Mic size={18} />
-                </button>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
                 {replyTarget && (
