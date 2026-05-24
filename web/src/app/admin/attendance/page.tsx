@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck2, CalendarDays, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
+import { CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
 import Select from "@/components/Select";
 import {
   type AttendanceMark,
@@ -22,6 +22,7 @@ import {
 import { PageHeader, PageHeaderSkeleton, StatGridSkeleton, TableSkeleton } from "@/components/ui";
 
 const STATUSES = ["present", "absent", "excused"];
+const ROWS_OPTIONS = [5, 10, 20, 50];
 
 function AttendanceSkeleton() {
   return (
@@ -53,6 +54,10 @@ export default function AdminAttendance() {
   const [savingMarks, setSavingMarks] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Pagination state
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const studentMap = new Map(students.map((s) => [s.id, s]));
 
@@ -171,6 +176,9 @@ export default function AdminAttendance() {
     };
   }, [sessionId]);
 
+  // Reset pagination when session or rows change
+  useEffect(() => { setCurrentPage(1); }, [sessionId, rowsPerPage]);
+
   const markForStudent = (studentId: string) => marks.find((m) => m.studentId === studentId)?.status ?? "";
 
   const saveMarks = async () => {
@@ -207,14 +215,12 @@ export default function AdminAttendance() {
     });
   };
 
-  const activeYearLabel = years.find((y) => y.id === yearId)?.label ?? "None";
+  const activeYear = years.find((y) => y.id === yearId);
 
   // Summary stats — based on ALL sessions in the report (not just the selected session)
-  // This gives aggregate stats for the selected grade/section/class
   const totalSessions = report?.sessions.length ?? 0;
   const totalEnrolled = enrolled.length;
 
-  // Aggregate present rate across all sessions
   const { totalPresent, totalMarks } = useMemo(() => {
     if (!report) return { totalPresent: 0, totalMarks: 0 };
     let present = 0;
@@ -271,9 +277,20 @@ export default function AdminAttendance() {
     ),
   [offerings, filterGrade, filterSection, filterSubject]);
 
+  // Pagination helpers
+  const totalPages = Math.max(1, Math.ceil(enrolled.length / rowsPerPage));
+  const pagedEnrolled = enrolled.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
   if (loading && years.length === 0) {
     return <AttendanceSkeleton />;
   }
+
+  const statusColor = (status: string) => {
+    if (status === "present") return { bg: "var(--success-light)", color: "#065f46" };
+    if (status === "absent")  return { bg: "var(--danger-light)",  color: "#991b1b" };
+    if (status === "excused") return { bg: "var(--warning-light)", color: "#92400e" };
+    return { bg: "var(--gray-100)", color: "var(--gray-600)" };
+  };
 
   return (
     <div className="page-wrapper">
@@ -285,15 +302,71 @@ export default function AdminAttendance() {
       />
       {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
 
+      {/* ── Stat cards ── */}
       <div className="stats-grid admin-dash-stats-grid">
-        <div className="stat-card admin-dash-stat-card">
+
+        {/* Academic Year — rich card */}
+        <div className="stat-card admin-dash-stat-card" style={{ gridColumn: "span 1", position: "relative", overflow: "hidden" }}>
+          {/* decorative gradient blob */}
+          <div style={{
+            position: "absolute", top: -18, right: -18,
+            width: 80, height: 80,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, var(--primary-200), var(--primary-400))",
+            opacity: 0.18,
+            pointerEvents: "none",
+          }} />
           <div className="stat-icon admin-dash-stat-icon blue">
             <CalendarDays size={20} />
           </div>
-          <div className="stat-info">
-            <div className="stat-label admin-dash-stat-label">Academic year</div>
-            <div className="stat-value" style={{ fontSize: "1.2rem" }}>{activeYearLabel}</div>
-            <div className="admin-dash-stat-note">Selected scope</div>
+          <div className="stat-info" style={{ flex: 1, minWidth: 0 }}>
+            <div className="stat-label admin-dash-stat-label">Academic Year</div>
+            <div
+              className="stat-value"
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 700,
+                color: "var(--primary-800)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "100%",
+              }}
+              title={activeYear?.label ?? "None"}
+            >
+              {activeYear?.label ?? "None"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
+              {activeYear?.isActive && !activeYear?.isArchived && (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: "0.25rem",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "var(--radius-full)",
+                  background: "var(--success-light)",
+                  color: "#065f46",
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.03em",
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", display: "inline-block" }} />
+                  Active
+                </span>
+              )}
+              {activeYear?.isArchived && (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: "0.25rem",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "var(--radius-full)",
+                  background: "var(--gray-100)",
+                  color: "var(--gray-500)",
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                }}>
+                  Archived
+                </span>
+              )}
+              <span className="admin-dash-stat-note" style={{ margin: 0 }}>Selected scope</span>
+            </div>
           </div>
         </div>
 
@@ -333,6 +406,7 @@ export default function AdminAttendance() {
         </div>
       </div>
 
+      {/* ── Filters card ── */}
       <div className="card attendance-panel" style={{ marginBottom: "1rem", display: "grid", gap: "0.75rem", maxWidth: 520, position: "relative", zIndex: 100, overflow: "visible" }}>
         <label>
           Academic year
@@ -461,11 +535,11 @@ export default function AdminAttendance() {
       {classId && (
         <div className="card attendance-panel">
           <h3 className="card-title attendance-section-title" style={{ marginBottom: "0.75rem" }}>
-            Sessions & marks
+            Sessions &amp; marks
           </h3>
           {loadingClass ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "2rem 0", color: "var(--gray-600)" }}>
-              <div className="spinner" style={{ width: 20, height: 20, border: "2px solid var(--gray-300)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
+              <div className="spinner" style={{ width: 20, height: 20, border: "2px solid var(--gray-300)", borderTopColor: "var(--primary-500)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
               Loading sessions…
             </div>
           ) : sessions.length === 0 ? (
@@ -499,11 +573,66 @@ export default function AdminAttendance() {
                 <>
                   {loadingMarks ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "1.5rem 0", color: "var(--gray-600)" }}>
-                      <div className="spinner" style={{ width: 18, height: 18, border: "2px solid var(--gray-300)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
+                      <div className="spinner" style={{ width: 18, height: 18, border: "2px solid var(--gray-300)", borderTopColor: "var(--primary-500)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
                       Loading marks for this session…
                     </div>
                   ) : (
                     <>
+                      {/* ── Table toolbar ── */}
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "0.75rem",
+                        marginBottom: "0.75rem",
+                      }}>
+                        {/* Session mini-stats */}
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          {[
+                            { label: "Present", count: marks.filter(m => m.status === "present").length, bg: "var(--success-light)", color: "#065f46" },
+                            { label: "Absent",  count: marks.filter(m => m.status === "absent").length,  bg: "var(--danger-light)",  color: "#991b1b" },
+                            { label: "Excused", count: marks.filter(m => m.status === "excused").length, bg: "var(--warning-light)", color: "#92400e" },
+                          ].map(({ label, count, bg, color }) => (
+                            <span key={label} style={{
+                              display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                              padding: "0.25rem 0.65rem",
+                              borderRadius: "var(--radius-full)",
+                              background: bg, color,
+                              fontSize: "0.75rem", fontWeight: 700,
+                            }}>
+                              {label} <strong>{count}</strong>
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Rows per page */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                            Rows per page
+                          </span>
+                          <select
+                            value={rowsPerPage}
+                            onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                            style={{
+                              padding: "0.3rem 0.65rem",
+                              borderRadius: "var(--radius-full)",
+                              border: "1.5px solid var(--primary-200)",
+                              background: "var(--primary-50)",
+                              color: "var(--primary-800)",
+                              fontWeight: 600,
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                              outline: "none",
+                            }}
+                          >
+                            {ROWS_OPTIONS.map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                       <div style={{ position: "relative" }}>
                         {savingMarks && (
                           <div style={{
@@ -520,7 +649,7 @@ export default function AdminAttendance() {
                             color: "var(--primary-700)",
                             fontSize: "0.9rem",
                           }}>
-                            <div style={{ width: 18, height: 18, border: "2.5px solid var(--primary-200)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
+                            <div style={{ width: 18, height: 18, border: "2.5px solid var(--primary-200)", borderTopColor: "var(--primary-500)", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />
                             Saving marks…
                           </div>
                         )}
@@ -528,23 +657,62 @@ export default function AdminAttendance() {
                           <table>
                             <thead>
                               <tr>
+                                <th style={{ width: 40 }}>#</th>
                                 <th>Student</th>
                                 <th>Status</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {enrolled.map((e) => {
+                              {pagedEnrolled.map((e, idx) => {
                                 const st = studentMap.get(e.studentId);
                                 const cur = markForStudent(e.studentId) || "absent";
+                                const { bg, color } = statusColor(cur);
+                                const rowNum = (currentPage - 1) * rowsPerPage + idx + 1;
                                 return (
                                   <tr key={e.studentId}>
-                                    <td>{st ? `${st.firstName} ${st.lastName}` : e.studentId}</td>
+                                    <td style={{ color: "var(--gray-400)", fontWeight: 500, fontSize: "0.78rem" }}>{rowNum}</td>
                                     <td>
-                                      <Select value={cur} onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)} style={{ padding: "0.35rem" }} disabled={savingMarks}>
-                                        {STATUSES.map((s) => (
-                                          <option key={s} value={s}>{s}</option>
-                                        ))}
-                                      </Select>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                        {/* Initials avatar */}
+                                        <div style={{
+                                          width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                                          background: "linear-gradient(135deg, var(--primary-500), var(--primary-700))",
+                                          display: "flex", alignItems: "center", justifyContent: "center",
+                                          color: "#fff", fontSize: "0.65rem", fontWeight: 700,
+                                        }}>
+                                          {st ? `${st.firstName[0]}${st.lastName[0]}`.toUpperCase() : "??"}
+                                        </div>
+                                        <span style={{ fontWeight: 500 }}>
+                                          {st ? `${st.firstName} ${st.lastName}` : e.studentId}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                        <span style={{
+                                          display: "inline-block",
+                                          padding: "0.2rem 0.6rem",
+                                          borderRadius: "var(--radius-full)",
+                                          background: bg, color,
+                                          fontSize: "0.72rem", fontWeight: 700,
+                                          minWidth: 58, textAlign: "center",
+                                          textTransform: "capitalize",
+                                          pointerEvents: "none",
+                                          userSelect: "none",
+                                        }}>
+                                          {cur}
+                                        </span>
+                                        <Select
+                                          value={cur}
+                                          onChange={(ev) => updateLocalMark(e.studentId, ev.target.value)}
+                                          disabled={savingMarks}
+                                          style={{ padding: "0.3rem 0.5rem", fontSize: "0.78rem" }}
+                                        >
+                                          {STATUSES.map((s) => (
+                                            <option key={s} value={s}>{s}</option>
+                                          ))}
+                                        </Select>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -553,6 +721,66 @@ export default function AdminAttendance() {
                           </table>
                         </div>
                       </div>
+
+                      {/* ── Pagination controls ── */}
+                      {totalPages > 1 && (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginTop: "0.9rem",
+                          flexWrap: "wrap",
+                          gap: "0.5rem",
+                        }}>
+                          <span style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>
+                            Showing {(currentPage - 1) * rowsPerPage + 1}–{Math.min(currentPage * rowsPerPage, enrolled.length)} of {enrolled.length} students
+                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: "0.3rem 0.55rem" }}
+                              disabled={currentPage === 1}
+                              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            >
+                              <ChevronLeft size={14} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                              <button
+                                key={page}
+                                type="button"
+                                onClick={() => setCurrentPage(page)}
+                                style={{
+                                  width: 30, height: 30,
+                                  borderRadius: "var(--radius-md)",
+                                  border: "none",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  cursor: "pointer",
+                                  background: page === currentPage
+                                    ? "linear-gradient(135deg, var(--primary-500), var(--primary-700))"
+                                    : "var(--gray-100)",
+                                  color: page === currentPage ? "#fff" : "var(--gray-600)",
+                                  transition: "all 150ms",
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                }}
+                              >
+                                {page}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: "0.3rem 0.55rem" }}
+                              disabled={currentPage === totalPages}
+                              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            >
+                              <ChevronRight size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <button
                         type="button"
                         className="btn btn-primary"

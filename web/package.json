@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node -e \"const fs=require('fs'),path=require('path'),{execSync}=require('child_process');const lp=path.join('.next','dev','lock');if(fs.existsSync(lp))fs.rmSync(lp,{force:true});try{const r=execSync('netstat -ano | findstr :3000',{encoding:'utf8'});const pid=[...new Set(r.trim().split('\\n').map(l=>l.trim().split(/\\s+/).pop()).filter(p=>p&&p!=='0'))];pid.forEach(p=>{try{execSync('taskkill /PID '+p+' /F',{stdio:'ignore'})}catch(_){}});if(pid.length)console.log('[dev] Freed port 3000 (PID '+pid.join(',')+').');}catch(_){}\" && next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

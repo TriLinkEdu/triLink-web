@@ -85,11 +85,11 @@ export default function AdminFeedback() {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case "open": return { bg: "#eff6ff", color: "#1d4ed8" };
-      case "in_progress": return { bg: "#fefce8", color: "#a16207" };
-      case "resolved": return { bg: "#f0fdf4", color: "#15803d" };
-      case "closed": return { bg: "#f3f4f6", color: "#374151" };
-      default: return { bg: "var(--gray-100)", color: "var(--gray-600)" };
+      case "open":        return { bg: "rgba(14,165,233,0.10)",  color: "#0284c7" };
+      case "in_progress": return { bg: "rgba(245,158,11,0.12)", color: "var(--warning, #d97706)" };
+      case "resolved":    return { bg: "rgba(16,185,129,0.10)", color: "var(--success, #059669)" };
+      case "closed":      return { bg: "var(--gray-100)",        color: "var(--gray-600)" };
+      default:            return { bg: "var(--gray-100)",        color: "var(--gray-600)" };
     }
   };
 
@@ -115,8 +115,8 @@ export default function AdminFeedback() {
                     borderRadius: 20,
                     fontSize: "0.72rem",
                     fontWeight: 700,
-                    background: "#ede9fe",
-                    color: "#6d28d9",
+                    background: "var(--primary-50, rgba(99,102,241,0.10))",
+                    color: "var(--primary-600, #4f46e5)",
                     textTransform: "capitalize",
                   }}>
                     {detailTicket.category}
@@ -201,7 +201,6 @@ export default function AdminFeedback() {
         title="Feedback tickets"
         subtitle="Tickets from students, teachers, and parents."
         icon={<MessageSquare size={22} />}
-        variant="light"
       />
       {err && <div className="card" style={{ color: "var(--danger)", marginBottom: "1rem" }}>{err}</div>}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>

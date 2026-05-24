@@ -113,8 +113,8 @@ export default function AiTutorChat() {
             <Sparkles size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-bold">TriLink AI Tutor</h2>
-            <p className="text-xs text-blue-500 font-medium">Always online to help you learn</p>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--gray-900)" }}>TriLink AI Tutor</h2>
+            <p style={{ fontSize: "0.75rem", color: "var(--primary-500)", fontWeight: 600, marginTop: 2 }}>Always online to help you learn</p>
           </div>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function AiTutorChat() {
       <div className="ai-messages-area" ref={scrollRef}>
         {messages.length === 0 && !loading && (
           <div className="ai-empty-state">
-            <Bot size={48} className="text-blue-200 mb-4" />
+            <Bot size={48} style={{ color: "var(--primary-200)", marginBottom: "1rem" }} />
             <h3>Hi {user?.firstName}!</h3>
             <p>I'm your personal AI tutor. Ask me anything about your lessons, or help with a specific topic!</p>
             <div className="ai-suggestions">
@@ -142,7 +142,7 @@ export default function AiTutorChat() {
               <div className="ai-message-content">{m.content}</div>
               {m.sources && m.sources.length > 0 && (
                 <div className="ai-message-sources">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Sources</p>
+                  <p style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--gray-400)", marginBottom: 4 }}>Sources</p>
                   {m.sources.map((s: any, i: number) => (
                     <div key={i} className="ai-source-tag">
                       {s.title || "Reference"}
@@ -163,7 +163,7 @@ export default function AiTutorChat() {
               <Bot size={18} />
             </div>
             <div className="ai-message-bubble loading">
-              <Loader2 className="animate-spin" size={18} />
+              <Loader2 style={{ animation: "spin 1s linear infinite" }} size={18} />
               <span>Thinking...</span>
             </div>
           </div>
@@ -188,203 +188,6 @@ export default function AiTutorChat() {
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-        .ai-tutor-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 120px);
-          background: #fff;
-          border-radius: 16px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-          overflow: hidden;
-          border: 1px solid var(--gray-200);
-        }
-        .ai-tutor-header {
-          padding: 1.25rem 1.5rem;
-          border-bottom: 1px solid var(--gray-100);
-          background: linear-gradient(to right, #fff, #f8faff);
-        }
-        .ai-bot-avatar {
-          width: 40px;
-          height: 40px;
-          background: linear-gradient(135deg, #3b82f6, #2563eb);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-        }
-        .ai-messages-area {
-          flex: 1;
-          overflow-y: auto;
-          padding: 1.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-          background: #fdfdfd;
-        }
-        .ai-message-row {
-          display: flex;
-          gap: 12px;
-          max-width: 85%;
-        }
-        .ai-message-row.user {
-          flex-direction: row-reverse;
-          align-self: flex-end;
-        }
-        .ai-message-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          background: var(--gray-100);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          margin-top: 4px;
-        }
-        .ai-message-row.assistant .ai-message-avatar {
-          background: #eff6ff;
-          color: #3b82f6;
-        }
-        .ai-message-bubble {
-          padding: 12px 16px;
-          border-radius: 16px;
-          font-size: 0.95rem;
-          line-height: 1.5;
-          position: relative;
-        }
-        .ai-message-row.assistant .ai-message-bubble {
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-top-left-radius: 4px;
-          color: #1f2937;
-        }
-        .ai-message-row.user .ai-message-bubble {
-          background: #3b82f6;
-          color: #fff;
-          border-top-right-radius: 4px;
-        }
-        .ai-message-time {
-          font-size: 0.7rem;
-          margin-top: 4px;
-          opacity: 0.6;
-        }
-        .ai-message-row.user .ai-message-time {
-          text-align: right;
-        }
-        .ai-message-bubble.loading {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #6b7280;
-        }
-        .ai-input-area {
-          padding: 1.25rem 1.5rem;
-          background: #fff;
-          border-top: 1px solid var(--gray-100);
-        }
-        .ai-input-wrapper {
-          display: flex;
-          gap: 12px;
-          background: #f3f4f6;
-          padding: 8px 8px 8px 16px;
-          border-radius: 12px;
-          align-items: center;
-          transition: all 0.2s;
-        }
-        .ai-input-wrapper:focus-within {
-          background: #fff;
-          box-shadow: 0 0 0 2px #3b82f633;
-          border: 1px solid #3b82f6;
-        }
-        .ai-input-wrapper input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          font-size: 0.95rem;
-          padding: 8px 0;
-        }
-        .ai-send-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--gray-200);
-          color: #fff;
-          border: none;
-          cursor: not-allowed;
-          transition: all 0.2s;
-        }
-        .ai-send-btn.active {
-          background: #3b82f6;
-          cursor: pointer;
-        }
-        .ai-send-btn.active:hover {
-          background: #2563eb;
-          transform: translateY(-1px);
-        }
-        .ai-empty-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          padding: 4rem 2rem;
-        }
-        .ai-empty-state h3 {
-          font-size: 1.5rem;
-          font-weight: 800;
-          margin-bottom: 0.5rem;
-          color: #111827;
-        }
-        .ai-empty-state p {
-          color: #6b7280;
-          max-width: 320px;
-          margin-bottom: 2rem;
-        }
-        .ai-suggestions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          justify-content: center;
-        }
-        .ai-suggestions button {
-          padding: 8px 16px;
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-radius: 20px;
-          font-size: 0.85rem;
-          color: #374151;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .ai-suggestions button:hover {
-          border-color: #3b82f6;
-          color: #3b82f6;
-          background: #eff6ff;
-        }
-        .ai-message-sources {
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px dashed #e5e7eb;
-        }
-        .ai-source-tag {
-          display: inline-block;
-          padding: 2px 8px;
-          background: #f9fafb;
-          border: 1px solid #f3f4f6;
-          border-radius: 4px;
-          font-size: 11px;
-          color: #6b7280;
-          margin-right: 4px;
-          margin-bottom: 4px;
-        }
-      `}</style>
     </div>
   );
 }

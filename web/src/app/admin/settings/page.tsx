@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Settings } from "lucide-react";
 import Select from "@/components/Select";
+import { PageHeader } from "@/components/ui";
 import {
   activateAcademicYear,
   getSchoolSettings,
@@ -132,12 +134,12 @@ export default function AdminSettings() {
 
   return (
     <div className="page-wrapper">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">School-wide defaults, your preferences, and the active academic year</p>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Configuration"
+        title="Settings"
+        subtitle="School-wide defaults, your preferences, and the active academic year."
+        icon={<Settings size={22} />}
+      />
 
       {err && (
         <div className="card" style={{ display: "flex", alignItems: "center", gap: 8, padding: "0.8rem 1.2rem", background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", fontWeight: 700, borderRadius: 12, marginBottom: "1.2rem", fontSize: "0.88rem" }}>
