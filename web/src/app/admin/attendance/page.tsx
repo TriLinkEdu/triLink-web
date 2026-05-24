@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
+import { CalendarCheck2, CalendarDays, ClipboardCheck, RefreshCcw, Sparkles, Users } from "lucide-react";
 import Select from "@/components/Select";
+import TablePagination from "@/components/TablePagination";
 import {
   type AttendanceMark,
   type AttendanceSession,
@@ -278,7 +279,6 @@ export default function AdminAttendance() {
   [offerings, filterGrade, filterSection, filterSubject]);
 
   // Pagination helpers
-  const totalPages = Math.max(1, Math.ceil(enrolled.length / rowsPerPage));
   const pagedEnrolled = enrolled.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   if (loading && years.length === 0) {
@@ -606,31 +606,6 @@ export default function AdminAttendance() {
                           ))}
                         </div>
 
-                        {/* Rows per page */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 500, whiteSpace: "nowrap" }}>
-                            Rows per page
-                          </span>
-                          <select
-                            value={rowsPerPage}
-                            onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                            style={{
-                              padding: "0.3rem 0.65rem",
-                              borderRadius: "var(--radius-full)",
-                              border: "1.5px solid var(--primary-200)",
-                              background: "var(--primary-50)",
-                              color: "var(--primary-800)",
-                              fontWeight: 600,
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              outline: "none",
-                            }}
-                          >
-                            {ROWS_OPTIONS.map(n => (
-                              <option key={n} value={n}>{n}</option>
-                            ))}
-                          </select>
-                        </div>
                       </div>
 
                       <div style={{ position: "relative" }}>
@@ -722,64 +697,17 @@ export default function AdminAttendance() {
                         </div>
                       </div>
 
-                      {/* ── Pagination controls ── */}
-                      {totalPages > 1 && (
-                        <div style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginTop: "0.9rem",
-                          flexWrap: "wrap",
-                          gap: "0.5rem",
-                        }}>
-                          <span style={{ fontSize: "0.8rem", color: "var(--gray-500)" }}>
-                            Showing {(currentPage - 1) * rowsPerPage + 1}–{Math.min(currentPage * rowsPerPage, enrolled.length)} of {enrolled.length} students
-                          </span>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: "0.3rem 0.55rem" }}
-                              disabled={currentPage === 1}
-                              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            >
-                              <ChevronLeft size={14} />
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                              <button
-                                key={page}
-                                type="button"
-                                onClick={() => setCurrentPage(page)}
-                                style={{
-                                  width: 30, height: 30,
-                                  borderRadius: "var(--radius-md)",
-                                  border: "none",
-                                  fontWeight: 600,
-                                  fontSize: "0.78rem",
-                                  cursor: "pointer",
-                                  background: page === currentPage
-                                    ? "linear-gradient(135deg, var(--primary-500), var(--primary-700))"
-                                    : "var(--gray-100)",
-                                  color: page === currentPage ? "#fff" : "var(--gray-600)",
-                                  transition: "all 150ms",
-                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                }}
-                              >
-                                {page}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: "0.3rem 0.55rem" }}
-                              disabled={currentPage === totalPages}
-                              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            >
-                              <ChevronRight size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      <TablePagination
+                        total={enrolled.length}
+                        page={currentPage - 1}
+                        rowsPerPage={rowsPerPage}
+                        rowsPerPageOptions={[5, 10, 20, 50]}
+                        onPageChange={(newPage) => setCurrentPage(newPage + 1)}
+                        onRowsPerPageChange={(newRowsPerPage) => {
+                          setRowsPerPage(newRowsPerPage);
+                          setCurrentPage(1);
+                        }}
+                      />
 
                       <button
                         type="button"

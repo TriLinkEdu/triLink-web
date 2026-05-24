@@ -8,6 +8,7 @@ interface TablePaginationProps {
   rowsPerPage: number;
   onPageChange: (newPage: number) => void;
   onRowsPerPageChange: (newRowsPerPage: number) => void;
+  rowsPerPageOptions?: number[];
 }
 
 export default function TablePagination({
@@ -16,6 +17,7 @@ export default function TablePagination({
   rowsPerPage,
   onPageChange,
   onRowsPerPageChange,
+  rowsPerPageOptions = [5, 10, 25, 50],
 }: TablePaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
   const currentPage = Math.min(page, totalPages - 1);
@@ -58,7 +60,7 @@ export default function TablePagination({
             minWidth: "65px"
           }}
         >
-          {[5, 10, 25, 50].map((v) => (
+          {rowsPerPageOptions.map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </Select>
