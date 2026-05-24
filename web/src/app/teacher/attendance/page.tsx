@@ -429,21 +429,93 @@ export default function TeacherAttendance() {
                 )}
             />
 
-            <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {visibleClasses.map(off => (
-                        <button key={off.id} className={`btn ${selectedOfferingId === off.id ? "btn-primary" : "btn-secondary"}`} onClick={() => setSelectedOfferingId(off.id)}>
-                            {offeringLabel(off)}
-                            {hasSessionToday(off.id) ? " • Locked" : ""}
-                        </button>
-                    ))}
+            <div className="card" style={{ marginBottom: 16, padding: "1.25rem 1.5rem" }}>
+                <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
+                    {visibleClasses.map(off => {
+                        const isSelected = selectedOfferingId === off.id;
+                        return (
+                            <button
+                                key={off.id}
+                                onClick={() => setSelectedOfferingId(off.id)}
+                                style={{
+                                    borderRadius: "12px",
+                                    padding: "0.6rem 1.15rem",
+                                    fontSize: "0.85rem",
+                                    fontWeight: isSelected ? 700 : 600,
+                                    background: isSelected ? "linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%)" : "#fff",
+                                    color: isSelected ? "#fff" : "var(--gray-600)",
+                                    border: isSelected ? "none" : "1.5px solid var(--gray-200)",
+                                    cursor: "pointer",
+                                    boxShadow: isSelected ? "0 4px 12px rgba(37, 99, 235, 0.2)" : "none",
+                                    transition: "all 0.2s ease"
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.borderColor = "var(--primary-300)";
+                                        e.currentTarget.style.color = "var(--primary-700)";
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.borderColor = "var(--gray-200)";
+                                        e.currentTarget.style.color = "var(--gray-600)";
+                                    }
+                                }}
+                            >
+                                {offeringLabel(off)}
+                                {hasSessionToday(off.id) ? " • Locked" : ""}
+                            </button>
+                        );
+                    })}
                     {hiddenClasses.length > 0 && (
                         <div ref={moreRef} style={{ position: "relative" }}>
-                            <button className="btn btn-secondary" onClick={() => setShowMoreDropdown(v => !v)}>More</button>
+                            <button
+                                onClick={() => setShowMoreDropdown(v => !v)}
+                                style={{
+                                    borderRadius: "12px",
+                                    padding: "0.6rem 1.15rem",
+                                    fontSize: "0.85rem",
+                                    fontWeight: 600,
+                                    background: "#fff",
+                                    color: "var(--gray-600)",
+                                    border: "1.5px solid var(--gray-200)",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease"
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.borderColor = "var(--primary-300)";
+                                    e.currentTarget.style.color = "var(--primary-700)";
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.borderColor = "var(--gray-200)";
+                                    e.currentTarget.style.color = "var(--gray-600)";
+                                }}
+                            >
+                                More
+                            </button>
                             {showMoreDropdown && (
-                                <div className="card" style={{ position: "absolute", top: "110%", right: 0, zIndex: 50, minWidth: 240, padding: 8 }}>
+                                <div className="card" style={{ position: "absolute", top: "115%", right: 0, zIndex: 50, minWidth: 240, padding: 8, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", border: "1.5px solid var(--gray-100)" }}>
                                     {hiddenClasses.map(off => (
-                                        <button key={off.id} className="btn btn-secondary" style={{ width: "100%", justifyContent: "flex-start", marginBottom: 6 }} onClick={() => { setSelectedOfferingId(off.id); setShowMoreDropdown(false); }}>
+                                        <button
+                                            key={off.id}
+                                            style={{
+                                                width: "100%",
+                                                justifyContent: "flex-start",
+                                                marginBottom: 6,
+                                                borderRadius: "8px",
+                                                padding: "0.5rem 0.85rem",
+                                                fontSize: "0.85rem",
+                                                background: "#fff",
+                                                border: "1.5px solid var(--gray-100)",
+                                                cursor: "pointer",
+                                                textAlign: "left",
+                                                color: "var(--gray-700)",
+                                                fontWeight: 600
+                                            }}
+                                            onClick={() => { setSelectedOfferingId(off.id); setShowMoreDropdown(false); }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = "var(--gray-50)")}
+                                            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                                        >
                                             {offeringLabel(off)}
                                         </button>
                                     ))}
@@ -454,16 +526,39 @@ export default function TeacherAttendance() {
                 </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                    <div><div style={{ fontSize: 12, color: "var(--gray-500)" }}>Total</div><div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div></div>
-                    <div><div style={{ fontSize: 12, color: "var(--gray-500)" }}>Present</div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--success)" }}>{stats.present}</div></div>
-                    <div><div style={{ fontSize: 12, color: "var(--gray-500)" }}>Absent</div><div style={{ fontSize: 24, fontWeight: 700, color: "var(--danger)" }}>{stats.absent}</div></div>
-                    <div><div style={{ fontSize: 12, color: "var(--gray-500)" }}>Excused</div><div style={{ fontSize: 24, fontWeight: 700, color: "#d97706" }}>{stats.excused}</div></div>
-                </div>
-                <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                    <button className="btn btn-secondary" onClick={markAll} disabled={isLocked}>Toggle all present/absent</button>
-                    {isLocked && <span style={{ color: "var(--gray-500)" }}>Today's session is locked.</span>}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: 16 }}>
+                {[
+                    { label: "Total Students", value: stats.total, color: "var(--primary-700)", bg: "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)", border: "1.5px solid rgba(37,99,235,0.15)" },
+                    { label: "Present Today", value: stats.present, color: "#166534", bg: "linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)", border: "1.5px solid rgba(34,197,94,0.15)" },
+                    { label: "Absent Today", value: stats.absent, color: "#991b1b", bg: "linear-gradient(135deg, #ffffff 0%, #fef2f2 100%)", border: "1.5px solid rgba(239,68,68,0.15)" },
+                    { label: "Excused Today", value: stats.excused, color: "#b45309", bg: "linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)", border: "1.5px solid rgba(245,158,11,0.15)" },
+                ].map(item => (
+                    <div key={item.label} style={{
+                        background: item.bg,
+                        borderRadius: 16,
+                        padding: "1.25rem 1.5rem",
+                        border: item.border,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                        transition: "all 0.15s ease"
+                    }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{item.label}</div>
+                        <div style={{ fontSize: "1.85rem", fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.value}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="card" style={{ marginBottom: 16, padding: "1rem 1.5rem" }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <button className="btn btn-secondary" onClick={markAll} disabled={isLocked} style={{ borderRadius: 10, padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 700, background: "#fff", border: "1.5px solid var(--gray-200)", color: "var(--gray-700)", cursor: "pointer", transition: "all 0.15s ease" }}
+                        onMouseEnter={e => !isLocked && (e.currentTarget.style.borderColor = "var(--primary-300)")}
+                        onMouseLeave={e => !isLocked && (e.currentTarget.style.borderColor = "var(--gray-200)")}
+                    >
+                        Toggle all present/absent
+                    </button>
+                    {isLocked && <span style={{ color: "var(--gray-500)", fontSize: "0.85rem", fontWeight: 600 }}>Today's session is locked.</span>}
                 </div>
             </div>
 

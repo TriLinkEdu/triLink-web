@@ -220,24 +220,34 @@ export default function TeacherDashboard() {
                   description="Ask an admin to assign you to class offerings."
                 />
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
-                  {offerings.map(c => (
-                    <div key={c.id} style={{
-                      padding: "1rem 1.25rem", borderRadius: 12,
-                      background: "var(--gray-50)", border: "1.5px solid var(--gray-100)",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      cursor: "pointer", transition: "border-color 0.15s",
-                    }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--primary-200)")}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--gray-100)")}
-                    >
-                      <div>
-                        <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--gray-900)" }}>{offeringLabel(c)}</div>
-                        <div style={{ fontSize: "0.72rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>Active session</div>
+                <div style={{ maxHeight: "260px", overflowY: "auto", paddingRight: "6px" }} className="custom-scrollbar">
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
+                    {offerings.map(c => (
+                      <div key={c.id} style={{
+                        padding: "1rem 1.25rem", borderRadius: 12,
+                        background: "var(--gray-50)", border: "1.5px solid var(--gray-100)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        cursor: "pointer", transition: "all 0.15s ease",
+                      }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.borderColor = "var(--primary-200)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.03)";
+                          e.currentTarget.style.background = "#fff";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.borderColor = "var(--gray-100)";
+                          e.currentTarget.style.boxShadow = "none";
+                          e.currentTarget.style.background = "var(--gray-50)";
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--gray-900)" }}>{offeringLabel(c)}</div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--gray-400)", marginTop: "0.2rem" }}>Active session</div>
+                        </div>
+                        <ChevronRight size={16} color="var(--gray-300)" />
                       </div>
-                      <ChevronRight size={16} color="var(--gray-300)" />
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -149,7 +149,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="content-grid admin-dash-bottom-grid" style={{ marginTop: "1.5rem" }}>
-        <div className="card admin-dash-bottom-card">
+        <div className="card admin-dash-bottom-card admin-dash-exam-card">
           <div className="admin-dash-bottom-head">
             <h3 className="card-title admin-dash-bottom-title">Exams, release, and reach</h3>
             <div className="admin-dash-chip">

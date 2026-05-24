@@ -362,65 +362,86 @@ export default function TeacherAnnouncements() {
         ) : sorted.length === 0 ? (
           <p style={{ fontSize: "0.875rem", color: "var(--gray-400)" }}>No announcements yet.</p>
         ) : (
-          sorted.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => setSelected(a)}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                width: "100%",
-                padding: "0.85rem 0.95rem",
-                background: "var(--gray-50)",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "0.5rem",
-                gap: "0.75rem",
-                border: "1px solid var(--gray-100)",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{a.title}</div>
-                <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", margin: "0.2rem 0" }}>
-                  {a.audience === "class" && a.classOffering ? (
-                    <span style={{ background: "var(--indigo-50)", color: "var(--indigo-700)", padding: "2px 6px", borderRadius: 4, marginRight: 8, fontSize: "0.7rem", fontWeight: 600 }}>
-                      {a.classOffering.subject?.name} - {a.classOffering.class?.name}
+          sorted.map((a) => {
+            const isClassScope = a.audience === "class";
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setSelected(a)}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  padding: "1.1rem 1.25rem",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  marginBottom: "0.75rem",
+                  gap: "1rem",
+                  border: "1.5px solid var(--gray-100)",
+                  borderLeft: isClassScope ? "4px solid var(--primary-500)" : "4px solid var(--gray-300)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.2s ease"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)";
+                  e.currentTarget.style.borderColor = "rgba(37, 99, 235, 0.2)";
+                  e.currentTarget.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.04)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "#fff";
+                  e.currentTarget.style.borderColor = "var(--gray-100)";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.transform = "none";
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--gray-900)", marginBottom: "0.4rem" }}>{a.title}</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--gray-500)", margin: "0.2rem 0", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                    {a.audience === "class" && a.classOffering ? (
+                      <span style={{ background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)", color: "var(--primary-700)", padding: "3px 8px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 700, border: "1px solid rgba(37,99,235,0.15)" }}>
+                        {a.classOffering.subject?.name} - {a.classOffering.class?.name}
+                      </span>
+                    ) : a.audience === "class" && a.classOfferingId ? (
+                      <span style={{ background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)", color: "var(--primary-700)", padding: "3px 8px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 700, border: "1px solid rgba(37,99,235,0.15)" }}>
+                        Class Broadcast
+                      </span>
+                    ) : (
+                      <span style={{ background: "var(--gray-100)", color: "var(--gray-700)", padding: "3px 8px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 700, textTransform: "capitalize", border: "1px solid var(--gray-200)" }}>
+                        {a.audience}
+                      </span>
+                    )}
+                    {a.targetGrade && (
+                      <span style={{ background: "#f0fdf4", color: "#166534", padding: "3px 8px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 700, border: "1px solid rgba(22,163,74,0.15)" }}>
+                        Grade {a.targetGrade}
+                      </span>
+                    )}
+                    <span style={{ color: "var(--gray-400)", fontWeight: 600 }}>
+                      · {new Date(a.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
-                  ) : a.audience === "class" && a.classOfferingId ? (
-                    <span style={{ background: "var(--indigo-50)", color: "var(--indigo-700)", padding: "2px 6px", borderRadius: 4, marginRight: 8, fontSize: "0.7rem", fontWeight: 600 }}>
-                      Class Broadcast
-                    </span>
-                  ) : (
-                    <span style={{ background: "var(--gray-100)", color: "var(--gray-700)", padding: "2px 6px", borderRadius: 4, marginRight: 8, fontSize: "0.7rem", fontWeight: 600, textTransform: "capitalize" }}>
-                      {a.audience}
-                    </span>
-                  )}
-                  {a.targetGrade && (
-                    <span style={{ background: "var(--emerald-50)", color: "var(--emerald-700)", padding: "2px 6px", borderRadius: 4, marginRight: 8, fontSize: "0.7rem", fontWeight: 600 }}>
-                      Grade {a.targetGrade}
-                    </span>
-                  )}
-                  · {new Date(a.createdAt).toLocaleString()}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.82rem",
+                      color: "var(--gray-600)",
+                      lineHeight: 1.6,
+                      fontWeight: 500,
+                      marginTop: "0.5rem",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {a.body}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "var(--gray-600)",
-                    marginTop: "0.25rem",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {a.body}
-                </div>
-              </div>
-            </button>
-          ))
+              </button>
+            );
+          })
         )}
       </div>
 

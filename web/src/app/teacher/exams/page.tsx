@@ -108,7 +108,7 @@ function classOfferingLabel(o?: ClassOffering | null) {
 import { filterOfferingsBySubject, subjectNameMatchesProfile } from "@/lib/teacher-utils";
 import { useTermStore } from "@/store/termStore";
 import { PageHeader, PageHeaderSkeleton, CardSkeleton } from "@/components/ui";
-import { FileText } from "lucide-react";
+import { FileText, Check } from "lucide-react";
 
 type QuestionListRow = { subjectId: string; subject?: { name?: string } };
 
@@ -1912,30 +1912,100 @@ export default function TeacherExams() {
                                     </div>
                                 </div>
                                 <div className="input-group" style={{ gridColumn: "1 / -1" }}>
-                                    <label>Classes</label>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "0.5rem", padding: "1rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "12px" }}>
-                                        {offeringsForClassSelect.map(o => (
-                                            <label key={o.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.9rem" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedOfferingIds.includes(o.id)}
-                                                    onChange={e => {
-                                                        const id = o.id;
-                                                        if (e.target.checked) {
-                                                            setSelectedOfferingIds(p => [...p, id]);
-                                                            if (!subject) {
-                                                                const sName = (o as any).subjectName || (o as any).subject?.name;
-                                                                if (sName) setSubject(sName);
-                                                                else if (user?.subject) setSubject(user.subject);
-                                                            }
-                                                        } else {
-                                                            setSelectedOfferingIds(p => p.filter(x => x !== id));
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                        <label style={{ margin: 0, fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)" }}>Classes</label>
+                                        {offeringsForClassSelect.length > 0 && (
+                                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allIds = offeringsForClassSelect.map(o => o.id);
+                                                        setSelectedOfferingIds(allIds);
+                                                        if (!subject && offeringsForClassSelect.length > 0) {
+                                                            const first = offeringsForClassSelect[0];
+                                                            const sName = (first as any).subjectName || (first as any).subject?.name;
+                                                            if (sName) setSubject(sName);
+                                                            else if (user?.subject) setSubject(user.subject);
                                                         }
                                                     }}
-                                                />
-                                                {offeringLabel(o)}
-                                            </label>
-                                        ))}
+                                                    className="btn btn-secondary"
+                                                    style={{ padding: "0.25rem 0.65rem", fontSize: "0.75rem", borderRadius: "8px", fontWeight: 700, border: "1.5px solid rgba(37, 99, 235, 0.15)", background: "#fff", color: "var(--primary-700)" }}
+                                                >
+                                                    Select All
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedOfferingIds([])}
+                                                    className="btn btn-secondary"
+                                                    style={{ padding: "0.25rem 0.65rem", fontSize: "0.75rem", borderRadius: "8px", fontWeight: 700, border: "1.5px solid var(--gray-200)", background: "#fff", color: "var(--gray-500)" }}
+                                                >
+                                                    Clear All
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0.65rem", padding: "1.25rem", background: "var(--gray-50)", border: "1.5px solid var(--gray-200)", borderRadius: "12px" }}>
+                                        {offeringsForClassSelect.map(o => {
+                                            const isChecked = selectedOfferingIds.includes(o.id);
+                                            return (
+                                                <label key={o.id} style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "0.5rem",
+                                                    cursor: "pointer",
+                                                    fontSize: "0.85rem",
+                                                    padding: "0.6rem 0.9rem",
+                                                    borderRadius: "10px",
+                                                    border: isChecked ? "1.5px solid var(--primary-500)" : "1.5px solid var(--gray-200)",
+                                                    background: isChecked ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" : "#fff",
+                                                    color: isChecked ? "var(--primary-800)" : "var(--gray-700)",
+                                                    fontWeight: isChecked ? 700 : 600,
+                                                    transition: "all 0.2s ease",
+                                                    boxShadow: isChecked ? "0 4px 10px rgba(37, 99, 235, 0.08)" : "none",
+                                                    userSelect: "none"
+                                                }}
+                                                    onMouseEnter={e => {
+                                                        if (!isChecked) {
+                                                            e.currentTarget.style.borderColor = "var(--primary-300)";
+                                                            e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.03)";
+                                                        }
+                                                    }}
+                                                    onMouseLeave={e => {
+                                                        if (!isChecked) {
+                                                            e.currentTarget.style.borderColor = "var(--gray-200)";
+                                                            e.currentTarget.style.boxShadow = "none";
+                                                        }
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={e => {
+                                                            const id = o.id;
+                                                            if (e.target.checked) {
+                                                                setSelectedOfferingIds(p => [...p, id]);
+                                                                if (!subject) {
+                                                                    const sName = (o as any).subjectName || (o as any).subject?.name;
+                                                                    if (sName) setSubject(sName);
+                                                                    else if (user?.subject) setSubject(user.subject);
+                                                                }
+                                                            } else {
+                                                                setSelectedOfferingIds(p => p.filter(x => x !== id));
+                                                            }
+                                                        }}
+                                                        style={{ display: "none" }}
+                                                    />
+                                                    {isChecked ? (
+                                                        <Check size={14} style={{ color: "var(--primary-600)", flexShrink: 0 }} />
+                                                    ) : (
+                                                        <div style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px solid var(--gray-300)", flexShrink: 0 }} />
+                                                    )}
+                                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {offeringLabel(o)}
+                                                    </span>
+                                                </label>
+                                            );
+                                        })}
                                         {offerings.length === 0 && <span style={{ fontSize: "0.9rem", color: "var(--gray-500)" }}>No classes assigned for this year</span>}
                                         {offerings.length > 0 && offeringsForClassSelect.length === 0 && (
                                             <span style={{ fontSize: "0.9rem", color: "var(--gray-500)" }}>No class matches the selected subject ({selectedSubject || "—"})</span>
