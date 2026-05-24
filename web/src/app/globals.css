@@ -773,6 +773,10 @@ table tbody tr:last-child td {
   transition: all var(--transition-fast);
 }
 
+.header-icon-btn.mobile-search-toggle {
+  display: none !important;
+}
+
 .header-icon-btn:hover {
   background: var(--gray-100);
   color: var(--gray-700);
@@ -995,31 +999,43 @@ table tbody tr:last-child td {
 .header-user {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.375rem;
-  padding-right: 0.75rem;
+  flex-direction: row;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.75rem;
   border-radius: var(--radius-full);
-  transition: background var(--transition-fast);
+  border: 1px solid var(--gray-100);
+  background: var(--gray-50);
+  transition: all var(--transition-fast);
   cursor: pointer;
 }
 
 .header-user:hover {
-  background: var(--gray-50);
+  background: var(--primary-50);
+  border-color: var(--primary-200);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.1);
 }
 
 .header-user-info {
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.2;
 }
 
 .header-user-name {
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 700;
   color: var(--gray-800);
+  white-space: nowrap;
 }
 
 .header-user-role {
-  font-size: 0.7rem;
-  color: var(--gray-500);
+  font-size: 0.74rem;
+  color: var(--primary-500);
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
 }
 
 /* Page Layout */
@@ -5312,7 +5328,10 @@ table tbody tr:last-child td {
   }
 
   .top-header {
-    padding: 0 1rem 0 3.5rem;
+    padding: 0.5rem 1rem 0.5rem 3.5rem !important;
+    height: auto !important;
+    min-height: 64px !important;
+    flex-wrap: wrap !important;
   }
 
   .header-search {
@@ -5534,13 +5553,23 @@ table tbody tr:last-child td {
   .top-header {
     padding: 0.5rem 0.75rem !important;
     gap: 0.4rem !important;
+    height: auto !important;
+    min-height: 64px !important;
+    flex-wrap: wrap !important;
   }
   .header-search {
     display: none !important;
   }
+  .header-icon-btn.mobile-search-toggle {
+    display: inline-flex !important;
+  }
+  .header-user {
+    padding: 0.3rem !important;
+    gap: 0 !important;
+  }
   :root {
     --user-info-display: none;
-    --year-display: none;
+    --year-display: flex;
   }
 }
 @media (min-width: 641px) {
@@ -5640,10 +5669,6 @@ table tbody tr:last-child td {
   .main-content {
     margin-left: 0 !important;
   }
-  .chat-shell {
-    height: calc(100vh - 100px) !important;
-    min-height: calc(100vh - 100px) !important;
-  }
 }
 
 /* ── Tablet Responsive Chat Layout (768px < width <= 1024px) ── */
@@ -5676,47 +5701,79 @@ table tbody tr:last-child td {
     background: #f5f5f5;
   }
 
-  /* When no conversation is active, show ONLY the inbox list */
-  .chat-shell.no-active-conv {
-    grid-template-columns: 1fr !important;
+  /* Set chat-shell layout to vertical flex */
+  .chat-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 120px) !important;
+    min-height: calc(100vh - 120px) !important;
+    position: relative !important;
   }
+
+  /* When no conversation is active: show ONLY the inbox list (full height) */
   .chat-shell.no-active-conv .chat-inbox {
     display: flex !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: 100% !important;
+    flex: 1 !important;
   }
   .chat-shell.no-active-conv .chat-stage,
   .chat-shell.no-active-conv .chat-info {
     display: none !important;
   }
 
-  /* When a conversation is active, show ONLY the chat stage (and details if explicitly shown) */
-  .chat-shell.has-active-conv {
-    grid-template-columns: 1fr !important;
-  }
-  
-  /* If active conversation is present, hide inbox */
+  /* When an active conversation is selected: stack inbox list on top, stage on bottom */
   .chat-shell.has-active-conv .chat-inbox {
-    display: none !important;
-  }
-
-  /* If info panel is closed on mobile, show the chat stage */
-  .chat-shell.has-active-conv.hide-info-panel .chat-stage {
-    display: flex !important;
-    width: 100% !important;
-  }
-  .chat-shell.has-active-conv.hide-info-panel .chat-info {
-    display: none !important;
-  }
-
-  /* If info panel is open on mobile, show the details panel */
-  .chat-shell.has-active-conv.show-info-panel .chat-stage {
-    display: none !important;
-  }
-  .chat-shell.has-active-conv.show-info-panel .chat-info {
     display: flex !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: 220px !important;
+    flex: none !important;
+    border-bottom: 1px solid #e8eaed !important;
+    border-right: none !important;
+  }
+  
+  /* Compact chat inbox scrolling list in vertical stacked mode */
+  .chat-shell.has-active-conv .chat-inbox .chat-conv-scroll {
+    max-height: 140px !important;
+  }
+  .chat-shell.has-active-conv .chat-inbox .chat-recent-strip {
+    display: none !important;
+  }
+
+  /* Active conversation stage takes the remaining space below inbox */
+  .chat-shell.has-active-conv .chat-stage {
+    display: flex !important;
+    flex: 1 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    border-right: none !important;
+  }
+
+  /* Collapsible right info panel acts as sliding overlay drawer on mobile */
+  .chat-shell.has-active-conv .chat-info {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(290px, 85vw) !important;
+    z-index: 100 !important;
+    border-left: 1px solid #e8eaed !important;
+    box-shadow: -10px 0 30px rgba(37, 99, 235, 0.15) !important;
+    display: none !important;
+    height: 100% !important;
+    background: #fff !important;
+  }
+
+  /* Show details overlay panel when active */
+  .chat-shell.has-active-conv.show-info-panel .chat-info {
+    display: flex !important;
+  }
+
+  /* Keep stage rendering below details drawer overlay */
+  .chat-shell.has-active-conv.show-info-panel .chat-stage {
+    display: flex !important;
   }
 }
 
@@ -6414,3 +6471,53 @@ table tbody tr:last-child td {
     max-width: 95%;
   }
 }
+
+/* ── Bluish User Dropdown Menu ── */
+.header-user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+  border-radius: 14px;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.12), 0 1px 3px rgba(37, 99, 235, 0.05);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  min-width: 190px;
+  overflow: hidden;
+}
+
+.header-user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: var(--gray-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.header-user-dropdown-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary-700);
+}
+
+.header-user-dropdown-item.logout {
+  color: #dc2626;
+}
+
+.header-user-dropdown-item.logout:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.header-user-dropdown-divider {
+  border-top: 1px solid rgba(37, 99, 235, 0.1);
+}
+

@@ -220,7 +220,7 @@ export default function AdminProfile() {
         title="Your profile"
         subtitle="Contact details and account security."
         icon={<UserCircle2 size={22} />}
-        variant="light"
+        variant="dark"
         actions={(
           <button
             type="button"

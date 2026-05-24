@@ -106,7 +106,7 @@ export default function AdminAuditPage() {
         title="Activity log"
         subtitle="Important account and security events across your school."
         icon={<ShieldCheck size={22} />}
-        variant="light"
+        variant="dark"
       />
 
       <div className="card" style={{ marginBottom: "1.5rem", background: "var(--primary-50)", border: "1.5px solid var(--primary-200)", borderRadius: 20, display: "flex", gap: "1.25rem", alignItems: "flex-start", padding: "2rem" }}>

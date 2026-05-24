@@ -456,9 +456,9 @@ export default function AdminSchoolSetup() {
               placeholder="e.g. 2025/2026"
               value={newYear.label}
               onChange={(e) => setNewYear((n) => ({ ...n, label: e.target.value }))}
-              style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--gray-300)", backgroundColor: "var(--gray-50)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
-              onFocus={(e) => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.backgroundColor = "#fff"; }}
-              onBlur={(e) => { e.target.style.borderColor = "var(--gray-300)"; e.target.style.backgroundColor = "var(--gray-50)"; }}
+              style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--primary-200)", backgroundColor: "rgba(37, 99, 235, 0.02)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
+              onFocus={(e) => { e.target.style.borderColor = "var(--primary-500)"; e.target.style.backgroundColor = "#fff"; }}
+              onBlur={(e) => { e.target.style.borderColor = "var(--primary-200)"; e.target.style.backgroundColor = "rgba(37, 99, 235, 0.02)"; }}
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -468,9 +468,9 @@ export default function AdminSchoolSetup() {
                 type="date"
                 value={newYear.startDate}
                 onChange={(e) => setNewYear((n) => ({ ...n, startDate: e.target.value }))}
-                style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--gray-300)", backgroundColor: "var(--gray-50)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
-                onFocus={(e) => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.backgroundColor = "#fff"; }}
-                onBlur={(e) => { e.target.style.borderColor = "var(--gray-300)"; e.target.style.backgroundColor = "var(--gray-50)"; }}
+                style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--primary-200)", backgroundColor: "rgba(37, 99, 235, 0.02)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--primary-500)"; e.target.style.backgroundColor = "#fff"; }}
+                onBlur={(e) => { e.target.style.borderColor = "var(--primary-200)"; e.target.style.backgroundColor = "rgba(37, 99, 235, 0.02)"; }}
               />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -479,9 +479,9 @@ export default function AdminSchoolSetup() {
                 type="date"
                 value={newYear.endDate}
                 onChange={(e) => setNewYear((n) => ({ ...n, endDate: e.target.value }))}
-                style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--gray-300)", backgroundColor: "var(--gray-50)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
-                onFocus={(e) => { e.target.style.borderColor = "var(--primary-400)"; e.target.style.backgroundColor = "#fff"; }}
-                onBlur={(e) => { e.target.style.borderColor = "var(--gray-300)"; e.target.style.backgroundColor = "var(--gray-50)"; }}
+                style={{ padding: "0.75rem 1rem", borderRadius: "10px", border: "1.5px solid var(--primary-200)", backgroundColor: "rgba(37, 99, 235, 0.02)", fontSize: "0.95rem", width: "100%", outline: "none", transition: "all 0.2s", color: "var(--gray-800)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)" }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--primary-500)"; e.target.style.backgroundColor = "#fff"; }}
+                onBlur={(e) => { e.target.style.borderColor = "var(--primary-200)"; e.target.style.backgroundColor = "rgba(37, 99, 235, 0.02)"; }}
               />
             </div>
           </div>

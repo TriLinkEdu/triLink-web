@@ -23,6 +23,7 @@ export default function Select({
   optionPadding = "0.5rem 0.8rem"
 }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,7 +77,17 @@ export default function Select({
   };
 
   // Split style into wrapper and button styles
-  const wrapperStyle: React.CSSProperties = { position: "relative" };
+  const wrapperStyle: React.CSSProperties = {
+    position: "relative",
+    border: disabled ? "1.5px solid var(--gray-200)" : hovered ? "1.5px solid var(--primary-500)" : "1.5px solid rgba(37, 99, 235, 0.25)",
+    background: disabled ? "var(--gray-50)" : hovered ? "#fff" : "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)",
+    borderRadius: "12px",
+    padding: "0.55rem 0.85rem",
+    boxShadow: hovered ? "0 4px 12px rgba(37, 99, 235, 0.08)" : "0 1px 2px rgba(37, 99, 235, 0.03)",
+    transition: "all 0.2s ease",
+    display: "inline-flex",
+    alignItems: "center"
+  };
   const buttonStyle: React.CSSProperties = {
     width: "100%",
     height: "100%",
@@ -110,7 +121,13 @@ export default function Select({
   }
 
   return (
-    <div ref={ref} className={className} style={wrapperStyle}>
+    <div
+      ref={ref}
+      className={className}
+      style={wrapperStyle}
+      onMouseEnter={() => !disabled && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <button
         type="button"
         id={id}
@@ -131,10 +148,12 @@ export default function Select({
           position: "absolute",
           ...(direction === "up" ? { bottom: "calc(100% + 6px)" } : { top: "calc(100% + 6px)" }),
           left: 0, right: 0,
-          background: "#fff", border: "1px solid var(--gray-200)",
-          borderRadius: "16px", boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+          background: "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)",
+          border: "1px solid rgba(37, 99, 235, 0.15)",
+          borderRadius: "14px",
+          boxShadow: "0 10px 30px rgba(37, 99, 235, 0.12), 0 1px 3px rgba(37, 99, 235, 0.05)",
           maxHeight: "320px", overflowY: "auto", zIndex: 99999,
-          padding: "4px", display: "flex", flexDirection: "column", gap: "2px",
+          padding: "6px", display: "flex", flexDirection: "column", gap: "4px",
           minWidth: dropdownMinWidth
         }}>
           {options.length === 0 ? (
@@ -150,19 +169,25 @@ export default function Select({
                   onClick={() => handleSelect(opt.value)}
                   style={{
                     width: "100%", padding: optionPadding, textAlign: optionTextAlign,
-                    background: isSelected ? "var(--primary-50)" : "transparent",
+                    background: isSelected ? "rgba(37, 99, 235, 0.08)" : "transparent",
                     color: isSelected ? "var(--primary-700)" : "var(--gray-800)",
-                    border: "none", borderRadius: "10px",
+                    border: "none", borderRadius: "8px",
                     cursor: opt.disabled ? "not-allowed" : "pointer",
-                    fontSize: "0.9rem", fontWeight: isSelected ? 600 : 500,
+                    fontSize: "0.9rem", fontWeight: isSelected ? 700 : 600,
                     display: "block", outline: "none",
                     transition: "all 0.15s ease"
                   }}
                   onMouseOver={(e) => {
-                    if (!opt.disabled && !isSelected) (e.currentTarget as HTMLButtonElement).style.background = "var(--gray-50)";
+                    if (!opt.disabled && !isSelected) {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(37, 99, 235, 0.05)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--primary-600)";
+                    }
                   }}
                   onMouseOut={(e) => {
-                    if (!opt.disabled && !isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    if (!opt.disabled && !isSelected) {
+                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--gray-800)";
+                    }
                   }}
                 >
                   {opt.label}

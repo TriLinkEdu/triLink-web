@@ -15,6 +15,7 @@ import { authFetch, getAccessToken } from "@/lib/auth";
 import { getSectionsForGrade, listGrades, listUsers, type Grade, type PublicUser, type Section } from "@/lib/admin-api";
 import Select from "@/components/Select";
 import { useToastStore } from "@/store/toastStore";
+import { PageHeader } from "@/components/ui";
 
 type RegistrationType = "student" | "teacher" | "parent";
 
@@ -352,20 +353,19 @@ export default function AdminRegistration() {
 
     return (
         <div className="page-wrapper">
-            <div className="registration-hero">
-                <div>
-                    <p className="registration-kicker">
-                        <Sparkles size={14} />
-                        Onboarding Studio
-                    </p>
-                    <h1 className="registration-title">Registration</h1>
-                    <p className="registration-subtitle">Register students, teachers, and parents with role-specific data</p>
-                </div>
-                <div className="admin-dash-pill">
-                    <ShieldCheck size={15} />
-                    Admin-only flow
-                </div>
-            </div>
+            <PageHeader
+                kicker="Onboarding Studio"
+                title="Registration"
+                subtitle="Register students, teachers, and parents with role-specific data"
+                icon={<Sparkles size={22} />}
+                variant="dark"
+                actions={
+                    <div className="admin-dash-pill">
+                        <ShieldCheck size={15} />
+                        Admin-only flow
+                    </div>
+                }
+            />
 
             {/* Role tabs */}
             <div className="registration-role-tabs">

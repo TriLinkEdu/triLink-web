@@ -19,6 +19,8 @@ import {
   type Section,
 } from "@/lib/admin-api";
 import { useToastStore } from "@/store/toastStore";
+import { PageHeader } from "@/components/ui";
+import TablePagination from "@/components/TablePagination";
 
 export default function AdminSectionAssignmentPage() {
   const { showToast } = useToastStore();
@@ -34,6 +36,8 @@ export default function AdminSectionAssignmentPage() {
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [search, setSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [loading, setLoading] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -150,6 +154,15 @@ export default function AdminSectionAssignmentPage() {
     void refreshStudentsAndOfferings();
   }, [refreshStudentsAndOfferings, selectedGradeId, selectedSectionId, selectedYearId]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [search, selectedGradeId, selectedSectionId]);
+
+  const paginatedStudents = useMemo(() => {
+    const start = page * rowsPerPage;
+    return students.slice(start, start + rowsPerPage);
+  }, [students, page, rowsPerPage]);
+
   const selectedOfferingCount = offerings.length;
   const selectedSubjectNames = offerings.map((o) => o.subjectName ?? o.displayName ?? o.name ?? o.subjectId);
   const allSelected = students.length > 0 && selectedStudentIds.length === students.length;
@@ -216,47 +229,44 @@ export default function AdminSectionAssignmentPage() {
 
   return (
     <div className="page-wrapper">
-      <div className="registration-hero" style={{ marginBottom: "1.25rem" }}>
-        <div>
-          <p className="registration-kicker">
-            <Sparkles size={14} />
-            Section assignment
-          </p>
-          <h1 className="registration-title">Assign students to a section</h1>
-          <p className="registration-subtitle">
-            Update the selected students&apos; grade/section and enroll them in every class offering for that section.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <Link className="btn btn-secondary" href="/admin/registration">
-            Registration
-          </Link>
-          <Link className="btn btn-primary" href="/admin/school-setup">
-            School setup
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Section assignment"
+        title="Assign students to a section"
+        subtitle="Update the selected students' grade/section and enroll them in every class offering for that section."
+        icon={<Sparkles size={22} />}
+        variant="dark"
+        actions={
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className="btn btn-secondary" href="/admin/registration">
+              Registration
+            </Link>
+            <Link className="btn btn-primary" href="/admin/school-setup">
+              School setup
+            </Link>
+          </div>
+        }
+      />
 
       <div className="school-setup-summary-grid" style={{ marginBottom: "1rem" }}>
         <div className="card school-setup-summary-card">
-          <div className="teachers-summary-icon blue"><GraduationCap size={20} /></div>
-          <div className="teachers-summary-label">Academic year</div>
-          <div className="teachers-summary-value">{selectedYear?.label ?? "Select a year"}</div>
+          <div className="school-setup-summary-icon blue"><GraduationCap size={20} /></div>
+          <div className="school-setup-summary-label">Academic year</div>
+          <div className="school-setup-summary-value">{selectedYear?.label ?? "Select a year"}</div>
         </div>
         <div className="card school-setup-summary-card">
-          <div className="teachers-summary-icon teal"><Layers3 size={20} /></div>
-          <div className="teachers-summary-label">Target section</div>
-          <div className="teachers-summary-value">{selectedGrade?.name ?? "—"} {selectedSection?.name ?? ""}</div>
+          <div className="school-setup-summary-icon teal"><Layers3 size={20} /></div>
+          <div className="school-setup-summary-label">Target section</div>
+          <div className="school-setup-summary-value">{selectedGrade?.name ?? "—"} {selectedSection?.name ?? ""}</div>
         </div>
         <div className="card school-setup-summary-card">
-          <div className="teachers-summary-icon orange"><Users size={20} /></div>
-          <div className="teachers-summary-label">Selected students</div>
-          <div className="teachers-summary-value">{selectedStudentIds.length}</div>
+          <div className="school-setup-summary-icon orange"><Users size={20} /></div>
+          <div className="school-setup-summary-label">Selected students</div>
+          <div className="school-setup-summary-value">{selectedStudentIds.length}</div>
         </div>
         <div className="card school-setup-summary-card">
-          <div className="teachers-summary-icon purple"><CheckCircle2 size={20} /></div>
-          <div className="teachers-summary-label">Section subjects</div>
-          <div className="teachers-summary-value">{selectedOfferingCount}</div>
+          <div className="school-setup-summary-icon purple"><CheckCircle2 size={20} /></div>
+          <div className="school-setup-summary-label">Section subjects</div>
+          <div className="school-setup-summary-value">{selectedOfferingCount}</div>
         </div>
       </div>
 
@@ -273,14 +283,15 @@ export default function AdminSectionAssignmentPage() {
       )}
 
       <div className="card" style={{ marginBottom: "1rem" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "1.25rem" }}>
           <div className="input-group">
-            <label htmlFor="year">Academic year</label>
+            <label htmlFor="year" style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)", marginBottom: "0.45rem", display: "block" }}>Academic year</label>
             <Select
               id="year"
               value={selectedYearId}
               onChange={(e) => setSelectedYearId(e.target.value)}
               disabled={yearOptions.length === 0}
+              style={{ width: "100%" }}
             >
               {yearOptions.length === 0 ? (
                 <option value="">No academic years available</option>
@@ -295,12 +306,13 @@ export default function AdminSectionAssignmentPage() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="grade">Grade</label>
+            <label htmlFor="grade" style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)", marginBottom: "0.45rem", display: "block" }}>Grade</label>
             <Select
               id="grade"
               value={selectedGradeId}
               onChange={(e) => setSelectedGradeId(e.target.value)}
               disabled={gradeOptions.length === 0}
+              style={{ width: "100%" }}
             >
               {gradeOptions.length === 0 ? (
                 <option value="">No grades available</option>
@@ -315,12 +327,13 @@ export default function AdminSectionAssignmentPage() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="section">Section</label>
+            <label htmlFor="section" style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)", marginBottom: "0.45rem", display: "block" }}>Section</label>
             <Select
               id="section"
               value={selectedSectionId}
               onChange={(e) => setSelectedSectionId(e.target.value)}
               disabled={sectionOptions.length === 0}
+              style={{ width: "100%" }}
             >
               {sectionOptions.length === 0 ? (
                 <option value="">No sections available</option>
@@ -337,18 +350,55 @@ export default function AdminSectionAssignmentPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, marginTop: 16, alignItems: "end" }}>
           <div className="input-group">
-            <label htmlFor="search">Search students</label>
-            <div className="input-field">
+            <label htmlFor="search" style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gray-700)", marginBottom: "0.45rem", display: "block" }}>Search students</label>
+            <div className="input-field" style={{
+              border: "1.5px solid rgba(37, 99, 235, 0.25)",
+              background: "linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%)",
+              borderRadius: "12px",
+              padding: "0.55rem 0.85rem",
+              boxShadow: "0 1px 2px rgba(37, 99, 235, 0.03)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              transition: "all 0.2s ease"
+            }}>
+              <Search size={16} style={{ color: "var(--primary-500)", flexShrink: 0 }} />
               <input
                 id="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or email"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  width: "100%",
+                  fontSize: "0.88rem",
+                  color: "var(--gray-800)",
+                  fontWeight: 600
+                }}
               />
             </div>
           </div>
 
-          <button className="btn btn-secondary" type="button" onClick={() => void refreshStudentsAndOfferings()}>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => void refreshStudentsAndOfferings()}
+            style={{
+              borderRadius: "12px",
+              height: "44px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              border: "1.5px solid rgba(37, 99, 235, 0.2)",
+              background: "#fff",
+              color: "var(--primary-700)",
+              fontWeight: 700,
+              padding: "0.55rem 1.25rem",
+              transition: "all 0.2s ease"
+            }}
+          >
             <RefreshCcw size={16} /> Refresh
           </button>
         </div>
@@ -384,7 +434,7 @@ export default function AdminSectionAssignmentPage() {
                 </tr>
               </thead>
               <tbody>
-                {students.map((student) => (
+                {paginatedStudents.map((student) => (
                   <tr key={student.id}>
                     <td>
                       <input
@@ -403,6 +453,16 @@ export default function AdminSectionAssignmentPage() {
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              total={students.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              onPageChange={setPage}
+              onRowsPerPageChange={(next) => {
+                setRowsPerPage(next);
+                setPage(0);
+              }}
+            />
           </div>
         )}
       </div>

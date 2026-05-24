@@ -28,6 +28,7 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     const pathname = usePathname();
     const [searchText, setSearchText] = useState("");
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [suggestions, setSuggestions] = useState<{ href: string; label: string }[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
@@ -58,9 +59,6 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     const role = pathname.split("/").filter(Boolean)[0] ?? "";
 
     useEffect(() => {
-        if (role !== "admin") {
-            return;
-        }
         let cancelled = false;
         (async () => {
             try {
@@ -81,12 +79,9 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
         return () => {
             cancelled = true;
         };
-    }, [role, pathname]);
+    }, [pathname]);
 
     useEffect(() => {
-        if (role === "admin") {
-            return;
-        }
         if (!["teacher", "student", "parent"].includes(role)) {
             return;
         }
@@ -238,56 +233,40 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
                 style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
                 <div className="header-user">
-                    <div className="header-user-info" style={{ display: "var(--user-info-display, flex)" }}>
+                    <div className="header-user-info">
                         <div className="header-user-name">{userName}</div>
                         <div className="header-user-role">{userRole}</div>
                     </div>
-<AuthenticatedAvatar
-    fileId={userProfileImageFileId}
-    initials={userInitials}
-    size={36}
-    alt={userName}
-/>
+                    <AuthenticatedAvatar
+                        fileId={userProfileImageFileId}
+                        initials={userInitials}
+                        size={34}
+                        alt={userName}
+                    />
                 </div>
             </button>
             {showUserMenu && (
                 <>
                     {/* Dropdown */}
-                    <div style={{
-                        position: "absolute", right: 0, top: "calc(100% + 8px)",
-                        background: "#fff", borderRadius: 12, zIndex: 1000,
-                        boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
-                        border: "1px solid var(--gray-100)",
-                        minWidth: 180, overflow: "hidden",
-                    }}>
+                    <div className="header-user-dropdown">
                         {userProfileHref && (
                             <Link
                                 href={userProfileHref}
                                 onClick={() => setShowUserMenu(false)}
-                                style={{
-                                    display: "flex", alignItems: "center", gap: 10,
-                                    padding: "12px 16px", textDecoration: "none",
-                                    color: "var(--gray-700)", fontSize: 14, fontWeight: 500,
-                                }}
+                                className="header-user-dropdown-item"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--primary-500)" }}>
                                     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                                 </svg>
                                 View Profile
                             </Link>
                         )}
-                        <div style={{ borderTop: "1px solid var(--gray-100)" }} />
+                        <div className="header-user-dropdown-divider" />
                         <button
                             onClick={handleLogout}
-                            style={{
-                                display: "flex", alignItems: "center", gap: 10,
-                                width: "100%", padding: "12px 16px",
-                                background: "none", border: "none", cursor: "pointer",
-                                color: "#dc2626", fontSize: 14, fontWeight: 500,
-                                textAlign: "left",
-                            }}
+                            className="header-user-dropdown-item logout"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
                             </svg>
                             Logout
@@ -299,7 +278,68 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
     );
 
     return (
-        <header className="top-header" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        <header className="top-header" style={{ flexWrap: "wrap", gap: "0.5rem", position: "relative" }}>
+            {mobileSearchOpen && (
+                <div style={{
+                    position: "absolute",
+                    left: 0, right: 0, top: 0, bottom: 0,
+                    background: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "0 1rem",
+                    gap: "0.5rem",
+                    zIndex: 1010,
+                    borderRadius: "inherit"
+                }}>
+                    <button
+                        type="button"
+                        onClick={() => setMobileSearchOpen(false)}
+                        style={{ background: "none", border: "none", color: "var(--gray-600)", cursor: "pointer", padding: "4px" }}
+                        aria-label="Close search"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" />
+                        </svg>
+                    </button>
+                    <input
+                        type="text"
+                        placeholder="Search anything..."
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                submitSearch();
+                                setMobileSearchOpen(false);
+                            }
+                        }}
+                        style={{
+                            flex: 1,
+                            border: "none",
+                            background: "transparent",
+                            fontSize: "1rem",
+                            outline: "none",
+                            fontWeight: 600,
+                            color: "var(--gray-800)"
+                        }}
+                        autoFocus
+                    />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            submitSearch();
+                            setMobileSearchOpen(false);
+                        }}
+                        style={{ background: "none", border: "none", color: "var(--primary-600)", cursor: "pointer", padding: "4px" }}
+                        aria-label="Submit search"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
             <div className="header-search" style={{ flex: "1 1 160px", minWidth: 0 }}>
                 <button type="button" className="header-search-btn" onClick={submitSearch} aria-label="Search">
                     <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -323,45 +363,56 @@ export default function Header({ userName, userRole, userInitials, userProfileHr
 
             <div className="header-actions" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "nowrap" }}>
                 {/* Academic Year Control */}
-                {role === "admin" ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginRight: "1rem" }}>
-                        <span style={{ fontSize: "0.8rem", color: "var(--gray-500)", fontWeight: 600 }}>Year:</span>
-                        <Select
-                            value={
-                                adminYearLabels.includes(adminSelectedYear)
-                                    ? adminSelectedYear
-                                    : adminYearLabels[0] ?? ""
+                <div style={{ display: "var(--year-display, flex)", alignItems: "center", gap: "0.4rem", marginRight: "0.5rem" }}>
+                    <Select
+                        value={
+                            adminYearLabels.includes(adminSelectedYear)
+                                ? adminSelectedYear
+                                : adminYearLabels[0] ?? portalYearLabel ?? currentSystemYear
+                        }
+                        onChange={(e) => {
+                            if (role === "admin") {
+                                setAdminSelectedYear(e.target.value);
                             }
-                            onChange={(e) => setAdminSelectedYear(e.target.value)}
-                            disabled={adminYearLabels.length === 0}
-                            style={{
-                                padding: "0.3rem 0.8rem",
-                                borderRadius: "20px",
-                                border: "1px solid var(--gray-200)",
-                                fontSize: "0.85rem",
-                                background: "var(--gray-50)",
-                                cursor: adminYearLabels.length === 0 ? "not-allowed" : "pointer",
-                                outline: "none",
-                                fontWeight: 600,
-                                color: "var(--gray-800)",
-                            }}
-                        >
-                            {adminYearLabels.length === 0 ? (
-                                <option value="">No academic years</option>
-                            ) : (
-                                adminYearLabels.map((y) => (
-                                    <option key={y} value={y}>
-                                        {y}
-                                    </option>
-                                ))
-                            )}
-                        </Select>
-                    </div>
-                ) : (
-                    <div style={{ marginRight: "0.5rem", padding: "0.25rem 0.6rem", background: "var(--primary-50)", color: "var(--primary-600)", borderRadius: "20px", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap", display: "var(--year-display, flex)" }}>
-                        {portalYearLabel ?? currentSystemYear}
-                    </div>
-                )}
+                        }}
+                        disabled={role !== "admin" || adminYearLabels.length === 0}
+                        style={{
+                            padding: "0.25rem 0.65rem",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(37, 99, 235, 0.22)",
+                            fontSize: "0.82rem",
+                            background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                            cursor: (role !== "admin" || adminYearLabels.length === 0) ? "default" : "pointer",
+                            outline: "none",
+                            fontWeight: 700,
+                            color: "var(--primary-700)",
+                            minWidth: "85px"
+                        }}
+                    >
+                        {adminYearLabels.length === 0 ? (
+                            <option value={portalYearLabel ?? currentSystemYear}>{portalYearLabel ?? currentSystemYear}</option>
+                        ) : (
+                            adminYearLabels.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))
+                        )}
+                    </Select>
+                </div>
+
+                {/* Mobile Search Toggle Button */}
+                <button
+                    type="button"
+                    className="header-icon-btn mobile-search-toggle"
+                    title="Search"
+                    aria-label="Toggle mobile search"
+                    onClick={() => setMobileSearchOpen(true)}
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                    </svg>
+                </button>
 
                 {notificationsHref ? (
                     <Link href={notificationsHref} className="header-icon-btn" title="Notifications" aria-label="Open notifications">
