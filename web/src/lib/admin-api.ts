@@ -72,6 +72,16 @@ export type Grade = { id: string; name: string; orderIndex?: number };
 export type Section = { id: string; name: string };
 export type Subject = { id: string; name: string; code?: string | null };
 
+export type Topic = {
+  id: string;
+  subjectId: string;
+  name: string;
+  description?: string | null;
+  orderIndex?: number;
+  aiTopicId?: string | null;
+  createdAt?: string;
+};
+
 export type ClassOffering = {
   id: string;
   academicYearId: string;
@@ -912,6 +922,7 @@ export type Question = {
   optionsJson?: string | null;
   answerKey?: string | null;
   subjectId: string;
+  topicId?: string | null;
   createdById: string;
   createdAt: string;
 };
@@ -1011,6 +1022,7 @@ export async function createQuestion(body: {
   optionsJson?: string;
   answerKey?: string;
   subjectId: string;
+  topicId?: string;
 }): Promise<Question> {
   return adminJson<Question>("/api/questions", { method: "POST", body: JSON.stringify(body) });
 }
@@ -1223,6 +1235,7 @@ export async function bulkUpsertGrades(body: {
   maxScore: number;
   note?: string;
   termId?: string;
+  topicId?: string;
   entries: { studentId: string; score: number | null }[];
 }): Promise<{ saved: number; entries: GradeEntry[] }> {
   return adminJson("/api/grade-entries/bulk", { method: "POST", body: JSON.stringify(body) });
@@ -1777,6 +1790,38 @@ export async function upsertReportCardRemark(body: {
   return adminJson(`/api/report-cards/remarks`, {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+// --- Topics ---
+
+export async function listTopics(subjectId: string): Promise<Topic[]> {
+  return adminJson<Topic[]>(`/api/topics?subjectId=${encodeURIComponent(subjectId)}`);
+}
+
+export async function createTopic(body: {
+  subjectId: string;
+  name: string;
+  description?: string;
+  orderIndex?: number;
+  aiTopicId?: string;
+}): Promise<Topic> {
+  return adminJson<Topic>(`/api/topics`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateTopic(id: string, body: Partial<Topic>): Promise<Topic> {
+  return adminJson<Topic>(`/api/topics/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteTopic(id: string): Promise<void> {
+  await adminFetch(`/api/topics/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 }
 

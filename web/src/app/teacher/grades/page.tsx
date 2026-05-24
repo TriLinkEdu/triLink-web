@@ -19,6 +19,9 @@ import {
     listGradesForClass,
     listMyClassOfferings,
     listUsers,
+    listTopics,
+    createTopic,
+    deleteTopic,
     releaseGrades,
     updateGradeEntry,
     type ClassOffering,
@@ -27,9 +30,10 @@ import {
     type GradeEntryType,
     type GradeGroup,
     type PublicUser,
+    type Topic,
 } from "@/lib/admin-api";
 
-type AssessmentTab = "gradebook" | "create" | "exam-imports";
+type AssessmentTab = "gradebook" | "create" | "exam-imports" | "topics";
 
 type StudentRosterRow = {
     studentId: string;
@@ -85,6 +89,8 @@ export default function TeacherGrades() {
     const [groups, setGroups] = useState<GradeGroup[]>([]);
     const [roster, setRoster] = useState<StudentRosterRow[]>([]);
     const [examImports, setExamImports] = useState<ExamImportRow[]>([]);
+    const [topics, setTopics] = useState<Topic[]>([]);
+    const [topicsLoading, setTopicsLoading] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [examLoading, setExamLoading] = useState(false);
@@ -99,8 +105,13 @@ export default function TeacherGrades() {
     const [newType, setNewType] = useState<GradeEntryType>("assignment");
     const [newMaxScore, setNewMaxScore] = useState("100");
     const [newNote, setNewNote] = useState("");
+    const [newTopicId, setNewTopicId] = useState("");
     const [newScores, setNewScores] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
+
+    const [topicName, setTopicName] = useState("");
+    const [topicDesc, setTopicNameDesc] = useState("");
+    const [topicSaving, setTopicSaving] = useState(false);
 
     const [editingEntry, setEditingEntry] = useState<string | null>(null);
     const [editScore, setEditScore] = useState("");
@@ -188,11 +199,60 @@ export default function TeacherGrades() {
         }
     }, [activeYearId, selectedTermId, showToast]);
 
+    const loadTopics = useCallback(async (subjectId: string) => {
+        if (!subjectId) return;
+        setTopicsLoading(true);
+        try {
+            const list = await listTopics(subjectId);
+            setTopics(list);
+        } catch (error) {
+            console.error("Failed to load topics", error);
+        } finally {
+            setTopicsLoading(false);
+        }
+    }, []);
+
     useEffect(() => { void loadOfferings(); }, [loadOfferings]);
     useEffect(() => { if (selectedClass) void loadClassData(selectedClass); }, [selectedClass, loadClassData, selectedTermId]);
     useEffect(() => { if (selectedClass && activeTab === "exam-imports") void loadExamImports(selectedClass); }, [activeTab, loadExamImports, selectedClass]);
+    useEffect(() => {
+        if (selectedOffering?.subjectId) {
+            void loadTopics(selectedOffering.subjectId);
+        }
+    }, [selectedOffering, loadTopics]);
 
     const enrolledStudents = assessedStudents;
+
+    const handleCreateTopic = async () => {
+        if (!selectedOffering?.subjectId || !topicName.trim()) return;
+        setTopicSaving(true);
+        try {
+            await createTopic({
+                subjectId: selectedOffering.subjectId,
+                name: topicName.trim(),
+                description: topicDesc.trim() || undefined,
+            });
+            showToast("Topic created");
+            setTopicName("");
+            setTopicNameDesc("");
+            void loadTopics(selectedOffering.subjectId);
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : "Failed to create topic", false);
+        } finally {
+            setTopicSaving(false);
+        }
+    };
+
+    const handleDeleteTopic = async (id: string) => {
+        if (!confirm("Delete this topic? This won't delete past grades but will remove the association.")) return;
+        try {
+            await deleteTopic(id);
+            showToast("Topic deleted");
+            if (selectedOffering?.subjectId) void loadTopics(selectedOffering.subjectId);
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : "Delete failed", false);
+        }
+    };
 
     const handleBulkSubmit = async () => {
         if (!selectedClass) { showToast("Select a class", false); return; }
@@ -210,6 +270,7 @@ export default function TeacherGrades() {
                 maxScore: max,
                 note: newNote.trim() || undefined,
                 termId: selectedTermId ?? undefined,
+                topicId: newTopicId || undefined,
                 entries: enrolledStudents.map((student) => ({
                     studentId: student.studentId,
                     score: newScores[student.studentId] !== undefined && newScores[student.studentId] !== "" ? parseFloat(newScores[student.studentId]) : null,
@@ -369,9 +430,9 @@ export default function TeacherGrades() {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                {(["gradebook", "create", "exam-imports"] as AssessmentTab[]).map((tab) => (
+                {(["gradebook", "create", "exam-imports", "topics"] as AssessmentTab[]).map((tab) => (
                     <button key={tab} className={`btn ${activeTab === tab ? "btn-primary" : "btn-secondary"}`} onClick={() => setActiveTab(tab)} style={{ borderRadius: 999, padding: "0.7rem 1rem" }}>
-                        {tab === "gradebook" ? "Gradebook" : tab === "create" ? "Create Assessment" : "Exam Imports"}
+                        {tab === "gradebook" ? "Gradebook" : tab === "create" ? "Create Assessment" : tab === "exam-imports" ? "Exam Imports" : "Manage Topics"}
                     </button>
                 ))}
             </div>
@@ -389,7 +450,17 @@ export default function TeacherGrades() {
                             <div className="input-group"><label>Max Score</label><div className="input-field"><input type="number" min={1} value={newMaxScore} onChange={(event) => setNewMaxScore(event.target.value)} /></div></div>
                         </div>
 
-                        <div className="input-group"><label>Note</label><div className="input-field"><input value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Optional note for the class" /></div></div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            <div className="input-group"><label>Note</label><div className="input-field"><input value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Optional note for the class" /></div></div>
+                            <div className="input-group">
+                                <label>AI Topic Association</label>
+                                <Select value={newTopicId} onChange={(e) => setNewTopicId(e.target.value)} style={{ padding: "0.65rem 0.9rem", border: "1.5px solid var(--gray-200)", borderRadius: 4, fontSize: "0.9rem", background: "#fff", width: "100%" }}>
+                                    <option value="">No Topic (General)</option>
+                                    {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </Select>
+                                <p style={{ fontSize: "0.72rem", color: "var(--gray-400)", marginTop: 4 }}>Linking a topic enables AI mastery tracking for this assessment.</p>
+                            </div>
+                        </div>
 
                         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", fontWeight: 600, color: "var(--gray-700)" }}>
                             <input type="checkbox" checked={saveAsDraft} onChange={(event) => setSaveAsDraft(event.target.checked)} />
@@ -465,6 +536,41 @@ export default function TeacherGrades() {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {activeTab === "topics" && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-header">
+                        <h3 className="card-title">Subject Topics</h3>
+                        <p style={{ margin: "0.2rem 0 0", color: "var(--gray-500)", fontSize: "0.84rem" }}>Manage topics for this subject. Assessments linked to these topics feed the AI mastery engine.</p>
+                    </div>
+                    <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: 20 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "flex-end", background: "var(--gray-50)", padding: 16, borderRadius: 12, border: "1px solid var(--gray-200)" }}>
+                            <div className="input-group" style={{ margin: 0 }}><label>New Topic Name</label><div className="input-field"><input value={topicName} onChange={(e) => setTopicName(e.target.value)} placeholder="e.g. Photosynthesis" /></div></div>
+                            <div className="input-group" style={{ margin: 0 }}><label>Description (Optional)</label><div className="input-field"><input value={topicDesc} onChange={(e) => setTopicNameDesc(e.target.value)} placeholder="Brief overview..." /></div></div>
+                            <button className="btn btn-primary" onClick={handleCreateTopic} disabled={topicSaving || !topicName.trim()} style={{ height: 42 }}>{topicSaving ? "Creating..." : "Add Topic"}</button>
+                        </div>
+
+                        {topicsLoading ? (
+                            <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Spinner /></div>
+                        ) : topics.length === 0 ? (
+                            <div style={{ padding: "2rem", textAlign: "center", color: "var(--gray-400)", border: "1.5px dashed var(--gray-200)", borderRadius: 12 }}>No topics defined for this subject yet.</div>
+                        ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                                {topics.map(t => (
+                                    <div key={t.id} style={{ padding: 16, borderRadius: 12, border: "1px solid var(--gray-200)", background: "#fff", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                                        <div>
+                                            <div style={{ fontWeight: 700, color: "var(--gray-900)" }}>{t.name}</div>
+                                            <div style={{ fontSize: "0.8rem", color: "var(--gray-500)", marginTop: 4 }}>{t.description || "No description"}</div>
+                                            {t.aiTopicId && <div style={{ fontSize: "0.65rem", color: "var(--primary-500)", fontWeight: 700, textTransform: "uppercase", marginTop: 8 }}>AI Linked</div>}
+                                        </div>
+                                        <button className="btn btn-sm" style={{ background: "var(--danger-light)", color: "var(--danger)", border: "none" }} onClick={() => handleDeleteTopic(t.id)}>Delete</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

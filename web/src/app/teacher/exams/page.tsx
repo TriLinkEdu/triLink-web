@@ -22,10 +22,12 @@ import {
     releaseAttempt as apiReleaseAttempt,
     getViolations,
     getExamStudentRoster,
+    listTopics,
     type ClassOffering,
     type Exam as ApiExam,
     type ExamRosterStudent,
     type Violation,
+    type Topic,
 } from "@/lib/admin-api";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -533,10 +535,11 @@ interface Question {
     correct: string;
     points: number;
     type: "mcq" | "truefalse" | "fillin" | "long_answer";
+    topicId?: string;
     bankId?: string;
     edited?: boolean;
 }
-const blankQ = (): Question => ({ id: Date.now() + Math.random(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1, type: "mcq", edited: false });
+const blankQ = (): Question => ({ id: Date.now() + Math.random(), text: "", options: { A: "", B: "", C: "", D: "" }, correct: "", points: 1, type: "mcq", edited: false, topicId: "" });
 
 interface BankQ { id: string; q: string; subj: string; type: string; used: number; options?: Record<"A"|"B"|"C"|"D", string>; correct?: string; rawType?: string; }
 
@@ -798,6 +801,22 @@ export default function TeacherExams() {
     const [bank, setBank] = useState<BankQ[]>([]);
     const [bankSearch, setBankSearch] = useState("");
 
+    const [topics, setTopics] = useState<Topic[]>([]);
+    const [topicsLoading, setTopicsLoading] = useState(false);
+
+    useEffect(() => {
+        const subjectId = offeringsForClassSelect[0]?.subjectId;
+        if (!subjectId) {
+            setTopics([]);
+            return;
+        }
+        setTopicsLoading(true);
+        listTopics(subjectId)
+            .then(setTopics)
+            .catch((e) => console.error("Failed to load topics", e))
+            .finally(() => setTopicsLoading(false));
+    }, [offeringsForClassSelect]);
+
     // Results - built from real API data
     const [results, setResults] = useState<ResultRow[]>([]);
     const [monitoringExam, setMonitoringExam] = useState<ApiExam | null>(null);
@@ -913,6 +932,7 @@ export default function TeacherExams() {
                     optionsJson: optionsArr ? JSON.stringify(optionsArr) : undefined,
                     answerKey: ans || (qq.type === "fillin" ? qq.correct : undefined),
                     subjectId,
+                    topicId: qq.topicId || undefined,
                 });
                 
                 setQuestions(prev => prev.map((oldQ, index) => index === idx ? { ...oldQ, bankId: created.id, edited: false } : oldQ));
@@ -1262,6 +1282,7 @@ export default function TeacherExams() {
                     optionsJson: optionsArr ? JSON.stringify(optionsArr) : undefined,
                     answerKey: ans || (qq.type === "fillin" ? qq.correct : undefined),
                     subjectId,
+                    topicId: qq.topicId || undefined,
                 });
                 newRows.push({
                     id: created.id,
@@ -1989,6 +2010,16 @@ export default function TeacherExams() {
                                         <option value="fillin">Blank Space (Fill in)</option>
                                         <option value="long_answer">Description (Long Answer)</option>
                                     </Select>
+                                </div>
+                                <div className="input-group">
+                                    <label>AI Topic Association</label>
+                                    <Select value={q.topicId || ""} onChange={e => updateQ({ topicId: e.target.value })} style={{ padding: "0.6rem", borderRadius: 8, border: "1.5px solid var(--gray-200)", width: "100%", fontSize: "0.85rem", background: "#fff" }}>
+                                        <option value="">No Topic (General)</option>
+                                        {topics.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </Select>
+                                    <p style={{ fontSize: "0.65rem", color: "var(--gray-400)", marginTop: 4 }}>Linking a topic enables AI mastery tracking for this question.</p>
                                 </div>
                             </div>
 
