@@ -1884,11 +1884,10 @@ export default function TeacherExams() {
             {/* ── CSV Column Picker Modal removed ── */}
 
             <PageHeader
-                kicker="Assessment"
+                kicker="Assessment Hub"
                 title="Exams & Assessments"
                 subtitle="Create quizzes, manage your exam bank, and review student grades."
                 icon={<FileText size={22} />}
-                variant="light"
                 actions={<TermSelector academicYearId={activeYearId || null} readOnly={false} />}
             />
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, CalendarDays, Megaphone, RefreshCcw, Sparkles, Users, Trash2, Send } from "lucide-react";
+import { BellRing, CalendarDays, Megaphone, RefreshCcw, Users, Trash2, Send } from "lucide-react";
 import { 
   type AcademicYear, 
   type Announcement, 

@@ -91,17 +91,6 @@ export default function StudentDashboard() {
             let examsRes: BackendExam[] = [];
             if (activeYear) {
                 examsRes = await listStudentExams(activeYear.id);
-                const me = getStoredUser();
-                if (me?.id) {
-                    try {
-                        const mine = await listEnrollments({ academicYearId: activeYear.id, studentId: me.id });
-                        const allowedOfferingIds = new Set(mine.map((e) => e.classOfferingId));
-                        examsRes = examsRes.filter((ex) => !ex.classOfferingId || allowedOfferingIds.has(ex.classOfferingId));
-                    } catch (enrollErr) {
-                        // Keep exam list fallback if enrollments endpoint is unavailable for this role.
-                        console.warn("Enrollment filter unavailable for student exam dashboard:", enrollErr);
-                    }
-                }
             }
 
             setApiAnnouncements(ann);

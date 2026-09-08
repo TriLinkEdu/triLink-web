@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getAttemptResult, type AttemptResult } from "@/lib/admin-api";
 import { toLetterGrade } from "@/lib/grading";
+import { PageHeader } from "@/components/ui";
+import { ClipboardList, Layout } from "lucide-react";
 
 type QuestionType = "mcq" | "truefalse" | "fillin";
 
@@ -98,20 +100,19 @@ export default function ExamResult() {
                     : "var(--danger)";
 
     return (
-        <div>
-            {/* Header */}
-            <div style={{ marginBottom: "1.5rem" }}>
-                <button onClick={() => router.push("/student/dashboard")} style={{
-                    display: "flex", alignItems: "center", gap: "0.4rem",
-                    background: "none", border: "none", color: "var(--primary-500)",
-                    fontWeight: 600, fontSize: "0.85rem", cursor: "pointer", marginBottom: "1rem",
-                }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg> Back to Dashboard</button>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--gray-900)", display: "flex", alignItems: "center", gap: "0.5rem" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg> Exam Result</h1>
-                <p style={{ fontSize: "0.875rem", color: "var(--gray-500)", marginTop: "0.25rem" }}>{data.examTitle}</p>
-                <p style={{ fontSize: "0.8rem", color: "var(--gray-400)", marginTop: "0.4rem", lineHeight: 1.5 }}>
-                    Submitted: {submittedAtLabel} · Released: {releasedAtLabel}
-                </p>
-            </div>
+        <div className="page-wrapper">
+            <PageHeader
+                kicker="Exam Result"
+                title={data.examTitle}
+                subtitle={`Submitted: ${submittedAtLabel} · Released: ${releasedAtLabel}`}
+                icon={<ClipboardList size={22} />}
+                actions={(
+                    <button onClick={() => router.push("/student/dashboard")} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.4rem", borderRadius: 12 }}>
+                        <Layout size={15} />
+                        Dashboard
+                    </button>
+                )}
+            />
 
             {/* Score Overview */}
             <div className="result-overview">

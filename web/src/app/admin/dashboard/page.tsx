@@ -130,7 +130,7 @@ export default function AdminDashboard() {
         icon={<ShieldCheck size={22} />}
         actions={(
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "0.4rem 0.85rem", borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)", fontSize: "0.78rem", fontWeight: 700, color: "#fff" }}>
-            <Sparkles size={13} /> Admin view
+            Admin view
           </span>
         )}
       />

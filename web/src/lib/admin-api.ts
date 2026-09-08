@@ -1238,7 +1238,7 @@ export async function bulkUpsertGrades(body: {
   topicId?: string;
   entries: { studentId: string; score: number | null }[];
 }): Promise<{ saved: number; entries: GradeEntry[] }> {
-  return adminJson("/api/grade-entries/bulk", { method: "POST", body: JSON.stringify(body) });
+  return adminJson("/api/grades/bulk", { method: "POST", body: JSON.stringify(body) });
 }
 /** Alias for bulkUpsertGrades */
 export const bulkGradeEntries = bulkUpsertGrades;
@@ -1252,42 +1252,42 @@ export async function createGradeEntry(body: {
   maxScore?: number;
   note?: string | null;
 }): Promise<GradeEntry> {
-  return adminJson<GradeEntry>("/api/grade-entries", { method: "POST", body: JSON.stringify(body) });
+  return adminJson<GradeEntry>("/api/grades", { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function updateGradeEntry(
   id: string,
   body: { title?: string; type?: GradeEntryType; score?: number | null; maxScore?: number; note?: string | null },
 ): Promise<GradeEntry> {
-  return adminJson<GradeEntry>(`/api/grade-entries/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  return adminJson<GradeEntry>(`/api/grades/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
 export async function releaseGrades(classOfferingId: string, title: string): Promise<{ released: number }> {
-  return adminJson("/api/grade-entries/release", {
+  return adminJson("/api/grades/release", {
     method: "POST",
     body: JSON.stringify({ classOfferingId, title }),
   });
 }
 
 export async function deleteGradeEntry(id: string): Promise<{ ok: boolean }> {
-  return adminJson(`/api/grade-entries/${encodeURIComponent(id)}`, { method: "DELETE" });
+  return adminJson(`/api/grades/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function deleteGradeGroup(classOfferingId: string, title: string): Promise<{ ok: boolean; deleted: number }> {
-  return adminJson("/api/grade-entries/group", {
+  return adminJson(`/api/grades/class/${encodeURIComponent(classOfferingId)}/groups`, {
     method: "DELETE",
-    body: JSON.stringify({ classOfferingId, title }),
+    body: JSON.stringify({ title }),
   });
 }
 
 export async function listGradesForClass(classOfferingId: string, termId?: string): Promise<ClassGradesResponse> {
   const q = termId ? `?termId=${encodeURIComponent(termId)}` : "";
-  return adminJson<ClassGradesResponse>(`/api/grade-entries/class/${encodeURIComponent(classOfferingId)}${q}`, { method: "GET" });
+  return adminJson<ClassGradesResponse>(`/api/grades/class/${encodeURIComponent(classOfferingId)}${q}`, { method: "GET" });
 }
 
 export async function listGradesForStudent(studentId: string, termId?: string): Promise<GradeEntry[]> {
   const q = termId ? `?termId=${encodeURIComponent(termId)}` : "";
-  return adminJson<GradeEntry[]>(`/api/grade-entries/student/${encodeURIComponent(studentId)}${q}`, { method: "GET" });
+  return adminJson<GradeEntry[]>(`/api/grades/student/${encodeURIComponent(studentId)}${q}`, { method: "GET" });
 }
 
 export type StudentTermGradesEntry = {
@@ -1321,7 +1321,7 @@ export async function getStudentGradesByTerm(
   termId: string,
 ): Promise<StudentTermGradesResponse> {
   return adminJson<StudentTermGradesResponse>(
-    `/api/grade-entries/student/${encodeURIComponent(studentId)}/term/${encodeURIComponent(termId)}`,
+    `/api/grades/student/${encodeURIComponent(studentId)}/term/${encodeURIComponent(termId)}`,
     { method: "GET" },
   );
 }
